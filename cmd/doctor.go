@@ -43,8 +43,8 @@ var doctorCmd = &cobra.Command{
 			}
 		}
 
-		check(installer.Available(), "Homebrew available",
-			"install it from https://brew.sh")
+		check(installer.BrewAvailable(), "Homebrew available",
+			"install it from https://brew.sh (opsforge can also install via GitHub releases)")
 		check(strings.Contains(os.Getenv("PATH"), "/opt/homebrew/bin") ||
 			strings.Contains(os.Getenv("PATH"), "/usr/local/bin"),
 			"Homebrew bin directory in PATH",

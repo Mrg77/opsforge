@@ -44,7 +44,9 @@ var (
 	styleCategory = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
 	styleDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 	styleCursor   = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green: installed
+	styleUpdate   = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // orange: update available
+	styleSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("51"))  // cyan: queued for install
 	styleErr      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 	styleHelp     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
@@ -215,7 +217,11 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			break
 		}
 		i := sel[m.cursor]
-		if !m.rows[i].status.Installed {
+		// Toggle when the tool is not installed, or installed but
+		// outdated (selecting it queues an upgrade). Up-to-date tools
+		// are locked — nothing to do.
+		st := m.rows[i].status
+		if !st.Installed || st.Outdated {
 			m.selected[i] = !m.selected[i]
 		}
 	case "i", "enter":
@@ -248,7 +254,7 @@ func (m Model) installNext() tea.Cmd {
 	i := m.queue[m.qpos]
 	t := m.rows[i].tool
 	return func() tea.Msg {
-		return installDoneMsg{rowIndex: i, result: installer.Install(t.Brew, t.Cask)}
+		return installDoneMsg{rowIndex: i, result: installer.Install(t)}
 	}
 }
 
@@ -288,28 +294,61 @@ func (m Model) viewSelect() string {
 			cursor = styleCursor.Render("❯ ")
 			cursorLine = len(lines)
 		}
-		box := "[ ]"
+		// Four visually distinct states:
+		//   [✓] green   already installed, up to date
+		//   [⬆] orange  installed, newer version available
+		//   [▸] cyan    selected for install this run
+		//   [ ] grey    not installed
+		var box string
+		note := styleDim.Render(r.tool.Description)
 		switch {
+		case r.status.Outdated:
+			box = styleUpdate.Render("[⬆]")
+			label := "update available"
+			if r.status.Version != "" {
+				label = r.status.Version + "  ↑ update available"
+			}
+			note = styleUpdate.Render(label)
 		case r.status.Installed:
 			box = styleOK.Render("[✓]")
+			if r.status.Version != "" {
+				note = styleDim.Render(r.status.Version)
+			}
 		case m.selected[i]:
-			box = styleCursor.Render("[x]")
+			box = styleSelected.Render("[▸]")
+		default:
+			box = "[ ]"
 		}
 		line := fmt.Sprintf("%s%s %-16s", cursor, box, r.tool.Name)
-		note := r.tool.Description
-		if r.status.Installed && r.status.Version != "" {
-			note = r.status.Version
-		}
-		lines = append(lines, line+styleDim.Render(note))
+		lines = append(lines, line+note)
 	}
 
 	for _, l := range window(lines, cursorLine, m.listHeight()) {
 		b.WriteString(l + "\n")
 	}
 
-	b.WriteString("\n" + styleHelp.Render(fmt.Sprintf(
-		"%d selected · space toggle · / filter · i install · q quit", len(m.selected))))
+	legend := styleOK.Render("[✓] installed") + styleHelp.Render(" · ") +
+		styleUpdate.Render("[⬆] update") + styleHelp.Render(" · ") +
+		styleSelected.Render("[▸] selected")
+	b.WriteString("\n" + legend + "\n")
+
+	status := fmt.Sprintf("%d selected", len(m.selected))
+	if n := m.outdatedCount(); n > 0 {
+		status += styleUpdate.Render(fmt.Sprintf(" · %d update(s) available", n))
+	}
+	b.WriteString(styleHelp.Render(status + " · space toggle · / filter · i install · q quit"))
 	return b.String()
+}
+
+// outdatedCount counts installed tools with an available update.
+func (m Model) outdatedCount() int {
+	n := 0
+	for _, r := range m.rows {
+		if !r.isHeader() && r.status.Outdated {
+			n++
+		}
+	}
+	return n
 }
 
 // listHeight is the number of list lines that fit between the header

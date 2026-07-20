@@ -27,9 +27,9 @@ var upgradeCmd = &cobra.Command{
 			if !statuses[t.Name].Installed {
 				continue
 			}
-			switch res := installer.Upgrade(t.Brew, t.Cask); {
+			switch res := installer.Upgrade(t); {
 			case res.Err == nil:
-				fmt.Printf("✓ %-16s up to date\n", t.Name)
+				fmt.Printf("✓ %-16s up to date (%s)\n", t.Name, res.Backend)
 				upgraded++
 			case res.NotBrewManaged:
 				fmt.Printf("· %-16s skipped (not installed via Homebrew)\n", t.Name)

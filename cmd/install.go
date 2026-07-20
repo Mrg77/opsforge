@@ -23,9 +23,6 @@ var installCmd = &cobra.Command{
   opsforge install kubectl helm k9s     # non-interactive, by name
   opsforge install --profile aws-k8s    # a whole stack at once`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !installer.Available() {
-			return fmt.Errorf("homebrew is required (https://brew.sh) — binary downloads are on the roadmap")
-		}
 		cat, err := catalog.Load()
 		if err != nil {
 			return err
@@ -40,7 +37,7 @@ var installCmd = &cobra.Command{
 // runPicker opens the interactive TUI; it is also the default behavior
 // when the binary is launched without any subcommand.
 func runPicker(cat *catalog.Catalog) error {
-	model := tui.New(cat.Categories, detect.All(cat.Tools()))
+	model := tui.New(cat.Categories, detect.AllWithOutdated(cat.Tools()))
 	final, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return err
@@ -88,8 +85,8 @@ func installNonInteractive(cat *catalog.Catalog, names []string) error {
 			fmt.Printf("✓ %-16s already installed\n", t.Name)
 			continue
 		}
-		fmt.Printf("… installing %s\n", t.Name)
-		if res := installer.Install(t.Brew, t.Cask); res.Err != nil {
+		fmt.Printf("… installing %s (via %s)\n", t.Name, installer.BackendFor(t))
+		if res := installer.Install(t); res.Err != nil {
 			fmt.Printf("✗ %-16s %v\n%s\n", t.Name, res.Err, res.OutputTail)
 			continue
 		}

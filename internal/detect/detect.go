@@ -27,6 +27,9 @@ type Status struct {
 	// Version is a best-effort one-line version string, empty when the
 	// tool is absent or its version output could not be parsed.
 	Version string
+	// Outdated is true when a newer version is available (currently
+	// determined via `brew outdated` for brew-managed tools).
+	Outdated bool
 }
 
 const versionTimeout = 3 * time.Second

@@ -42,6 +42,11 @@ categories:
         description: Terminal UI to manage Kubernetes clusters
         version_args: ["version", "--short"]
         completion_zsh: ["k9s", "completion", "zsh"]
+        github:
+          repo: derailed/k9s
+          asset: "k9s_{os}_{arch}.tar.gz"
+          os_map: {darwin: Darwin, linux: Linux}
+          arch_map: {amd64: amd64, arm64: arm64}
       - name: kubectx
         bin: kubectx
         brew: kubectx
@@ -51,6 +56,9 @@ categories:
         brew: kind
         description: Run local Kubernetes clusters in Docker
         completion_zsh: ["kind", "completion", "zsh"]
+        github:
+          repo: kubernetes-sigs/kind
+          asset: "kind-{os}-{arch}"
       - name: minikube
         bin: minikube
         brew: minikube

@@ -8,7 +8,6 @@ import (
 	"golang.org/x/term"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
-	"github.com/Mrg77/opsforge/internal/installer"
 )
 
 // version is injected at build time by GoReleaser via ldflags.
@@ -32,9 +31,6 @@ Run with no arguments to open the interactive picker.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !term.IsTerminal(int(os.Stdout.Fd())) {
 			return cmd.Help()
-		}
-		if !installer.Available() {
-			return fmt.Errorf("homebrew is required (https://brew.sh) — binary downloads are on the roadmap")
 		}
 		cat, err := catalog.Load()
 		if err != nil {

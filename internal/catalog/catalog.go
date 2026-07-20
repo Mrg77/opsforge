@@ -29,6 +29,31 @@ type Tool struct {
 	// CompletionZsh is the argv that prints a zsh completion script,
 	// empty when the tool has no native zsh completion.
 	CompletionZsh []string `yaml:"completion_zsh"`
+	// GitHub, when set, lets opsforge install the tool by downloading a
+	// release binary directly — used as a fallback on hosts without
+	// Homebrew (bare Linux servers, CI images).
+	GitHub *GitHubRelease `yaml:"github"`
+}
+
+// GitHubRelease describes how to fetch a tool's binary from its GitHub
+// releases. The asset name is templated per OS/arch so one entry covers
+// every platform.
+type GitHubRelease struct {
+	// Repo is "owner/name".
+	Repo string `yaml:"repo"`
+	// AssetTemplate is the release asset filename with {os}, {arch} and
+	// {version} placeholders, e.g. "k9s_{os}_{arch}.tar.gz".
+	AssetTemplate string `yaml:"asset"`
+	// BinInArchive is the path to the executable inside the archive when
+	// it is not at the root; empty means the archive holds the bare
+	// binary (or the asset is the binary itself).
+	BinInArchive string `yaml:"bin_in_archive"`
+	// ArchMap overrides the default GOARCH→asset-arch mapping (e.g. some
+	// projects ship "x86_64" instead of "amd64").
+	ArchMap map[string]string `yaml:"arch_map"`
+	// OSMap overrides the default GOOS→asset-os mapping (e.g. "Darwin"
+	// instead of "darwin").
+	OSMap map[string]string `yaml:"os_map"`
 }
 
 // Category groups tools by domain for display.
@@ -71,6 +96,10 @@ func Load() (*Catalog, error) {
 				return nil, fmt.Errorf("tool %q has no brew formula", t.Name)
 			case seen[t.Name]:
 				return nil, fmt.Errorf("duplicate tool name %q", t.Name)
+			case t.GitHub != nil && t.GitHub.Repo == "":
+				return nil, fmt.Errorf("tool %q has a github block without a repo", t.Name)
+			case t.GitHub != nil && t.GitHub.AssetTemplate == "":
+				return nil, fmt.Errorf("tool %q has a github block without an asset template", t.Name)
 			}
 			seen[t.Name] = true
 		}

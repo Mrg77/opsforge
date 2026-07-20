@@ -1,5 +1,11 @@
 # opsforge 🔥
 
+[![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
+[![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
+[![Go Reference](https://pkg.go.dev/badge/github.com/Mrg77/opsforge.svg)](https://pkg.go.dev/github.com/Mrg77/opsforge)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 **Forge your DevOps workstation in minutes.** Pick the CLIs you need from an
 interactive terminal UI, install them in one go, and get a zsh layer with
 auto-generated completions, curated aliases and a kube-aware prompt.
@@ -39,7 +45,15 @@ go install github.com/Mrg77/opsforge@latest   # from source
 ## Usage
 
 Launching the bare binary opens the interactive picker — browse by
-category, check what you want, hit install.
+category, check what you want, hit install. It detects what you already
+have and what can be upgraded, at a glance:
+
+| Marker | Meaning |
+|---|---|
+| `[✓]` green | installed and up to date (shows the detected version) |
+| `[⬆]` orange | installed, **newer version available** (select it to upgrade) |
+| `[▸]` cyan | selected for install this run |
+| `[ ]` grey | not installed |
 
 | Command | What it does |
 |---|---|
@@ -47,7 +61,7 @@ category, check what you want, hit install.
 | `opsforge install kubectl helm` | Non-interactive install by name (scriptable) |
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
-| `opsforge upgrade` | Upgrade every installed catalog tool via Homebrew |
+| `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
 | `opsforge list` | Catalog with live installed/version status |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, broken tools |
 | `opsforge shell install` | Adds the opsforge layer to your `~/.zshrc` (idempotent) |
@@ -73,17 +87,27 @@ Networking & HTTP, Databases, Security & Secrets, Utilities. The catalog is
 a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a
 tool is a five-line PR.
 
-Everything installs through Homebrew, so you always get the latest
-released version, and `opsforge upgrade` refreshes the whole toolbox in
-one command.
+### Install backends
+
+opsforge picks a backend per tool at runtime:
+
+- **Homebrew** (default when `brew` is on PATH) — always the latest
+  released version; `opsforge upgrade` refreshes the whole toolbox.
+- **GitHub releases** — for hosts without Homebrew (bare Linux servers,
+  CI images), tools carrying a `github:` block in the catalog are
+  installed by downloading and extracting their release binary into
+  `~/.local/bin`. No package manager required.
+
+Force a backend with `OPSFORGE_BACKEND=brew|github`; change the binary
+target dir with `OPSFORGE_BIN_DIR`.
 
 ## Architecture
 
 ```
 cmd/                Cobra commands (install, list, doctor, shell)
 internal/catalog/   Embedded YAML catalog + validation
-internal/detect/    Concurrent PATH + version detection (timeout-guarded)
-internal/installer/ Homebrew backend
+internal/detect/    Concurrent PATH + version detection + brew-outdated
+internal/installer/ Backend router: Homebrew + GitHub-releases download
 internal/tui/       Bubble Tea picker & install progress UI
 internal/shellcfg/  zsh layer generation, completion cache, ~/.zshrc management
 ```
