@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,6 +47,25 @@ func TestUpdateAllSelectsOnlyOutdated(t *testing.T) {
 		if m.selected[i] != wantSel {
 			t.Errorf("tool %q selected=%v, want %v", r.tool.Name, m.selected[i], wantSel)
 		}
+	}
+}
+
+func TestSelectedOutdatedShowsSelectionMarker(t *testing.T) {
+	m := testModel(nil)
+	// Select an outdated tool, then render; the cyan [▸] marker must
+	// appear so the selection is visible despite the orange update state.
+	for i, r := range m.rows {
+		if r.tool.Name == "outdated-1" {
+			m.selected[i] = true
+		}
+	}
+	view := m.viewSelect()
+	if !strings.Contains(view, "[▸]") {
+		t.Error("selected outdated tool does not render the [▸] selection marker")
+	}
+	// The update-available note should still be present.
+	if !strings.Contains(view, "update available") {
+		t.Error("outdated note disappeared when the tool was selected")
 	}
 }
 

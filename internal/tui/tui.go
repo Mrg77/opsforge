@@ -376,29 +376,37 @@ func (m Model) viewSelect() string {
 			cursor = styleCursor.Render("❯ ")
 			cursorLine = len(lines)
 		}
-		// Four visually distinct states, same glyph width so the columns
-		// never shift:
-		//   [✓] green   already installed, up to date
+		// The box always reflects selection first, so toggling any row —
+		// including an outdated one — gives immediate feedback. The note
+		// still carries the underlying state (version, update available).
+		// Marker widths match so columns never shift:
+		//   [▸] cyan    checked this run (install or upgrade)
+		//   [✓] green   installed, up to date
 		//   [✓] orange  installed, newer version available
-		//   [▸] cyan    selected for install this run
 		//   [ ] grey    not installed
 		var box string
-		note := styleDim.Render(r.tool.Description)
+		var note string
 		switch {
 		case r.status.Outdated:
-			box = styleUpdate.Render("[✓]")
-			label := "update available"
+			note = styleUpdate.Render("update available")
 			if r.status.Version != "" {
-				label = r.status.Version + "  · update available"
+				note = styleUpdate.Render(r.status.Version + "  · update available")
 			}
-			note = styleUpdate.Render(label)
 		case r.status.Installed:
-			box = styleOK.Render("[✓]")
+			note = styleDim.Render(r.tool.Description)
 			if r.status.Version != "" {
 				note = styleDim.Render(r.status.Version)
 			}
+		default:
+			note = styleDim.Render(r.tool.Description)
+		}
+		switch {
 		case m.selected[i]:
 			box = styleSelected.Render("[▸]")
+		case r.status.Outdated:
+			box = styleUpdate.Render("[✓]")
+		case r.status.Installed:
+			box = styleOK.Render("[✓]")
 		default:
 			box = "[ ]"
 		}
