@@ -1,0 +1,353 @@
+// Package tui implements the interactive tool picker: a categorized
+// checkbox list with fuzzy-ish filtering, followed by a sequential
+// installation screen with per-tool status.
+package tui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/Mrg77/opsforge/internal/catalog"
+	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/installer"
+)
+
+type phase int
+
+const (
+	phaseSelect phase = iota
+	phaseInstall
+	phaseDone
+)
+
+// row is one display line: either a category header or a tool entry.
+type row struct {
+	header string
+	tool   catalog.Tool
+	status detect.Status
+}
+
+func (r row) isHeader() bool { return r.header != "" }
+
+type installDoneMsg struct {
+	rowIndex int
+	result   installer.Result
+}
+
+var (
+	styleTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
+	styleCategory = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	styleDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	styleCursor   = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
+	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	styleErr      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	styleHelp     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+)
+
+// Model is the Bubble Tea model for the picker.
+type Model struct {
+	rows     []row
+	cursor   int // position within selectable()
+	selected map[int]bool
+	results  map[int]installer.Result
+
+	filter    textinput.Model
+	filtering bool
+
+	spin  spinner.Model
+	phase phase
+	queue []int
+	qpos  int
+}
+
+// New builds the picker from the catalog and current detection state.
+func New(categories []catalog.Category, statuses map[string]detect.Status) Model {
+	var rows []row
+	for _, c := range categories {
+		rows = append(rows, row{header: c.Name})
+		for _, t := range c.Tools {
+			rows = append(rows, row{tool: t, status: statuses[t.Name]})
+		}
+	}
+	ti := textinput.New()
+	ti.Placeholder = "type to filter…"
+	ti.Prompt = "/ "
+	ti.CharLimit = 40
+	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
+	return Model{
+		rows:     rows,
+		selected: map[int]bool{},
+		results:  map[int]installer.Result{},
+		filter:   ti,
+		spin:     sp,
+	}
+}
+
+// Init implements tea.Model.
+func (m Model) Init() tea.Cmd { return nil }
+
+// visible returns row indexes to display given the current filter;
+// headers appear only when at least one of their tools matches.
+func (m Model) visible() []int {
+	query := strings.ToLower(strings.TrimSpace(m.filter.Value()))
+	var out []int
+	pendingHeader := -1
+	for i, r := range m.rows {
+		if r.isHeader() {
+			pendingHeader = i
+			continue
+		}
+		if query != "" &&
+			!strings.Contains(strings.ToLower(r.tool.Name), query) &&
+			!strings.Contains(strings.ToLower(r.tool.Description), query) {
+			continue
+		}
+		if pendingHeader != -1 {
+			out = append(out, pendingHeader)
+			pendingHeader = -1
+		}
+		out = append(out, i)
+	}
+	return out
+}
+
+// selectable returns the subset of visible rows the cursor can land on.
+func (m Model) selectable() []int {
+	var out []int
+	for _, i := range m.visible() {
+		if !m.rows[i].isHeader() {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func (m *Model) clampCursor() {
+	if n := len(m.selectable()); m.cursor >= n {
+		m.cursor = max(0, n-1)
+	}
+}
+
+// Update implements tea.Model.
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spin, cmd = m.spin.Update(msg)
+		return m, cmd
+	case installDoneMsg:
+		m.results[msg.rowIndex] = msg.result
+		m.qpos++
+		if m.qpos < len(m.queue) {
+			return m, m.installNext()
+		}
+		m.phase = phaseDone
+		return m, nil
+	case tea.KeyMsg:
+		return m.updateKeys(msg)
+	}
+	return m, nil
+}
+
+func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.phase == phaseInstall {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+	if m.phase == phaseDone {
+		switch msg.String() {
+		case "q", "enter", "ctrl+c", "esc":
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
+	if m.filtering {
+		switch msg.String() {
+		case "esc":
+			m.filtering = false
+			m.filter.SetValue("")
+			m.filter.Blur()
+		case "enter":
+			m.filtering = false
+			m.filter.Blur()
+		default:
+			var cmd tea.Cmd
+			m.filter, cmd = m.filter.Update(msg)
+			m.clampCursor()
+			return m, cmd
+		}
+		m.clampCursor()
+		return m, nil
+	}
+
+	switch msg.String() {
+	case "q", "ctrl+c":
+		return m, tea.Quit
+	case "up", "k":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "down", "j":
+		if m.cursor < len(m.selectable())-1 {
+			m.cursor++
+		}
+	case "/":
+		m.filtering = true
+		return m, m.filter.Focus()
+	case " ":
+		sel := m.selectable()
+		if len(sel) == 0 {
+			break
+		}
+		i := sel[m.cursor]
+		if !m.rows[i].status.Installed {
+			m.selected[i] = !m.selected[i]
+		}
+	case "i", "enter":
+		if len(m.selected) == 0 {
+			break
+		}
+		m.queue = nil
+		for _, i := range m.orderedSelection() {
+			m.queue = append(m.queue, i)
+		}
+		m.qpos = 0
+		m.phase = phaseInstall
+		return m, tea.Batch(m.spin.Tick, m.installNext())
+	}
+	return m, nil
+}
+
+// orderedSelection returns selected row indexes in catalog order.
+func (m Model) orderedSelection() []int {
+	var out []int
+	for i := range m.rows {
+		if m.selected[i] {
+			out = append(out, i)
+		}
+	}
+	return out
+}
+
+func (m Model) installNext() tea.Cmd {
+	i := m.queue[m.qpos]
+	t := m.rows[i].tool
+	return func() tea.Msg {
+		return installDoneMsg{rowIndex: i, result: installer.Install(t.Brew, t.Cask)}
+	}
+}
+
+// View implements tea.Model.
+func (m Model) View() string {
+	switch m.phase {
+	case phaseInstall, phaseDone:
+		return m.viewInstall()
+	default:
+		return m.viewSelect()
+	}
+}
+
+func (m Model) viewSelect() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render("opsforge — pick your tools") + "\n")
+	if m.filtering || m.filter.Value() != "" {
+		b.WriteString(m.filter.View() + "\n")
+	}
+	b.WriteString("\n")
+
+	sel := m.selectable()
+	cursorRow := -1
+	if len(sel) > 0 {
+		cursorRow = sel[m.cursor]
+	}
+	for _, i := range m.visible() {
+		r := m.rows[i]
+		if r.isHeader() {
+			b.WriteString(styleCategory.Render("▸ "+r.header) + "\n")
+			continue
+		}
+		cursor := "  "
+		if i == cursorRow {
+			cursor = styleCursor.Render("❯ ")
+		}
+		box := "[ ]"
+		switch {
+		case r.status.Installed:
+			box = styleOK.Render("[✓]")
+		case m.selected[i]:
+			box = styleCursor.Render("[x]")
+		}
+		line := fmt.Sprintf("%s%s %-16s", cursor, box, r.tool.Name)
+		note := r.tool.Description
+		if r.status.Installed && r.status.Version != "" {
+			note = r.status.Version
+		}
+		b.WriteString(line + styleDim.Render(note) + "\n")
+	}
+
+	b.WriteString("\n" + styleHelp.Render(fmt.Sprintf(
+		"%d selected · space toggle · / filter · i install · q quit", len(m.selected))))
+	return b.String()
+}
+
+func (m Model) viewInstall() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render("opsforge — installing") + "\n\n")
+	for pos, i := range m.queue {
+		name := m.rows[i].tool.Name
+		switch {
+		case m.phase == phaseInstall && pos == m.qpos:
+			b.WriteString(fmt.Sprintf("%s installing %s\n", m.spin.View(), name))
+		case pos >= m.qpos && m.phase == phaseInstall:
+			b.WriteString(styleDim.Render(fmt.Sprintf("  queued     %s", name)) + "\n")
+		default:
+			res := m.results[i]
+			if res.Err != nil {
+				b.WriteString(styleErr.Render(fmt.Sprintf("✗ failed     %s", name)) + "\n")
+				b.WriteString(styleDim.Render(indent(res.OutputTail, "    ")) + "\n")
+			} else {
+				b.WriteString(styleOK.Render(fmt.Sprintf("✓ installed  %s", name)) + "\n")
+			}
+		}
+	}
+	if m.phase == phaseDone {
+		ok, failed := m.Summary()
+		b.WriteString(fmt.Sprintf("\n%d installed, %d failed · press q to exit\n", ok, failed))
+	}
+	return b.String()
+}
+
+func indent(s, prefix string) string {
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = prefix + lines[i]
+	}
+	return strings.Join(lines, "\n")
+}
+
+// Summary counts successful and failed installations.
+func (m Model) Summary() (ok, failed int) {
+	for _, res := range m.results {
+		if res.Err != nil {
+			failed++
+		} else {
+			ok++
+		}
+	}
+	return ok, failed
+}
+
+// InstalledCount reports how many tools were successfully installed,
+// used by the CLI to decide whether to refresh shell completions.
+func (m Model) InstalledCount() int {
+	ok, _ := m.Summary()
+	return ok
+}

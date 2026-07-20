@@ -1,0 +1,38 @@
+version: 2
+
+project_name: opsforge
+
+builds:
+  - main: .
+    binary: opsforge
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/Mrg77/opsforge/cmd.version={{ .Version }}
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^ci:"
+      - "^chore:"
+
+# Uncomment once a homebrew-tap repository exists to ship
+# `brew install Mrg77/tap/opsforge`.
+# brews:
+#   - repository:
+#       owner: Mrg77
+#       name: homebrew-tap
+#     homepage: https://github.com/Mrg77/opsforge
+#     description: "Forge your DevOps workstation"

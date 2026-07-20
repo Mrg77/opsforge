@@ -1,0 +1,211 @@
+profiles:
+  - name: core
+    description: Daily-driver basics for any ops work
+    tools: [jq, yq, fzf, direnv, gh]
+  - name: k8s
+    description: Kubernetes workstation
+    tools: [kubectl, helm, k9s, kubectx, stern, kustomize]
+  - name: aws-k8s
+    description: AWS + Kubernetes stack
+    tools: [aws, kubectl, helm, k9s, terraform, docker, colima]
+  - name: gcp-k8s
+    description: Google Cloud + Kubernetes stack
+    tools: [gcloud, kubectl, helm, k9s, terraform, docker, colima]
+  - name: iac
+    description: Infrastructure as Code toolbox
+    tools: [terraform, opentofu, ansible, packer]
+  - name: security
+    description: DevSecOps essentials
+    tools: [trivy, sops, age, vault, hadolint]
+
+categories:
+  - name: Kubernetes
+    tools:
+      - name: kubectl
+        bin: kubectl
+        brew: kubernetes-cli
+        description: Kubernetes command-line tool
+        version_args: ["version", "--client"]
+        completion_zsh: ["kubectl", "completion", "zsh"]
+      - name: helm
+        bin: helm
+        brew: helm
+        description: Kubernetes package manager
+        version_args: ["version", "--short"]
+        completion_zsh: ["helm", "completion", "zsh"]
+      - name: k9s
+        bin: k9s
+        brew: k9s
+        description: Terminal UI to manage Kubernetes clusters
+        version_args: ["version", "--short"]
+        completion_zsh: ["k9s", "completion", "zsh"]
+      - name: kubectx
+        bin: kubectx
+        brew: kubectx
+        description: Fast context and namespace switching (kubectx + kubens)
+      - name: kind
+        bin: kind
+        brew: kind
+        description: Run local Kubernetes clusters in Docker
+        completion_zsh: ["kind", "completion", "zsh"]
+      - name: minikube
+        bin: minikube
+        brew: minikube
+        description: Local single-node Kubernetes cluster
+        completion_zsh: ["minikube", "completion", "zsh"]
+      - name: stern
+        bin: stern
+        brew: stern
+        description: Multi-pod log tailing for Kubernetes
+        completion_zsh: ["stern", "--completion", "zsh"]
+      - name: kustomize
+        bin: kustomize
+        brew: kustomize
+        description: Template-free Kubernetes manifest customization
+        version_args: ["version"]
+        completion_zsh: ["kustomize", "completion", "zsh"]
+      - name: argocd
+        bin: argocd
+        brew: argocd
+        description: GitOps continuous delivery CLI for Kubernetes
+        version_args: ["version", "--client", "--short"]
+        completion_zsh: ["argocd", "completion", "zsh"]
+
+  - name: Infrastructure as Code
+    tools:
+      - name: terraform
+        bin: terraform
+        brew: hashicorp/tap/terraform
+        description: HashiCorp infrastructure as code
+        version_args: ["version"]
+      - name: opentofu
+        bin: tofu
+        brew: opentofu
+        description: Open-source Terraform fork (Linux Foundation)
+        version_args: ["version"]
+      - name: packer
+        bin: packer
+        brew: hashicorp/tap/packer
+        description: Machine image builder
+        version_args: ["version"]
+      - name: ansible
+        bin: ansible
+        brew: ansible
+        description: Agentless configuration management
+      - name: pulumi
+        bin: pulumi
+        brew: pulumi
+        description: Infrastructure as code in real languages
+        completion_zsh: ["pulumi", "gen-completion", "zsh"]
+
+  - name: Cloud CLIs
+    tools:
+      - name: aws
+        bin: aws
+        brew: awscli
+        description: Amazon Web Services CLI v2
+      - name: azure
+        bin: az
+        brew: azure-cli
+        description: Microsoft Azure CLI
+      - name: gcloud
+        bin: gcloud
+        brew: google-cloud-sdk
+        cask: true
+        description: Google Cloud SDK
+      - name: doctl
+        bin: doctl
+        brew: doctl
+        description: DigitalOcean CLI
+        completion_zsh: ["doctl", "completion", "zsh"]
+      - name: scw
+        bin: scw
+        brew: scw
+        description: Scaleway CLI (French cloud provider)
+        completion_zsh: ["scw", "autocomplete", "script", "shell=zsh"]
+
+  - name: Containers
+    tools:
+      - name: docker
+        bin: docker
+        brew: docker
+        description: Docker CLI (pair with colima as runtime on macOS)
+      - name: docker-compose
+        bin: docker-compose
+        brew: docker-compose
+        description: Multi-container applications
+      - name: colima
+        bin: colima
+        brew: colima
+        description: Container runtime for macOS (Docker Desktop alternative)
+        version_args: ["version"]
+      - name: lazydocker
+        bin: lazydocker
+        brew: lazydocker
+        description: Terminal UI for Docker
+      - name: dive
+        bin: dive
+        brew: dive
+        description: Explore and optimize Docker image layers
+      - name: hadolint
+        bin: hadolint
+        brew: hadolint
+        description: Dockerfile linter
+
+  - name: Git & CI/CD
+    tools:
+      - name: gh
+        bin: gh
+        brew: gh
+        description: GitHub CLI
+        completion_zsh: ["gh", "completion", "-s", "zsh"]
+      - name: glab
+        bin: glab
+        brew: glab
+        description: GitLab CLI
+        completion_zsh: ["glab", "completion", "-s", "zsh"]
+      - name: act
+        bin: act
+        brew: act
+        description: Run GitHub Actions locally
+
+  - name: Security & Secrets
+    tools:
+      - name: trivy
+        bin: trivy
+        brew: trivy
+        description: Vulnerability scanner for containers and IaC
+        completion_zsh: ["trivy", "completion", "zsh"]
+      - name: sops
+        bin: sops
+        brew: sops
+        description: Encrypted secrets in git (age/KMS/PGP)
+      - name: age
+        bin: age
+        brew: age
+        description: Simple, modern file encryption
+      - name: vault
+        bin: vault
+        brew: hashicorp/tap/vault
+        description: HashiCorp secrets management
+        version_args: ["version"]
+
+  - name: Utilities
+    tools:
+      - name: jq
+        bin: jq
+        brew: jq
+        description: JSON processor
+      - name: yq
+        bin: yq
+        brew: yq
+        description: YAML/XML/TOML processor
+        completion_zsh: ["yq", "shell-completion", "zsh"]
+      - name: fzf
+        bin: fzf
+        brew: fzf
+        description: Fuzzy finder for the command line
+      - name: direnv
+        bin: direnv
+        brew: direnv
+        description: Per-directory environment variables
