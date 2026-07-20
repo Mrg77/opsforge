@@ -51,6 +51,11 @@ categories:
         bin: kubectx
         brew: kubectx
         description: Fast context and namespace switching (kubectx + kubens)
+        github:
+          repo: ahmetb/kubectx
+          asset: "kubectx_{tag}_{os}_{arch}.tar.gz"
+          os_map: {darwin: darwin, linux: linux}
+          arch_map: {amd64: x86_64, arm64: arm64}
       - name: kind
         bin: kind
         brew: kind
@@ -69,6 +74,9 @@ categories:
         brew: stern
         description: Multi-pod log tailing for Kubernetes
         completion_zsh: ["stern", "--completion", "zsh"]
+        github:
+          repo: stern/stern
+          asset: "stern_{version}_{os}_{arch}.tar.gz"
       - name: kustomize
         bin: kustomize
         brew: kustomize
@@ -81,11 +89,17 @@ categories:
         description: GitOps continuous delivery CLI for Kubernetes
         version_args: ["version", "--client", "--short"]
         completion_zsh: ["argocd", "completion", "zsh"]
+        github:
+          repo: argoproj/argo-cd
+          asset: "argocd-{os}-{arch}"
       - name: flux
         bin: flux
         brew: fluxcd/tap/flux
         description: GitOps toolkit CLI (Flux CD)
         completion_zsh: ["flux", "completion", "zsh"]
+        github:
+          repo: fluxcd/flux2
+          asset: "flux_{version}_{os}_{arch}.tar.gz"
       - name: velero
         bin: velero
         brew: velero
@@ -198,6 +212,11 @@ categories:
         bin: lazydocker
         brew: lazydocker
         description: Terminal UI for Docker
+        github:
+          repo: jesseduffield/lazydocker
+          asset: "lazydocker_{version}_{os}_{arch}.tar.gz"
+          os_map: {darwin: Darwin, linux: Linux}
+          arch_map: {amd64: x86_64, arm64: arm64}
       - name: dive
         bin: dive
         brew: dive
@@ -240,6 +259,10 @@ categories:
         bin: lazygit
         brew: lazygit
         description: Terminal UI for git
+        github:
+          repo: jesseduffield/lazygit
+          asset: "lazygit_{version}_{os}_{arch}.tar.gz"
+          arch_map: {amd64: x86_64, arm64: arm64}
 
   - name: Observability & Monitoring
     tools:
@@ -336,24 +359,37 @@ categories:
         description: Vulnerability scanner for images and filesystems
         version_args: ["version"]
         completion_zsh: ["grype", "completion", "zsh"]
+        github:
+          repo: anchore/grype
+          asset: "grype_{version}_{os}_{arch}.tar.gz"
       - name: syft
         bin: syft
         brew: syft
         description: SBOM generator for containers and code
         version_args: ["version"]
         completion_zsh: ["syft", "completion", "zsh"]
+        github:
+          repo: anchore/syft
+          asset: "syft_{version}_{os}_{arch}.tar.gz"
       - name: gitleaks
         bin: gitleaks
         brew: gitleaks
         description: Detect secrets committed in git repos
         version_args: ["version"]
         completion_zsh: ["gitleaks", "completion", "zsh"]
+        github:
+          repo: gitleaks/gitleaks
+          asset: "gitleaks_{version}_{os}_{arch}.tar.gz"
+          arch_map: {amd64: x64, arm64: arm64}
       - name: cosign
         bin: cosign
         brew: cosign
         description: Sign and verify container images
         version_args: ["version"]
         completion_zsh: ["cosign", "completion", "zsh"]
+        github:
+          repo: sigstore/cosign
+          asset: "cosign-{os}-{arch}"
       - name: sops
         bin: sops
         brew: sops

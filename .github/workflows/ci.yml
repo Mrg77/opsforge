@@ -49,8 +49,10 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: Validate catalog formulas against the Homebrew API
-        run: go test ./internal/catalog/ -run TestCatalogBrewFormulasExist -v
+      - name: Validate catalog formulas and github assets against upstream
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: go test ./internal/catalog/ -run 'TestCatalogBrewFormulasExist|TestCatalogGitHubAssetsResolve' -v
 
   build:
     runs-on: ubuntu-latest

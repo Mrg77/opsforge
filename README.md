@@ -94,9 +94,11 @@ opsforge picks a backend per tool at runtime:
 - **Homebrew** (default when `brew` is on PATH) — always the latest
   released version; `opsforge upgrade` refreshes the whole toolbox.
 - **GitHub releases** — for hosts without Homebrew (bare Linux servers,
-  CI images), tools carrying a `github:` block in the catalog are
-  installed by downloading and extracting their release binary into
-  `~/.local/bin`. No package manager required.
+  CI images), tools carrying a `github:` block in the catalog (k9s, kind,
+  kubectx, stern, argocd, flux, grype, syft, gitleaks, cosign, lazygit,
+  lazydocker, …) are installed by downloading and extracting their
+  release binary into `~/.local/bin`. No package manager required. Every
+  asset template is validated against upstream releases in CI.
 
 Force a backend with `OPSFORGE_BACKEND=brew|github`; change the binary
 target dir with `OPSFORGE_BIN_DIR`.
