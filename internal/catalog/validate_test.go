@@ -1,26 +1,28 @@
 package catalog
 
 import (
+	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 // TestCatalogBrewFormulasExist checks that every brew reference in the
-// catalog resolves to a real formula or cask. It shells out to
-// `brew info`, tapping third-party taps first (as the installer does at
-// runtime), so a typo in a formula name is caught here instead of by a
-// user mid-install.
+// catalog resolves to a real formula or cask of the declared kind. It
+// queries the public Homebrew API (formulae.brew.sh) rather than the
+// local `brew` cache, so results do not depend on which formulas/taps
+// happen to be installed on the machine running the test — that machine
+// state is exactly what let a renamed cask (google-cloud-sdk ->
+// gcloud-cli) and a moved formula (tflint) pass locally yet fail on a
+// clean CI runner.
 //
-// Skipped when brew is unavailable (e.g. Linux CI); the macOS CI job
-// enforces it. Set OPSFORGE_SKIP_BREW_VALIDATION=1 to skip locally.
+// Third-party tapped references ("owner/tap/name") are not on the public
+// core/cask API, so their existence is asserted structurally and left to
+// the runtime `brew tap`. Set OPSFORGE_SKIP_BREW_VALIDATION=1 to skip.
 func TestCatalogBrewFormulasExist(t *testing.T) {
 	if os.Getenv("OPSFORGE_SKIP_BREW_VALIDATION") != "" {
 		t.Skip("OPSFORGE_SKIP_BREW_VALIDATION set; skipping catalog formula validation")
-	}
-	if _, err := exec.LookPath("brew"); err != nil {
-		t.Skip("brew not installed; skipping catalog formula validation")
 	}
 
 	cat, err := Load()
@@ -28,28 +30,65 @@ func TestCatalogBrewFormulasExist(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Tap every third-party tap up front (serially) so the parallel
-	// `brew info` checks below can resolve tapped formulas.
-	taps := map[string]bool{}
-	for _, tool := range cat.Tools() {
-		if parts := strings.Split(tool.Brew, "/"); len(parts) == 3 {
-			taps[parts[0]+"/"+parts[1]] = true
-		}
-	}
-	for tap := range taps {
-		if err := exec.Command("brew", "tap", tap).Run(); err != nil {
-			t.Logf("could not tap %s (formula check may fail): %v", tap, err)
-		}
-	}
-
+	client := &http.Client{Timeout: 15 * time.Second}
 	for _, tool := range cat.Tools() {
 		tool := tool
 		t.Run(tool.Name, func(t *testing.T) {
 			t.Parallel()
-			if out, err := exec.Command("brew", "info", tool.Brew).CombinedOutput(); err != nil {
-				t.Errorf("brew formula %q for tool %q does not resolve:\n%s",
-					tool.Brew, tool.Name, out)
+			// Tapped refs (owner/tap/name) are handled by `brew tap` at
+			// install time and are not on the public core API.
+			if strings.Count(tool.Brew, "/") == 2 {
+				return
+			}
+			kind := "formula"
+			if tool.Cask {
+				kind = "cask"
+			}
+			switch existsInAPI(client, kind, tool.Brew) {
+			case apiFound:
+				// good
+			case apiWrongKind:
+				t.Errorf("brew %q for tool %q exists but not as a %s — check the `cask` flag",
+					tool.Brew, tool.Name, kind)
+			default:
+				t.Errorf("brew %s %q for tool %q does not exist on the Homebrew API "+
+					"(renamed or removed?)", kind, tool.Brew, tool.Name)
 			}
 		})
 	}
+}
+
+type apiResult int
+
+const (
+	apiMissing apiResult = iota
+	apiFound
+	apiWrongKind
+)
+
+// existsInAPI reports whether name resolves on the Homebrew API as the
+// given kind, distinguishing "wrong kind" (exists as the other kind) so
+// a mislabeled cask/formula gives an actionable error.
+func existsInAPI(c *http.Client, kind, name string) apiResult {
+	if headOK(c, kind, name) {
+		return apiFound
+	}
+	other := "cask"
+	if kind == "cask" {
+		other = "formula"
+	}
+	if headOK(c, other, name) {
+		return apiWrongKind
+	}
+	return apiMissing
+}
+
+func headOK(c *http.Client, kind, name string) bool {
+	url := "https://formulae.brew.sh/api/" + kind + "/" + name + ".json"
+	resp, err := c.Get(url)
+	if err != nil {
+		return false
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode == http.StatusOK
 }

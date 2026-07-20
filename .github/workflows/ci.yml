@@ -40,15 +40,16 @@ jobs:
         run: go test -race ./...
 
   # Validates that every brew reference in the catalog resolves to a real
-  # formula/cask — catches a typo before a user hits it mid-install.
+  # formula/cask of the declared kind, via the public Homebrew API — so a
+  # renamed/removed formula is caught before a user hits it mid-install.
   catalog-validation:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: Validate catalog formulas against Homebrew
+      - name: Validate catalog formulas against the Homebrew API
         run: go test ./internal/catalog/ -run TestCatalogBrewFormulasExist -v
 
   build:

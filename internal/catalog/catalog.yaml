@@ -115,7 +115,8 @@ categories:
         description: Terraform wrapper for DRY multi-env configs
       - name: tflint
         bin: tflint
-        brew: tflint
+        brew: terraform-linters/tap/tflint
+        cask: true
         description: Terraform linter
       - name: terraform-docs
         bin: terraform-docs
@@ -159,7 +160,7 @@ categories:
         description: Microsoft Azure CLI
       - name: gcloud
         bin: gcloud
-        brew: google-cloud-sdk
+        brew: gcloud-cli
         cask: true
         description: Google Cloud SDK
       - name: doctl
