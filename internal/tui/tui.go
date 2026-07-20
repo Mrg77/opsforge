@@ -294,19 +294,20 @@ func (m Model) viewSelect() string {
 			cursor = styleCursor.Render("❯ ")
 			cursorLine = len(lines)
 		}
-		// Four visually distinct states:
+		// Four visually distinct states, same glyph width so the columns
+		// never shift:
 		//   [✓] green   already installed, up to date
-		//   [⬆] orange  installed, newer version available
+		//   [✓] orange  installed, newer version available
 		//   [▸] cyan    selected for install this run
 		//   [ ] grey    not installed
 		var box string
 		note := styleDim.Render(r.tool.Description)
 		switch {
 		case r.status.Outdated:
-			box = styleUpdate.Render("[⬆]")
+			box = styleUpdate.Render("[✓]")
 			label := "update available"
 			if r.status.Version != "" {
-				label = r.status.Version + "  ↑ update available"
+				label = r.status.Version + "  · update available"
 			}
 			note = styleUpdate.Render(label)
 		case r.status.Installed:
@@ -328,7 +329,7 @@ func (m Model) viewSelect() string {
 	}
 
 	legend := styleOK.Render("[✓] installed") + styleHelp.Render(" · ") +
-		styleUpdate.Render("[⬆] update") + styleHelp.Render(" · ") +
+		styleUpdate.Render("[✓] update available") + styleHelp.Render(" · ") +
 		styleSelected.Render("[▸] selected")
 	b.WriteString("\n" + legend + "\n")
 

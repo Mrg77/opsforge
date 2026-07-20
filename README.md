@@ -51,7 +51,7 @@ have and what can be upgraded, at a glance:
 | Marker | Meaning |
 |---|---|
 | `[✓]` green | installed and up to date (shows the detected version) |
-| `[⬆]` orange | installed, **newer version available** (select it to upgrade) |
+| `[✓]` orange | installed, **newer version available** (select it to upgrade) |
 | `[▸]` cyan | selected for install this run |
 | `[ ]` grey | not installed |
 
