@@ -27,6 +27,10 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      # The brew-formula validation test is exercised by the dedicated
+      # catalog-validation job; skip it here to keep unit tests offline.
+      OPSFORGE_SKIP_BREW_VALIDATION: "1"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -34,6 +38,18 @@ jobs:
           go-version: stable
       - name: go test
         run: go test -race ./...
+
+  # Validates that every brew reference in the catalog resolves to a real
+  # formula/cask — catches a typo before a user hits it mid-install.
+  catalog-validation:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - name: Validate catalog formulas against Homebrew
+        run: go test ./internal/catalog/ -run TestCatalogBrewFormulasExist -v
 
   build:
     runs-on: ubuntu-latest

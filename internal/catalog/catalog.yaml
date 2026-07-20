@@ -319,7 +319,7 @@ categories:
         description: MySQL/MariaDB client with autocompletion
       - name: usql
         bin: usql
-        brew: usql
+        brew: xo/xo/usql
         description: Universal SQL client (one CLI, every database)
 
   - name: Security & Secrets
