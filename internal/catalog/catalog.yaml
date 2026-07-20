@@ -1,22 +1,25 @@
 profiles:
   - name: core
     description: Daily-driver basics for any ops work
-    tools: [jq, yq, fzf, direnv, gh]
+    tools: [jq, yq, fzf, direnv, gh, ripgrep, bat]
   - name: k8s
     description: Kubernetes workstation
     tools: [kubectl, helm, k9s, kubectx, stern, kustomize]
   - name: aws-k8s
     description: AWS + Kubernetes stack
-    tools: [aws, kubectl, helm, k9s, terraform, docker, colima]
+    tools: [aws, eksctl, kubectl, helm, k9s, terraform, docker, colima]
   - name: gcp-k8s
     description: Google Cloud + Kubernetes stack
     tools: [gcloud, kubectl, helm, k9s, terraform, docker, colima]
   - name: iac
     description: Infrastructure as Code toolbox
-    tools: [terraform, opentofu, ansible, packer]
+    tools: [terraform, opentofu, terragrunt, tflint, terraform-docs, ansible, packer]
+  - name: observability
+    description: Monitoring, load testing and log digging
+    tools: [k6, vegeta, btop, ctop, stern, lnav]
   - name: security
     description: DevSecOps essentials
-    tools: [trivy, sops, age, vault, hadolint]
+    tools: [trivy, grype, syft, gitleaks, sops, age, cosign, hadolint]
 
 categories:
   - name: Kubernetes
@@ -70,6 +73,21 @@ categories:
         description: GitOps continuous delivery CLI for Kubernetes
         version_args: ["version", "--client", "--short"]
         completion_zsh: ["argocd", "completion", "zsh"]
+      - name: flux
+        bin: flux
+        brew: fluxcd/tap/flux
+        description: GitOps toolkit CLI (Flux CD)
+        completion_zsh: ["flux", "completion", "zsh"]
+      - name: velero
+        bin: velero
+        brew: velero
+        description: Kubernetes backup and restore
+        version_args: ["version", "--client-only"]
+        completion_zsh: ["velero", "completion", "zsh"]
+      - name: kubeseal
+        bin: kubeseal
+        brew: kubeseal
+        description: Encrypt secrets for Sealed Secrets controller
 
   - name: Infrastructure as Code
     tools:
@@ -83,6 +101,23 @@ categories:
         brew: opentofu
         description: Open-source Terraform fork (Linux Foundation)
         version_args: ["version"]
+      - name: terragrunt
+        bin: terragrunt
+        brew: terragrunt
+        description: Terraform wrapper for DRY multi-env configs
+      - name: tflint
+        bin: tflint
+        brew: tflint
+        description: Terraform linter
+      - name: terraform-docs
+        bin: terraform-docs
+        brew: terraform-docs
+        description: Generate docs from Terraform modules
+      - name: infracost
+        bin: infracost
+        brew: infracost
+        description: Cloud cost estimates for Terraform
+        completion_zsh: ["infracost", "completion", "--shell", "zsh"]
       - name: packer
         bin: packer
         brew: hashicorp/tap/packer
@@ -104,6 +139,12 @@ categories:
         bin: aws
         brew: awscli
         description: Amazon Web Services CLI v2
+      - name: eksctl
+        bin: eksctl
+        brew: eksctl
+        description: Create and manage EKS clusters
+        version_args: ["version"]
+        completion_zsh: ["eksctl", "completion", "zsh"]
       - name: azure
         bin: az
         brew: azure-cli
@@ -139,6 +180,11 @@ categories:
         brew: colima
         description: Container runtime for macOS (Docker Desktop alternative)
         version_args: ["version"]
+      - name: podman
+        bin: podman
+        brew: podman
+        description: Daemonless container engine
+        completion_zsh: ["podman", "completion", "zsh"]
       - name: lazydocker
         bin: lazydocker
         brew: lazydocker
@@ -147,6 +193,15 @@ categories:
         bin: dive
         brew: dive
         description: Explore and optimize Docker image layers
+      - name: skopeo
+        bin: skopeo
+        brew: skopeo
+        description: Inspect and copy container images between registries
+      - name: crane
+        bin: crane
+        brew: crane
+        description: Interact with container registries
+        version_args: ["version"]
       - name: hadolint
         bin: hadolint
         brew: hadolint
@@ -168,6 +223,96 @@ categories:
         bin: act
         brew: act
         description: Run GitHub Actions locally
+      - name: pre-commit
+        bin: pre-commit
+        brew: pre-commit
+        description: Git hooks framework
+      - name: lazygit
+        bin: lazygit
+        brew: lazygit
+        description: Terminal UI for git
+
+  - name: Observability & Monitoring
+    tools:
+      - name: k6
+        bin: k6
+        brew: k6
+        description: Modern load testing (Grafana k6)
+        version_args: ["version"]
+        completion_zsh: ["k6", "completion", "zsh"]
+      - name: vegeta
+        bin: vegeta
+        brew: vegeta
+        description: HTTP load testing and attack tool
+        version_args: ["-version"]
+      - name: btop
+        bin: btop
+        brew: btop
+        description: Resource monitor (CPU, memory, network, processes)
+      - name: ctop
+        bin: ctop
+        brew: ctop
+        description: top-like metrics for containers
+        version_args: ["-v"]
+
+  - name: Logs
+    tools:
+      - name: lnav
+        bin: lnav
+        brew: lnav
+        description: Log file navigator with SQL queries
+        version_args: ["-V"]
+      - name: goaccess
+        bin: goaccess
+        brew: goaccess
+        description: Real-time web log analyzer
+
+  - name: Networking & HTTP
+    tools:
+      - name: httpie
+        bin: http
+        brew: httpie
+        description: Human-friendly HTTP client
+      - name: curlie
+        bin: curlie
+        brew: curlie
+        description: curl with the ease of httpie
+      - name: grpcurl
+        bin: grpcurl
+        brew: grpcurl
+        description: curl for gRPC services
+        version_args: ["-version"]
+      - name: websocat
+        bin: websocat
+        brew: websocat
+        description: WebSocket client and swiss-army knife
+      - name: doggo
+        bin: doggo
+        brew: doggo
+        description: Modern DNS client
+      - name: mtr
+        bin: mtr
+        brew: mtr
+        description: traceroute + ping network diagnostics
+      - name: nmap
+        bin: nmap
+        brew: nmap
+        description: Network discovery and port scanning
+
+  - name: Databases
+    tools:
+      - name: pgcli
+        bin: pgcli
+        brew: pgcli
+        description: PostgreSQL client with autocompletion
+      - name: mycli
+        bin: mycli
+        brew: mycli
+        description: MySQL/MariaDB client with autocompletion
+      - name: usql
+        bin: usql
+        brew: usql
+        description: Universal SQL client (one CLI, every database)
 
   - name: Security & Secrets
     tools:
@@ -176,6 +321,30 @@ categories:
         brew: trivy
         description: Vulnerability scanner for containers and IaC
         completion_zsh: ["trivy", "completion", "zsh"]
+      - name: grype
+        bin: grype
+        brew: grype
+        description: Vulnerability scanner for images and filesystems
+        version_args: ["version"]
+        completion_zsh: ["grype", "completion", "zsh"]
+      - name: syft
+        bin: syft
+        brew: syft
+        description: SBOM generator for containers and code
+        version_args: ["version"]
+        completion_zsh: ["syft", "completion", "zsh"]
+      - name: gitleaks
+        bin: gitleaks
+        brew: gitleaks
+        description: Detect secrets committed in git repos
+        version_args: ["version"]
+        completion_zsh: ["gitleaks", "completion", "zsh"]
+      - name: cosign
+        bin: cosign
+        brew: cosign
+        description: Sign and verify container images
+        version_args: ["version"]
+        completion_zsh: ["cosign", "completion", "zsh"]
       - name: sops
         bin: sops
         brew: sops
@@ -205,6 +374,22 @@ categories:
         bin: fzf
         brew: fzf
         description: Fuzzy finder for the command line
+      - name: ripgrep
+        bin: rg
+        brew: ripgrep
+        description: Blazing fast recursive grep
+      - name: bat
+        bin: bat
+        brew: bat
+        description: cat with syntax highlighting
+      - name: fd
+        bin: fd
+        brew: fd
+        description: Fast and friendly alternative to find
+      - name: tldr
+        bin: tldr
+        brew: tldr
+        description: Community-driven simplified man pages
       - name: direnv
         bin: direnv
         brew: direnv

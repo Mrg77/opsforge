@@ -33,16 +33,22 @@ var installCmd = &cobra.Command{
 		if len(args) > 0 || installProfile != "" {
 			return installNonInteractive(cat, args)
 		}
-		model := tui.New(cat.Categories, detect.All(cat.Tools()))
-		final, err := tea.NewProgram(model).Run()
-		if err != nil {
-			return err
-		}
-		if final.(tui.Model).InstalledCount() > 0 {
-			return postInstall(cat)
-		}
-		return nil
+		return runPicker(cat)
 	},
+}
+
+// runPicker opens the interactive TUI; it is also the default behavior
+// when the binary is launched without any subcommand.
+func runPicker(cat *catalog.Catalog) error {
+	model := tui.New(cat.Categories, detect.All(cat.Tools()))
+	final, err := tea.NewProgram(model).Run()
+	if err != nil {
+		return err
+	}
+	if final.(tui.Model).InstalledCount() > 0 {
+		return postInstall(cat)
+	}
+	return nil
 }
 
 // installNonInteractive resolves the requested tool names (explicit args

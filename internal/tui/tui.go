@@ -63,6 +63,10 @@ type Model struct {
 	phase phase
 	queue []int
 	qpos  int
+
+	// height is the terminal height from the last WindowSizeMsg, used
+	// to window the list — the full catalog no longer fits on screen.
+	height int
 }
 
 // New builds the picker from the catalog and current detection state.
@@ -136,6 +140,9 @@ func (m *Model) clampCursor() {
 // Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		return m, nil
 	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spin, cmd = m.spin.Update(msg)
@@ -268,15 +275,18 @@ func (m Model) viewSelect() string {
 	if len(sel) > 0 {
 		cursorRow = sel[m.cursor]
 	}
+	var lines []string
+	cursorLine := 0
 	for _, i := range m.visible() {
 		r := m.rows[i]
 		if r.isHeader() {
-			b.WriteString(styleCategory.Render("▸ "+r.header) + "\n")
+			lines = append(lines, styleCategory.Render("▸ "+r.header))
 			continue
 		}
 		cursor := "  "
 		if i == cursorRow {
 			cursor = styleCursor.Render("❯ ")
+			cursorLine = len(lines)
 		}
 		box := "[ ]"
 		switch {
@@ -290,7 +300,11 @@ func (m Model) viewSelect() string {
 		if r.status.Installed && r.status.Version != "" {
 			note = r.status.Version
 		}
-		b.WriteString(line + styleDim.Render(note) + "\n")
+		lines = append(lines, line+styleDim.Render(note))
+	}
+
+	for _, l := range window(lines, cursorLine, m.listHeight()) {
+		b.WriteString(l + "\n")
 	}
 
 	b.WriteString("\n" + styleHelp.Render(fmt.Sprintf(
@@ -298,25 +312,64 @@ func (m Model) viewSelect() string {
 	return b.String()
 }
 
+// listHeight is the number of list lines that fit between the header
+// and the footer; a sane default applies before the first resize event.
+func (m Model) listHeight() int {
+	const chrome = 5 // title + filter + blank + blank + help
+	if m.height == 0 {
+		return 30
+	}
+	return max(5, m.height-chrome)
+}
+
+// window slices lines so the cursor stays on screen, marking clipped
+// content with ellipsis rows.
+func window(lines []string, cursorLine, height int) []string {
+	if len(lines) <= height {
+		return lines
+	}
+	start := 0
+	if cursorLine >= height-1 {
+		start = min(cursorLine-height+2, len(lines)-height)
+	}
+	out := append([]string{}, lines[start:start+height]...)
+	if start > 0 {
+		out[0] = styleDim.Render("  ↑ more")
+	}
+	if start+height < len(lines) {
+		out[len(out)-1] = styleDim.Render("  ↓ more")
+	}
+	return out
+}
+
 func (m Model) viewInstall() string {
 	var b strings.Builder
 	b.WriteString(styleTitle.Render("opsforge — installing") + "\n\n")
+	var lines []string
+	activeLine := 0
 	for pos, i := range m.queue {
 		name := m.rows[i].tool.Name
 		switch {
 		case m.phase == phaseInstall && pos == m.qpos:
-			b.WriteString(fmt.Sprintf("%s installing %s\n", m.spin.View(), name))
+			activeLine = len(lines)
+			lines = append(lines, fmt.Sprintf("%s installing %s", m.spin.View(), name))
 		case pos >= m.qpos && m.phase == phaseInstall:
-			b.WriteString(styleDim.Render(fmt.Sprintf("  queued     %s", name)) + "\n")
+			lines = append(lines, styleDim.Render(fmt.Sprintf("  queued     %s", name)))
 		default:
 			res := m.results[i]
 			if res.Err != nil {
-				b.WriteString(styleErr.Render(fmt.Sprintf("✗ failed     %s", name)) + "\n")
-				b.WriteString(styleDim.Render(indent(res.OutputTail, "    ")) + "\n")
+				lines = append(lines, styleErr.Render(fmt.Sprintf("✗ failed     %s", name)))
+				lines = append(lines, styleDim.Render(indent(res.OutputTail, "    ")))
 			} else {
-				b.WriteString(styleOK.Render(fmt.Sprintf("✓ installed  %s", name)) + "\n")
+				lines = append(lines, styleOK.Render(fmt.Sprintf("✓ installed  %s", name)))
 			}
 		}
+	}
+	if m.phase == phaseDone {
+		activeLine = len(lines) - 1
+	}
+	for _, l := range window(lines, activeLine, m.listHeight()) {
+		b.WriteString(l + "\n")
 	}
 	if m.phase == phaseDone {
 		ok, failed := m.Summary()

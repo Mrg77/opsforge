@@ -53,9 +53,12 @@ go install github.com/Mrg77/opsforge@latest   # from source
 
 ## Usage
 
+Launching the bare binary opens the interactive picker — browse by
+category, check what you want, hit install.
+
 | Command | What it does |
 |---|---|
-| `opsforge install` | Interactive picker: browse the catalog, check tools, install them |
+| `opsforge` / `opsforge install` | Interactive picker: browse the catalog, check tools, install them |
 | `opsforge install kubectl helm` | Non-interactive install by name (scriptable) |
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
@@ -79,10 +82,15 @@ go install github.com/Mrg77/opsforge@latest   # from source
 
 ## The catalog
 
-36 curated tools across 7 categories: Kubernetes, Infrastructure as Code,
-Cloud CLIs, Containers, Git & CI/CD, Security & Secrets, Utilities. The
-catalog is a single embedded [YAML file](internal/catalog/catalog.yaml) —
-adding a tool is a five-line PR.
+65 curated tools across 11 categories: Kubernetes, Infrastructure as Code,
+Cloud CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs,
+Networking & HTTP, Databases, Security & Secrets, Utilities. The catalog is
+a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a
+tool is a five-line PR.
+
+Everything installs through Homebrew, so you always get the latest
+released version, and `opsforge upgrade` refreshes the whole toolbox in
+one command.
 
 ## Architecture
 
