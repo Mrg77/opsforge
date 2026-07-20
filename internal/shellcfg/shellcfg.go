@@ -1,19 +1,26 @@
-// Package shellcfg generates and manages the opsforge zsh layer:
-// cached completions for installed tools, a few curated aliases and an
-// optional kube-context segment in the right prompt.
+// Package shellcfg generates and manages the opsforge zsh layer: a set
+// of modular scripts (prompt, guards, aliases, integrations) plus cached
+// tool completions, wired into the user's shell through a single eval
+// line in ~/.zshrc.
 //
 // The user-facing contract mirrors starship/direnv/mise:
 //
 //	eval "$(opsforge shell env)"   # in ~/.zshrc, added by `shell install`
 //	opsforge shell sync            # regenerates cached completion scripts
+//
+// Modules are embedded from modules/*.zsh and written to
+// ~/.config/opsforge/shell/ on `shell install`, which keeps ~/.zshrc to
+// a single line and makes `shell doctor`/`shell uninstall` clean.
 package shellcfg
 
 import (
 	"context"
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -21,17 +28,43 @@ import (
 	"github.com/Mrg77/opsforge/internal/detect"
 )
 
+//go:embed modules/*.zsh
+var moduleFS embed.FS
+
 const (
 	markerStart = "# >>> opsforge shell layer >>>"
 	markerEnd   = "# <<< opsforge shell layer <<<"
 )
 
-// aliases maps a catalog tool name to the aliases it enables. Kept
-// deliberately short: only near-universal muscle-memory shortcuts.
-var aliases = map[string][]string{
-	"kubectl":   {"alias k=kubectl"},
-	"terraform": {"alias tf=terraform"},
-	"docker":    {`alias dc="docker compose"`},
+// Module is one embedded zsh feature file.
+type Module struct {
+	Name string // e.g. "prompt"
+	Body string
+}
+
+// Modules returns the embedded feature modules in load order. Order
+// matters: aliases before integrations (so integrations can override),
+// guards last (the accept-line widget should wrap everything).
+func Modules() ([]Module, error) {
+	order := []string{"prompt", "aliases", "integrations", "guards"}
+	var mods []Module
+	for _, name := range order {
+		body, err := moduleFS.ReadFile("modules/" + name + ".zsh")
+		if err != nil {
+			return nil, fmt.Errorf("reading module %s: %w", name, err)
+		}
+		mods = append(mods, Module{Name: name, Body: string(body)})
+	}
+	return mods, nil
+}
+
+// ConfigDir is where opsforge writes its shell modules.
+func ConfigDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".config", "opsforge", "shell"), nil
 }
 
 // CompletionsDir is where cached completion scripts live.
@@ -43,58 +76,67 @@ func CompletionsDir() (string, error) {
 	return filepath.Join(home, ".cache", "opsforge", "completions"), nil
 }
 
+// WriteModules materializes the embedded modules to ConfigDir and
+// returns the directory. Called by `shell install`.
+func WriteModules() (string, error) {
+	dir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", err
+	}
+	mods, err := Modules()
+	if err != nil {
+		return "", err
+	}
+	for _, m := range mods {
+		path := filepath.Join(dir, m.Name+".zsh")
+		if err := os.WriteFile(path, []byte(m.Body), 0o644); err != nil {
+			return "", fmt.Errorf("writing %s: %w", path, err)
+		}
+	}
+	return dir, nil
+}
+
 // Env renders the zsh snippet meant to be eval'd from ~/.zshrc. It must
-// stay fast: only PATH lookups, no tool subprocesses.
-func Env(tools []catalog.Tool) (string, error) {
-	dir, err := CompletionsDir()
+// stay fast: PATH lookups and sourcing of prewritten files only, no tool
+// subprocesses at shell-startup time.
+func Env() (string, error) {
+	cfgDir, err := ConfigDir()
+	if err != nil {
+		return "", err
+	}
+	complDir, err := CompletionsDir()
 	if err != nil {
 		return "", err
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n", markerStart)
-	// compinit may already have run in the user's zshrc; the compdef
-	// guard avoids a second, slow invocation.
+	// compinit may already have run; the compdef guard avoids a slow
+	// second invocation.
 	fmt.Fprintf(&b, `if ! typeset -f compdef >/dev/null 2>&1; then
   autoload -Uz compinit && compinit -u
 fi
+# cached tool completions
 if [ -d %[1]q ]; then
-  for _of_script in %[1]q/*.zsh(N); do
-    source "$_of_script"
-  done
-  unset _of_script
+  for _of_c in %[1]q/*.zsh(N); do source "$_of_c"; done
+  unset _of_c
 fi
-`, dir)
-	for _, t := range tools {
-		if _, err := exec.LookPath(t.Bin); err != nil {
-			continue
-		}
-		for _, a := range aliases[t.Name] {
-			fmt.Fprintf(&b, "%s\n", a)
-		}
-		if t.Name == "kubectl" {
-			b.WriteString(kubePrompt)
-		}
-	}
+# opsforge modules (prompt, aliases, integrations, guards)
+if [ -d %[2]q ]; then
+  for _of_m in %[2]q/prompt.zsh %[2]q/aliases.zsh %[2]q/integrations.zsh %[2]q/guards.zsh; do
+    [ -r "$_of_m" ] && source "$_of_m"
+  done
+  unset _of_m
+fi
+`, complDir, cfgDir)
 	fmt.Fprintf(&b, "%s\n", markerEnd)
 	return b.String(), nil
 }
 
-// kubePrompt shows the current kube context on the right prompt, only
-// when the user has not already claimed RPROMPT.
-const kubePrompt = `_opsforge_kube_ctx() {
-  local c
-  c=$(kubectl config current-context 2>/dev/null) || return
-  print -n "⎈ ${c}"
-}
-if [[ -z "$RPROMPT" ]]; then
-  setopt PROMPT_SUBST
-  RPROMPT='%F{blue}$(_opsforge_kube_ctx)%f'
-fi
-`
-
 // Sync regenerates cached completion scripts for every installed tool
-// exposing a native zsh completion command. It returns the tool names
-// that were synced.
+// exposing a native zsh completion command. Returns the synced names.
 func Sync(tools []catalog.Tool) ([]string, error) {
 	dir, err := CompletionsDir()
 	if err != nil {
@@ -111,11 +153,11 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		gen := exec.CommandContext(ctx, t.CompletionZsh[0], t.CompletionZsh[1:]...)
 		gen.Env = detect.SafeProbeEnv() // never let a probe trigger cloud auth
-		gen.WaitDelay = time.Second     // see detect.version: children may hold the pipe
+		gen.WaitDelay = time.Second     // children may hold the pipe open
 		out, err := gen.Output()
 		cancel()
 		if err != nil || len(out) == 0 {
-			continue // a tool refusing to emit its completion is not fatal
+			continue
 		}
 		path := filepath.Join(dir, t.Name+".zsh")
 		if err := os.WriteFile(path, out, 0o644); err != nil {
@@ -123,12 +165,16 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 		}
 		synced = append(synced, t.Name)
 	}
+	sort.Strings(synced)
 	return synced, nil
 }
 
 // InstallToZshrc idempotently adds the eval line to ~/.zshrc inside
-// marker comments, replacing any previous opsforge block.
+// marker comments and writes the module files.
 func InstallToZshrc() (string, error) {
+	if _, err := WriteModules(); err != nil {
+		return "", err
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -150,7 +196,29 @@ func InstallToZshrc() (string, error) {
 	return path, nil
 }
 
-// InstalledInZshrc reports whether ~/.zshrc already contains the block.
+// UninstallFromZshrc removes the opsforge block from ~/.zshrc and deletes
+// the module directory. Completion cache is left in place (cheap, and the
+// user may re-enable). Returns the zshrc path touched.
+func UninstallFromZshrc() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	path := filepath.Join(home, ".zshrc")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(path, []byte(RemoveBlock(string(data))), 0o644); err != nil {
+		return "", err
+	}
+	if dir, err := ConfigDir(); err == nil {
+		os.RemoveAll(dir)
+	}
+	return path, nil
+}
+
+// InstalledInZshrc reports whether ~/.zshrc contains the opsforge block.
 func InstalledInZshrc() bool {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -163,8 +231,8 @@ func InstalledInZshrc() bool {
 	return strings.Contains(string(data), markerStart)
 }
 
-// RemoveBlock strips a previously installed opsforge block, returning
-// the remaining content unchanged when no block is present.
+// RemoveBlock strips a previously installed opsforge block, returning the
+// remaining content unchanged when no block is present.
 func RemoveBlock(content string) string {
 	start := strings.Index(content, markerStart)
 	if start == -1 {

@@ -439,3 +439,23 @@ categories:
         bin: direnv
         brew: direnv
         description: Per-directory environment variables
+      - name: zoxide
+        bin: zoxide
+        brew: zoxide
+        description: Smarter cd that learns your habits
+        github:
+          repo: ajeetdsouza/zoxide
+          asset: "zoxide-{version}-{arch}-{os}.tar.gz"
+          os_map: {darwin: apple-darwin, linux: unknown-linux-musl}
+          arch_map: {amd64: x86_64, arm64: aarch64}
+      - name: atuin
+        bin: atuin
+        brew: atuin
+        description: Full-text shell history with sync
+        # No github: block — atuin ships no macOS-amd64 release binary,
+        # so brew (which builds it) is the only backend that covers every
+        # platform. Adding a partial github block would fail on Intel Macs.
+      - name: eza
+        bin: eza
+        brew: eza
+        description: Modern replacement for ls

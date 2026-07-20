@@ -70,24 +70,40 @@ At-a-glance markers:
 | `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
 | `opsforge list` | Catalog with live installed/version status |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, broken tools |
-| `opsforge shell install` | Adds the opsforge layer to your `~/.zshrc` (idempotent) |
-| `opsforge shell sync` | Regenerates cached zsh completions for installed tools |
-| `opsforge shell env` | Prints the zsh snippet (`eval "$(opsforge shell env)"`) |
+| `opsforge shell install` | Install the DevOps zsh environment into `~/.zshrc` (idempotent) |
+| `opsforge shell uninstall` | Remove it cleanly (restores `~/.zshrc`, deletes modules) |
+| `opsforge shell doctor` | Show what the shell environment provides and its state |
+| `opsforge shell sync` | Regenerate cached zsh completions for installed tools |
+| `opsforge shell env` | Print the zsh snippet (`eval "$(opsforge shell env)"`) |
 
-### The shell layer
+### The DevOps shell environment
 
-- **Completions** — every installed tool that ships a zsh completion script
-  gets it generated and cached in `~/.cache/opsforge/completions/`, loaded at
-  shell startup with a guarded `compinit` (no double-init slowdown).
-- **Aliases** — a deliberately short list of muscle-memory shortcuts
-  (`k`=kubectl, `tf`=terraform, `dc`=docker compose), enabled only when the
-  underlying tool is installed.
-- **Prompt** — current Kubernetes context (`⎈ prod-cluster`) in the right
-  prompt, only if you haven't already claimed `RPROMPT`.
+`opsforge shell install` turns your **own zsh** (no shell replacement,
+scripts and CI untouched) into a DevOps-aware environment, delivered as
+small modules under `~/.config/opsforge/shell/`:
+
+- **Context prompt** — kube `cluster:namespace` (**red on a prod-looking
+  context** so you notice before a mistake), active cloud account
+  (AWS profile / GCP project), and terraform workspace. Each segment
+  shows only when relevant.
+- **Prod guards** — before a destructive command (`kubectl delete`,
+  `terraform destroy`, `helm uninstall`…) runs against a production
+  context, opsforge asks you to type `yes`. Disable per-session with
+  `OPSFORGE_GUARDS=0`.
+- **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
+  context/namespace (fzf picker when available). All guarded on the tool
+  being installed.
+- **Integrations** — `fzf`, `zoxide` and `atuin` are wired up when
+  present, so history search and directory jumping just work.
+- **Completions** — cached zsh completions for every installed tool,
+  loaded with a guarded `compinit` (no double-init slowdown).
+
+Every module is validated with `zsh -n` in CI, so a broken script can
+never reach your shell.
 
 ## The catalog
 
-65 curated tools across 11 categories: Kubernetes, Infrastructure as Code,
+68 curated tools across 11 categories: Kubernetes, Infrastructure as Code,
 Cloud CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs,
 Networking & HTTP, Databases, Security & Secrets, Utilities. The catalog is
 a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a
