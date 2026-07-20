@@ -4,22 +4,7 @@
 interactive terminal UI, install them in one go, and get a zsh layer with
 auto-generated completions, curated aliases and a kube-aware prompt.
 
-```
-┌─ opsforge — pick your tools ───────────────┐
-│ ▸ Kubernetes                               │
-│ ❯ [✓] kubectl        Client Version v1.33  │
-│   [x] helm           v3.19.0               │
-│   [ ] k9s            Terminal UI for K8s   │
-│ ▸ Infrastructure as Code                   │
-│   [x] terraform      Terraform v1.12       │
-│   [ ] opentofu       Open-source TF fork   │
-│ ▸ Cloud CLIs                               │
-│   [x] scw            Scaleway CLI          │
-│                                            │
-│ 3 selected · space toggle · / filter ·     │
-│ i install · q quit                         │
-└────────────────────────────────────────────┘
-```
+![opsforge demo](demo/opsforge.gif)
 
 ## Why
 
