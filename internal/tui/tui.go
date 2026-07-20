@@ -23,6 +23,7 @@ const (
 	phaseSelect phase = iota
 	phaseInstall
 	phaseDone
+	phaseRescan
 )
 
 // row is one display line: either a category header or a tool entry.
@@ -51,6 +52,12 @@ var (
 	styleHelp     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
+// Rescanner re-detects installed/outdated status for all tools. The TUI
+// calls it after an install/upgrade batch so the list reflects the new
+// reality (freshly installed tools turn green) before returning to the
+// picker.
+type Rescanner func() map[string]detect.Status
+
 // Model is the Bubble Tea model for the picker.
 type Model struct {
 	rows     []row
@@ -61,10 +68,12 @@ type Model struct {
 	filter    textinput.Model
 	filtering bool
 
-	spin  spinner.Model
-	phase phase
-	queue []int
-	qpos  int
+	spin    spinner.Model
+	phase   phase
+	queue   []int
+	qpos    int
+	rescan  Rescanner
+	didWork bool // at least one install/upgrade succeeded this session
 
 	// height is the terminal height from the last WindowSizeMsg, used
 	// to window the list — the full catalog no longer fits on screen.
@@ -72,7 +81,10 @@ type Model struct {
 }
 
 // New builds the picker from the catalog and current detection state.
-func New(categories []catalog.Category, statuses map[string]detect.Status) Model {
+// rescan may be nil, in which case returning to the menu after an
+// install keeps the pre-install status (still correct, just not
+// refreshed).
+func New(categories []catalog.Category, statuses map[string]detect.Status, rescan Rescanner) Model {
 	var rows []row
 	for _, c := range categories {
 		rows = append(rows, row{header: c.Name})
@@ -91,8 +103,22 @@ func New(categories []catalog.Category, statuses map[string]detect.Status) Model
 		results:  map[int]installer.Result{},
 		filter:   ti,
 		spin:     sp,
+		rescan:   rescan,
 	}
 }
+
+// applyStatuses updates each tool row from a fresh detection map.
+func (m *Model) applyStatuses(statuses map[string]detect.Status) {
+	for i := range m.rows {
+		if !m.rows[i].isHeader() {
+			m.rows[i].status = statuses[m.rows[i].tool.Name]
+		}
+	}
+}
+
+// DidWork reports whether any install/upgrade succeeded, so the caller
+// can decide to refresh shell completions on exit.
+func (m Model) DidWork() bool { return m.didWork }
 
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
@@ -151,16 +177,46 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	case installDoneMsg:
 		m.results[msg.rowIndex] = msg.result
+		if msg.result.Err == nil {
+			m.didWork = true
+		}
 		m.qpos++
 		if m.qpos < len(m.queue) {
 			return m, m.installNext()
 		}
 		m.phase = phaseDone
 		return m, nil
+	case rescanDoneMsg:
+		m.applyStatuses(msg.statuses)
+		m.selected = map[int]bool{}
+		m.results = map[int]installer.Result{}
+		m.queue = nil
+		m.phase = phaseSelect
+		return m, nil
 	case tea.KeyMsg:
 		return m.updateKeys(msg)
 	}
 	return m, nil
+}
+
+// rescanDoneMsg carries a fresh detection map back to the model.
+type rescanDoneMsg struct{ statuses map[string]detect.Status }
+
+// backToMenu re-detects tool status (if a rescanner is set) and returns
+// to the picker. Detection runs off the UI goroutine.
+func (m Model) backToMenu() (tea.Model, tea.Cmd) {
+	if m.rescan == nil {
+		m.selected = map[int]bool{}
+		m.results = map[int]installer.Result{}
+		m.queue = nil
+		m.phase = phaseSelect
+		return m, nil
+	}
+	m.phase = phaseRescan
+	rescan := m.rescan
+	return m, tea.Batch(m.spin.Tick, func() tea.Msg {
+		return rescanDoneMsg{statuses: rescan()}
+	})
 }
 
 func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -170,9 +226,17 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	if m.phase == phaseRescan {
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 	if m.phase == phaseDone {
 		switch msg.String() {
-		case "q", "enter", "ctrl+c", "esc":
+		case "enter", "m":
+			return m.backToMenu()
+		case "q", "ctrl+c":
 			return m, tea.Quit
 		}
 		return m, nil
@@ -211,6 +275,21 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		return m, m.filter.Focus()
+	case "u":
+		// Select every outdated tool at once — the "update all" shortcut.
+		for i, r := range m.rows {
+			if !r.isHeader() && r.status.Outdated {
+				m.selected[i] = true
+			}
+		}
+	case "a":
+		// Toggle-select every not-yet-installed tool currently visible
+		// (respects the active filter), for bulk installs.
+		for _, i := range m.visible() {
+			if r := m.rows[i]; !r.isHeader() && !r.status.Installed {
+				m.selected[i] = true
+			}
+		}
 	case " ":
 		sel := m.selectable()
 		if len(sel) == 0 {
@@ -263,6 +342,9 @@ func (m Model) View() string {
 	switch m.phase {
 	case phaseInstall, phaseDone:
 		return m.viewInstall()
+	case phaseRescan:
+		return styleTitle.Render("opsforge") + "\n\n" +
+			m.spin.View() + " re-scanning your tools…\n"
 	default:
 		return m.viewSelect()
 	}
@@ -335,9 +417,10 @@ func (m Model) viewSelect() string {
 
 	status := fmt.Sprintf("%d selected", len(m.selected))
 	if n := m.outdatedCount(); n > 0 {
-		status += styleUpdate.Render(fmt.Sprintf(" · %d update(s) available", n))
+		status += styleUpdate.Render(fmt.Sprintf(" · %d update(s) available — press u to select all", n))
 	}
-	b.WriteString(styleHelp.Render(status + " · space toggle · / filter · i install · q quit"))
+	b.WriteString(styleHelp.Render(status + "\n" +
+		"space toggle · u update-all · a select-all · / filter · i install · q quit"))
 	return b.String()
 }
 
@@ -413,7 +496,8 @@ func (m Model) viewInstall() string {
 	}
 	if m.phase == phaseDone {
 		ok, failed := m.Summary()
-		b.WriteString(fmt.Sprintf("\n%d installed, %d failed · press q to exit\n", ok, failed))
+		b.WriteString(fmt.Sprintf("\n%d installed, %d failed\n", ok, failed))
+		b.WriteString(styleHelp.Render("enter/m back to menu · q quit"))
 	}
 	return b.String()
 }
@@ -436,11 +520,4 @@ func (m Model) Summary() (ok, failed int) {
 		}
 	}
 	return ok, failed
-}
-
-// InstalledCount reports how many tools were successfully installed,
-// used by the CLI to decide whether to refresh shell completions.
-func (m Model) InstalledCount() int {
-	ok, _ := m.Summary()
-	return ok
 }

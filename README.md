@@ -46,7 +46,13 @@ go install github.com/Mrg77/opsforge@latest   # from source
 
 Launching the bare binary opens the interactive picker — browse by
 category, check what you want, hit install. It detects what you already
-have and what can be upgraded, at a glance:
+have and what can be upgraded, at a glance.
+
+Keys: `space` toggle · `u` select all updates · `a` select all
+not-installed · `/` filter · `i` install · after a run, `enter`/`m`
+returns to the menu (re-scanned) or `q` quits.
+
+At-a-glance markers:
 
 | Marker | Meaning |
 |---|---|

@@ -37,12 +37,15 @@ var installCmd = &cobra.Command{
 // runPicker opens the interactive TUI; it is also the default behavior
 // when the binary is launched without any subcommand.
 func runPicker(cat *catalog.Catalog) error {
-	model := tui.New(cat.Categories, detect.AllWithOutdated(cat.Tools()))
+	rescan := func() map[string]detect.Status {
+		return detect.AllWithOutdated(cat.Tools())
+	}
+	model := tui.New(cat.Categories, rescan(), rescan)
 	final, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return err
 	}
-	if final.(tui.Model).InstalledCount() > 0 {
+	if final.(tui.Model).DidWork() {
 		return postInstall(cat)
 	}
 	return nil
@@ -99,15 +102,21 @@ func installNonInteractive(cat *catalog.Catalog, names []string) error {
 	return nil
 }
 
-// postInstall refreshes shell completions after successful installs.
+// postInstall refreshes shell completions after successful installs and
+// nudges the user to enable the shell layer if they have not yet.
 func postInstall(cat *catalog.Catalog) error {
 	synced, err := shellcfg.Sync(cat.Tools())
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Refreshed zsh completions for %d tool(s).\n", len(synced))
-	if !shellcfg.InstalledInZshrc() {
-		fmt.Println("Tip: run `opsforge shell install` to enable the opsforge shell layer.")
+	fmt.Printf("Generated zsh completions for %d tool(s).\n", len(synced))
+	if shellcfg.InstalledInZshrc() {
+		fmt.Println("Run `exec zsh` (or open a new terminal) to load the new completions.")
+	} else {
+		fmt.Println()
+		fmt.Println("To get tab-completion for every installed tool, enable the opsforge")
+		fmt.Println("shell layer once:")
+		fmt.Println("    opsforge shell install && exec zsh")
 	}
 	return nil
 }
