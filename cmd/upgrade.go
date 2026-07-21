@@ -3,11 +3,21 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
+	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+)
+
+var (
+	upOK  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	upNew = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")) // green: new version
+	upOld = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))           // orange: old version
+	upDim = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	upErr = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
 )
 
 var upgradeOutdatedOnly bool
@@ -43,21 +53,33 @@ var upgradeCmd = &cobra.Command{
 			return nil
 		}
 
-		upgraded, skipped, failed := 0, 0, 0
+		upgraded, unchanged, skipped, failed := 0, 0, 0, 0
 		for _, t := range targets {
+			before := audit.NormalizeVersion(statuses[t.Name].Version)
 			switch res := installer.Upgrade(t); {
 			case res.Err == nil:
-				fmt.Printf("✓ %-16s up to date (%s)\n", t.Name, res.Backend)
-				upgraded++
+				after := audit.NormalizeVersion(detect.Tool(t).Version)
+				switch {
+				case before != "" && after != "" && before != after:
+					fmt.Printf("%s %-16s %s → %s\n", upOK.Render("✓"), t.Name,
+						upOld.Render("v"+before), upNew.Render("v"+after))
+					upgraded++
+				default:
+					fmt.Printf("%s %-16s %s\n", upOK.Render("✓"), t.Name,
+						upDim.Render("already up to date"))
+					unchanged++
+				}
 			case res.NotBrewManaged:
-				fmt.Printf("· %-16s skipped (not installed via Homebrew)\n", t.Name)
+				fmt.Printf("%s %-16s %s\n", upDim.Render("·"), t.Name,
+					upDim.Render("skipped (not installed via Homebrew)"))
 				skipped++
 			default:
-				fmt.Printf("✗ %-16s %v\n%s\n", t.Name, res.Err, res.OutputTail)
+				fmt.Printf("%s %-16s %v\n%s\n", upErr.Render("✗"), t.Name, res.Err, res.OutputTail)
 				failed++
 			}
 		}
-		fmt.Printf("\n%d upgraded, %d skipped, %d failed\n", upgraded, skipped, failed)
+		fmt.Printf("\n%s upgraded, %d already current, %d skipped, %d failed\n",
+			upNew.Render(fmt.Sprintf("%d", upgraded)), unchanged, skipped, failed)
 		if failed > 0 {
 			return fmt.Errorf("%d upgrade(s) failed", failed)
 		}
