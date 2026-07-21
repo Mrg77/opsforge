@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -108,9 +109,11 @@ upgraded. Only tools with an OSV mapping in the catalog are checked.`,
 				if v.FixedIn != "" {
 					fix = auditDim.Render("  → fixed in " + v.FixedIn)
 				}
-				fmt.Printf("    %s %s%s\n",
+				id := hyperlink(vulnURL(v.ID), v.ID)
+				summary := truncate(v.Summary, 90-len(v.ID))
+				fmt.Printf("    %s %s %s%s\n",
 					sevStyle(v.Severity).Render(fmt.Sprintf("[%s]", v.Severity)),
-					truncate(fmt.Sprintf("%s %s", v.ID, v.Summary), 90), fix)
+					id, summary, fix)
 			}
 		}
 
@@ -139,10 +142,30 @@ func sevStyle(s audit.Severity) lipgloss.Style {
 }
 
 func truncate(s string, n int) string {
+	if n < 1 {
+		n = 1
+	}
 	if len(s) > n {
 		return s[:n-1] + "…"
 	}
 	return s
+}
+
+// vulnURL returns the canonical advisory page for a vuln id: the NVD
+// page for CVEs, the OSV.dev page otherwise (GHSA, GO-…).
+func vulnURL(id string) string {
+	if strings.HasPrefix(id, "CVE-") {
+		return "https://nvd.nist.gov/vuln/detail/" + id
+	}
+	return "https://osv.dev/vulnerability/" + id
+}
+
+// hyperlink wraps text in an OSC 8 terminal hyperlink escape sequence.
+// Terminals that support it (iTerm2, WezTerm, Ghostty, kitty, modern
+// gnome-terminal) render `text` as a clickable link to `url`; others
+// simply show `text` unchanged.
+func hyperlink(url, text string) string {
+	return "\x1b]8;;" + url + "\x1b\\" + text + "\x1b]8;;\x1b\\"
 }
 
 func init() {
