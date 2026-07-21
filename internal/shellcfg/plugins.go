@@ -4,13 +4,15 @@ import (
 	"os/exec"
 )
 
-// InteractivePlugins are the zsh plugins that provide the Fish/Warp-like
-// editing experience (inline suggestions, auto menu, syntax highlighting).
-// They are brew formulas; the interactive.zsh module sources whichever are
-// present, so a failed install just means a missing feature, never a
-// broken shell.
+// InteractivePlugins are the zsh plugins that provide the modern editing
+// experience (inline suggestions + syntax highlighting). They are brew
+// formulas; interactive.zsh sources whichever are present, so a failed
+// install just means a missing feature, never a broken shell.
+//
+// Note: zsh-autocomplete is deliberately excluded — it conflicts with an
+// existing compinit in the user's .zshrc and breaks TAB. The navigable
+// TAB menu in interactive.zsh (native zsh) covers that need reliably.
 var InteractivePlugins = []string{
-	"zsh-autocomplete",
 	"zsh-autosuggestions",
 	"zsh-syntax-highlighting",
 }
