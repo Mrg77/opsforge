@@ -20,6 +20,9 @@ profiles:
   - name: security
     description: DevSecOps essentials
     tools: [trivy, grype, syft, gitleaks, sops, age, cosign, hadolint]
+  - name: secrets
+    description: Secrets and identity management
+    tools: [sops, age, vault, step, mkcert, gitleaks]
 
 categories:
   - name: Kubernetes
@@ -110,6 +113,33 @@ categories:
         bin: kubeseal
         brew: kubeseal
         description: Encrypt secrets for Sealed Secrets controller
+      - name: krew
+        bin: kubectl-krew
+        brew: krew
+        description: Plugin manager for kubectl
+      - name: helmfile
+        bin: helmfile
+        brew: helmfile
+        description: Declarative spec for deploying Helm charts
+        completion_zsh: ["helmfile", "completion", "zsh"]
+      - name: kubeconform
+        bin: kubeconform
+        brew: kubeconform
+        description: Fast Kubernetes manifest validation
+      - name: popeye
+        bin: popeye
+        brew: popeye
+        description: Kubernetes cluster sanitizer / linter
+      - name: skaffold
+        bin: skaffold
+        brew: skaffold
+        description: Continuous development for Kubernetes apps
+        completion_zsh: ["skaffold", "completion", "zsh"]
+      - name: k3d
+        bin: k3d
+        brew: k3d
+        description: Run k3s (lightweight Kubernetes) in Docker
+        completion_zsh: ["k3d", "completion", "zsh"]
 
   - name: Infrastructure as Code
     tools:
@@ -346,7 +376,7 @@ categories:
         brew: xo/xo/usql
         description: Universal SQL client (one CLI, every database)
 
-  - name: Security & Secrets
+  - name: Security & Compliance
     tools:
       - name: trivy
         bin: trivy
@@ -390,6 +420,18 @@ categories:
         github:
           repo: sigstore/cosign
           asset: "cosign-{os}-{arch}"
+      - name: oras
+        bin: oras
+        brew: oras
+        description: Manage OCI artifacts in registries
+        completion_zsh: ["oras", "completion", "zsh"]
+      - name: kubent
+        bin: kubent
+        brew: kubent
+        description: Detect deprecated Kubernetes APIs (kube-no-trouble)
+
+  - name: Secrets & Identity
+    tools:
       - name: sops
         bin: sops
         brew: sops
@@ -403,6 +445,70 @@ categories:
         brew: hashicorp/tap/vault
         description: HashiCorp secrets management
         version_args: ["version"]
+      - name: 1password-cli
+        bin: op
+        brew: 1password-cli
+        cask: true
+        description: 1Password command-line tool
+      - name: bitwarden-cli
+        bin: bw
+        brew: bitwarden-cli
+        description: Bitwarden password manager CLI
+      - name: infisical
+        bin: infisical
+        brew: infisical
+        description: Open-source secrets management platform CLI
+      - name: doppler
+        bin: doppler
+        brew: doppler
+        description: SecretOps platform CLI
+        completion_zsh: ["doppler", "completion", "zsh"]
+      - name: teller
+        bin: teller
+        brew: teller
+        description: Secrets manager for developers (multi-backend)
+      - name: step
+        bin: step
+        brew: step
+        description: Zero-trust certificate and PKI toolkit (smallstep)
+        completion_zsh: ["step", "completion", "zsh"]
+      - name: cfssl
+        bin: cfssl
+        brew: cfssl
+        description: CloudFlare's PKI/TLS toolkit
+      - name: gopass
+        bin: gopass
+        brew: gopass
+        description: Team password manager on top of git + GPG
+      - name: mkcert
+        bin: mkcert
+        brew: mkcert
+        description: Locally-trusted development certificates
+
+  - name: Serverless & PaaS
+    tools:
+      - name: vercel
+        bin: vercel
+        brew: vercel-cli
+        description: Deploy frontends and serverless functions (Vercel)
+      - name: netlify
+        bin: netlify
+        brew: netlify-cli
+        description: Deploy and manage sites on Netlify
+      - name: flyctl
+        bin: flyctl
+        brew: flyctl
+        description: Deploy apps close to users on Fly.io
+        completion_zsh: ["flyctl", "completion", "zsh"]
+      - name: railway
+        bin: railway
+        brew: railway
+        description: Deploy apps and databases on Railway
+        completion_zsh: ["railway", "completion", "zsh"]
+      - name: serverless
+        bin: serverless
+        brew: serverless
+        description: Serverless Framework CLI (AWS Lambda et al.)
 
   - name: Utilities
     tools:
@@ -459,3 +565,29 @@ categories:
         bin: eza
         brew: eza
         description: Modern replacement for ls
+      - name: just
+        bin: just
+        brew: just
+        description: Command runner (a modern make for tasks)
+        completion_zsh: ["just", "--completions", "zsh"]
+      - name: task
+        bin: task
+        brew: task
+        description: Task runner / build tool (Taskfile.yml)
+        completion_zsh: ["task", "--completion", "zsh"]
+      - name: gron
+        bin: gron
+        brew: gron
+        description: Make JSON greppable
+      - name: jless
+        bin: jless
+        brew: jless
+        description: Terminal JSON/YAML viewer and pager
+      - name: hurl
+        bin: hurl
+        brew: hurl
+        description: Run and test HTTP requests in plain text
+      - name: duckdb
+        bin: duckdb
+        brew: duckdb
+        description: In-process analytical SQL database
