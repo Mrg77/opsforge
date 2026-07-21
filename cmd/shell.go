@@ -79,11 +79,30 @@ var shellInstallCmd = &cobra.Command{
 		if cat, err := catalog.Load(); err == nil {
 			shellcfg.Sync(cat.Tools())
 		}
-		fmt.Printf("opsforge shell environment installed in %s\n", path)
-		fmt.Println("Run `exec zsh` (or open a new terminal) to activate it.")
+
+		// Install the interactive plugins (inline suggestions, auto menu,
+		// syntax highlighting) so the experience is complete out of the box.
+		if !shellNoPlugins {
+			fmt.Println("Setting up the interactive experience (this may take a minute)…")
+			installed, failed := shellcfg.EnsureInteractivePlugins()
+			for _, p := range installed {
+				fmt.Printf("  %s installed %s\n", docOKGreen.Render("✓"), p)
+			}
+			if len(failed) > 0 {
+				fmt.Printf("  %s could not install: %v (features degrade gracefully)\n",
+					docDimGrey.Render("·"), failed)
+			}
+		}
+
+		fmt.Printf("\nopsforge shell environment installed in %s\n", path)
+		fmt.Println("Run `exec zsh` (or open a new terminal) to activate it — then just")
+		fmt.Println("start typing: suggestions appear inline (→ to accept), a menu opens")
+		fmt.Println("automatically, and your command line is colored as you go.")
 		return nil
 	},
 }
+
+var shellNoPlugins bool
 
 var shellUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
@@ -132,6 +151,11 @@ var shellDoctorCmd = &cobra.Command{
 		entries, _ := os.ReadDir(complDir)
 		fmt.Printf("%s %d cached tool completion(s)\n", mark(len(entries) > 0), len(entries))
 
+		fmt.Println("\ninteractive experience (inline suggestions, auto menu, highlighting):")
+		for _, p := range shellcfg.InteractivePluginStatus() {
+			fmt.Printf("  %s %s\n", mark(p.Installed), p.Name)
+		}
+
 		fmt.Println("\nintegrations detected on PATH:")
 		for _, tool := range []string{"fzf", "zoxide", "atuin", "eza", "bat", "kubectl"} {
 			_, err := lookPath(tool)
@@ -142,6 +166,8 @@ var shellDoctorCmd = &cobra.Command{
 }
 
 func init() {
+	shellInstallCmd.Flags().BoolVar(&shellNoPlugins, "no-plugins", false,
+		"skip installing the interactive plugins (autosuggestions, menu, highlighting)")
 	shellCmd.AddCommand(shellEnvCmd, shellSyncCmd, shellInstallCmd, shellUninstallCmd, shellDoctorCmd)
 	rootCmd.AddCommand(shellCmd)
 }
