@@ -12,6 +12,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
+	"github.com/Mrg77/opsforge/internal/versions"
 )
 
 var (
@@ -51,6 +52,14 @@ var doctorCmd = &cobra.Command{
 			"add `eval \"$(/opt/homebrew/bin/brew shellenv)\"` to your ~/.zprofile")
 		check(shellcfg.InstalledInZshrc(), "opsforge shell layer in ~/.zshrc",
 			"run `opsforge shell install`")
+
+		if mgr := versions.Detect(); mgr != versions.None {
+			fmt.Printf("%s version manager: %s (opsforge use <tool>@<ver> works)\n",
+				docOK.Render("✓"), mgr)
+		} else {
+			fmt.Printf("%s no version manager (install mise for `opsforge use`)\n",
+				docWarn.Render("⚠"))
+		}
 
 		dir, err := shellcfg.CompletionsDir()
 		if err == nil {

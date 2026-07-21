@@ -99,6 +99,7 @@ the (re-scanned) menu, `q` quits.
 | `opsforge profiles` | List stack profiles with installed/total counts |
 | `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
 | `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
+| `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
 | `opsforge list` | Catalog with live installed/version status |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, broken tools |
 
@@ -122,6 +123,21 @@ on any machine:
 ```sh
 opsforge install --profile my-stack   # reinstall your saved stack anywhere
 ```
+
+### Pinning tool versions
+
+Need a specific version to reproduce or debug something (`terraform@1.5` behaves
+differently than `1.6`)? opsforge delegates to a real version manager instead of
+reinventing one:
+
+```sh
+opsforge install mise             # once
+opsforge use terraform@1.5        # pins it in this directory
+```
+
+`opsforge use` prefers **mise** (its one-shot `mise use` installs and pins) and
+falls back to **asdf**, writing the project's `mise.toml` / `.tool-versions`. It
+works for any runtime those managers support, not just catalog tools.
 
 ### Security audit
 
@@ -182,7 +198,7 @@ reach your shell.
 
 ## The catalog
 
-104 curated tools across 13 categories: Kubernetes, Infrastructure as Code, Cloud
+107 curated tools across 14 categories: Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, Databases, Security & Compliance, Secrets & Identity, Serverless & PaaS,
 Utilities. The catalog is a single embedded

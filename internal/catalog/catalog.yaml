@@ -515,6 +515,18 @@ categories:
         brew: serverless
         description: Serverless Framework CLI (AWS Lambda et al.)
 
+  - name: Runtime & Versions
+    tools:
+      - name: mise
+        bin: mise
+        brew: mise
+        description: Polyglot tool-version manager (asdf successor)
+        completion_zsh: ["mise", "completion", "zsh"]
+      - name: asdf
+        bin: asdf
+        brew: asdf
+        description: Manage multiple runtime versions per project
+
   - name: Utilities
     tools:
       - name: jq
