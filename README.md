@@ -112,6 +112,15 @@ opsforge profiles                    # list all profiles with install status
 Built-in profiles: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
 `security`.
 
+**Save your own.** In the picker, select the tools that make up *your* stack and
+press `s` to save them as a named profile. It's written to
+`~/.config/opsforge/profiles.yaml`, so you can reproduce your exact environment
+on any machine:
+
+```sh
+opsforge install --profile my-stack   # reinstall your saved stack anywhere
+```
+
 ## The DevOps shell environment
 
 ```sh

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/userprofiles"
 )
 
 var (
@@ -45,32 +46,22 @@ var profilesCmd = &cobra.Command{
 			return err
 		}
 		statuses := detect.AllWithOutdated(cat.Tools())
+		userps, _ := userprofiles.Load()
 
 		fmt.Println()
+		fmt.Println(profileMeta.Render("  BUILT-IN"))
 		for _, p := range cat.Profiles {
-			installed := 0
-			for _, name := range p.Tools {
-				if statuses[name].Installed {
-					installed++
-				}
-			}
+			printProfile(p, statuses, false)
+		}
 
-			// Header: name, progress bar, count, description.
-			fmt.Printf("  %s  %s  %s\n",
-				profileName.Render(fmt.Sprintf("%-14s", p.Name)),
-				progressBar(installed, len(p.Tools), 12),
-				profileMeta.Render(fmt.Sprintf("%d/%d", installed, len(p.Tools))))
-			fmt.Printf("  %s\n", profileDesc.Render(p.Description))
-
-			// Tools in an aligned grid: 4 fixed-width columns.
-			const cols = 4
-			for i, name := range p.Tools {
-				fmt.Print("  " + renderCell(name, statuses[name]))
-				if (i+1)%cols == 0 || i == len(p.Tools)-1 {
-					fmt.Println()
-				}
+		if len(userps) > 0 {
+			fmt.Println(profileMeta.Render("  YOURS"))
+			for _, p := range userps {
+				printProfile(p, statuses, true)
 			}
-			fmt.Println()
+		} else {
+			fmt.Println(profileMeta.Render(
+				"  Tip: in the picker, select tools and press s to save your own profile.\n"))
 		}
 
 		fmt.Printf("  %s   %s   %s\n\n",
@@ -79,6 +70,35 @@ var profilesCmd = &cobra.Command{
 			toolMissing.Render("● not installed"))
 		return nil
 	},
+}
+
+// printProfile renders one profile: header with progress bar, then its
+// tools in an aligned 4-column grid. `own` marks user profiles.
+func printProfile(p catalog.Profile, statuses map[string]detect.Status, own bool) {
+	installed := 0
+	for _, name := range p.Tools {
+		if statuses[name].Installed {
+			installed++
+		}
+	}
+	desc := p.Description
+	if own {
+		desc = "your saved stack"
+	}
+	fmt.Printf("  %s  %s  %s\n",
+		profileName.Render(fmt.Sprintf("%-14s", p.Name)),
+		progressBar(installed, len(p.Tools), 12),
+		profileMeta.Render(fmt.Sprintf("%d/%d", installed, len(p.Tools))))
+	fmt.Printf("  %s\n", profileDesc.Render(desc))
+
+	const cols = 4
+	for i, name := range p.Tools {
+		fmt.Print("  " + renderCell(name, statuses[name]))
+		if (i+1)%cols == 0 || i == len(p.Tools)-1 {
+			fmt.Println()
+		}
+	}
+	fmt.Println()
 }
 
 // renderCell formats one tool as a fixed-width, colored, state-marked cell.

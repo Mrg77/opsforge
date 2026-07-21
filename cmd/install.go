@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -12,6 +11,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/tui"
+	"github.com/Mrg77/opsforge/internal/userprofiles"
 )
 
 var installProfile string
@@ -40,7 +40,21 @@ func runPicker(cat *catalog.Catalog) error {
 	rescan := func() map[string]detect.Status {
 		return detect.AllWithOutdated(cat.Tools())
 	}
-	model := tui.New(cat.Categories, rescan(), rescan)
+	// Saving validates tool names against the catalog before persisting,
+	// so a profile can never reference a tool that does not exist.
+	saver := func(name string, tools []string) error {
+		for _, tn := range tools {
+			if _, ok := cat.Tool(tn); !ok {
+				return fmt.Errorf("unknown tool %q", tn)
+			}
+		}
+		return userprofiles.Save(catalog.Profile{
+			Name:        name,
+			Description: "user profile",
+			Tools:       tools,
+		})
+	}
+	model := tui.New(cat.Categories, rescan(), rescan).WithProfileSaver(saver)
 	final, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return err
@@ -56,14 +70,9 @@ func runPicker(cat *catalog.Catalog) error {
 // rest sequentially with plain line output — scriptable and CI-friendly.
 func installNonInteractive(cat *catalog.Catalog, names []string) error {
 	if installProfile != "" {
-		p, ok := cat.Profile(installProfile)
+		p, ok := resolveProfile(cat, installProfile)
 		if !ok {
-			var known []string
-			for _, pr := range cat.Profiles {
-				known = append(known, pr.Name)
-			}
-			return fmt.Errorf("unknown profile %q (available: %s)",
-				installProfile, strings.Join(known, ", "))
+			return fmt.Errorf("unknown profile %q (see `opsforge profiles`)", installProfile)
 		}
 		names = append(names, p.Tools...)
 	}
@@ -119,6 +128,24 @@ func postInstall(cat *catalog.Catalog) error {
 		fmt.Println("    opsforge shell install && exec zsh")
 	}
 	return nil
+}
+
+// resolveProfile looks up a profile by name, checking the embedded
+// catalog first, then the user's saved profiles.
+func resolveProfile(cat *catalog.Catalog, name string) (catalog.Profile, bool) {
+	if p, ok := cat.Profile(name); ok {
+		return p, true
+	}
+	userps, err := userprofiles.Load()
+	if err != nil {
+		return catalog.Profile{}, false
+	}
+	for _, p := range userps {
+		if p.Name == name {
+			return p, true
+		}
+	}
+	return catalog.Profile{}, false
 }
 
 func init() {

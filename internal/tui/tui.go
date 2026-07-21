@@ -75,10 +75,20 @@ type Model struct {
 	rescan  Rescanner
 	didWork bool // at least one install/upgrade succeeded this session
 
+	// Save-as-profile mode: prompts for a name, then calls saveProfile.
+	saving      bool
+	nameInput   textinput.Model
+	saveProfile ProfileSaver
+	notice      string // transient status line (e.g. "saved profile 'x'")
+
 	// height is the terminal height from the last WindowSizeMsg, used
 	// to window the list — the full catalog no longer fits on screen.
 	height int
 }
+
+// ProfileSaver persists a named profile from the given tool names. The
+// TUI calls it when the user saves a selection; nil disables saving.
+type ProfileSaver func(name string, tools []string) error
 
 // New builds the picker from the catalog and current detection state.
 // rescan may be nil, in which case returning to the menu after an
@@ -96,15 +106,37 @@ func New(categories []catalog.Category, statuses map[string]detect.Status, resca
 	ti.Placeholder = "type to filter…"
 	ti.Prompt = "/ "
 	ti.CharLimit = 40
+	ni := textinput.New()
+	ni.Placeholder = "profile name"
+	ni.Prompt = "save as: "
+	ni.CharLimit = 40
 	sp := spinner.New(spinner.WithSpinner(spinner.Dot))
 	return Model{
-		rows:     rows,
-		selected: map[int]bool{},
-		results:  map[int]installer.Result{},
-		filter:   ti,
-		spin:     sp,
-		rescan:   rescan,
+		rows:      rows,
+		selected:  map[int]bool{},
+		results:   map[int]installer.Result{},
+		filter:    ti,
+		nameInput: ni,
+		spin:      sp,
+		rescan:    rescan,
 	}
+}
+
+// WithProfileSaver enables the "save selection as profile" action (key s).
+func (m Model) WithProfileSaver(f ProfileSaver) Model {
+	m.saveProfile = f
+	return m
+}
+
+// selectedToolNames returns the catalog names of currently selected tools.
+func (m Model) selectedToolNames() []string {
+	var names []string
+	for i := range m.rows {
+		if m.selected[i] && !m.rows[i].isHeader() {
+			names = append(names, m.rows[i].tool.Name)
+		}
+	}
+	return names
 }
 
 // applyStatuses updates each tool row from a fresh detection map.
@@ -261,6 +293,33 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if m.saving {
+		switch msg.String() {
+		case "esc":
+			m.saving = false
+			m.nameInput.SetValue("")
+			m.nameInput.Blur()
+		case "enter":
+			name := strings.TrimSpace(m.nameInput.Value())
+			m.saving = false
+			m.nameInput.Blur()
+			if name != "" && m.saveProfile != nil {
+				if err := m.saveProfile(name, m.selectedToolNames()); err != nil {
+					m.notice = styleErr.Render("save failed: " + err.Error())
+				} else {
+					m.notice = styleOK.Render(fmt.Sprintf("saved profile '%s' (%d tools)",
+						name, len(m.selectedToolNames())))
+				}
+			}
+			m.nameInput.SetValue("")
+		default:
+			var cmd tea.Cmd
+			m.nameInput, cmd = m.nameInput.Update(msg)
+			return m, cmd
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
@@ -275,6 +334,13 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		m.filtering = true
 		return m, m.filter.Focus()
+	case "s":
+		// Save current selection as a named user profile.
+		if m.saveProfile != nil && len(m.selected) > 0 {
+			m.saving = true
+			m.notice = ""
+			return m, m.nameInput.Focus()
+		}
 	case "u":
 		// Select every outdated tool at once — the "update all" shortcut.
 		for i, r := range m.rows {
@@ -353,7 +419,9 @@ func (m Model) View() string {
 func (m Model) viewSelect() string {
 	var b strings.Builder
 	b.WriteString(styleTitle.Render("opsforge — pick your tools") + "\n")
-	if m.filtering || m.filter.Value() != "" {
+	if m.saving {
+		b.WriteString(m.nameInput.View() + styleHelp.Render("  (enter to save · esc to cancel)") + "\n")
+	} else if m.filtering || m.filter.Value() != "" {
 		b.WriteString(m.filter.View() + "\n")
 	}
 	b.WriteString("\n")
@@ -423,12 +491,19 @@ func (m Model) viewSelect() string {
 		styleSelected.Render("[▸] selected")
 	b.WriteString("\n" + legend + "\n")
 
+	if m.notice != "" {
+		b.WriteString(m.notice + "\n")
+	}
+
 	status := fmt.Sprintf("%d selected", len(m.selected))
 	if n := m.outdatedCount(); n > 0 {
 		status += styleUpdate.Render(fmt.Sprintf(" · %d update(s) available — press u to select all", n))
 	}
-	b.WriteString(styleHelp.Render(status + "\n" +
-		"space toggle · u update-all · a select-all · / filter · i install · q quit"))
+	help := "space toggle · u update-all · a select-all · / filter · i install · q quit"
+	if m.saveProfile != nil {
+		help = "space toggle · u update-all · a select-all · s save-profile · / filter · i install · q quit"
+	}
+	b.WriteString(styleHelp.Render(status + "\n" + help))
 	return b.String()
 }
 
