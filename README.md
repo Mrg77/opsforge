@@ -98,6 +98,7 @@ the (re-scanned) menu, `q` quits.
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
 | `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
+| `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
 | `opsforge list` | Catalog with live installed/version status |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, broken tools |
 
@@ -121,6 +122,27 @@ on any machine:
 ```sh
 opsforge install --profile my-stack   # reinstall your saved stack anywhere
 ```
+
+### Security audit
+
+```sh
+opsforge audit
+```
+
+Cross-references your **installed** tool versions against the
+[OSV.dev](https://osv.dev) vulnerability database and reports the tools with
+known CVEs, sorted by severity, with the version that fixes each one:
+
+```
+⚠ argocd         2.11.0
+    [CRITICAL] CVE-2025-47933 Argo CD allows cross-site scripting…  → fixed in 2.13.8
+    [HIGH]     CVE-2025-59531 Unauthenticated argocd-server panic…  → fixed in 2.14.20
+✓ helm           4.2.3 — no known vulnerabilities
+```
+
+Version matching is done client-side against OSV's affected ranges, so a CVE
+fixed before your version (or only in a future major) is not reported — you see
+only what actually affects the version you run.
 
 ## The DevOps shell environment
 
@@ -185,6 +207,11 @@ dir with `OPSFORGE_BIN_DIR`.
 
 The parts I'd point a reviewer to:
 
+- **CVE audit with real version matching.** `opsforge audit` queries OSV.dev per
+  installed tool, then filters vulnerabilities *client-side* against OSV's
+  affected ranges (semver `introduced`/`fixed`) and dedupes CVEs that appear
+  under multiple advisory IDs — so it reports only what affects the version you
+  actually run, with the fix version on your branch.
 - **Auth-safe version detection.** Probing `kubectl --version` on a machine
   where kubectl is a cloud-SDK dispatcher wired to an OIDC plugin can pop a
   browser login. Every probe runs with a neutralized `KUBECONFIG` and a

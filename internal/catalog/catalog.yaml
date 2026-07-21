@@ -39,6 +39,7 @@ categories:
         description: Kubernetes package manager
         version_args: ["version", "--short"]
         completion_zsh: ["helm", "completion", "zsh"]
+        osv: {ecosystem: Go, name: helm.sh/helm/v3}
       - name: k9s
         bin: k9s
         brew: k9s
@@ -92,6 +93,7 @@ categories:
         description: GitOps continuous delivery CLI for Kubernetes
         version_args: ["version", "--client", "--short"]
         completion_zsh: ["argocd", "completion", "zsh"]
+        osv: {ecosystem: Go, name: github.com/argoproj/argo-cd/v2}
         github:
           repo: argoproj/argo-cd
           asset: "argocd-{os}-{arch}"
@@ -148,6 +150,7 @@ categories:
         brew: hashicorp/tap/terraform
         description: HashiCorp infrastructure as code
         version_args: ["version"]
+        osv: {ecosystem: Go, name: github.com/hashicorp/terraform}
       - name: opentofu
         bin: tofu
         brew: opentofu
@@ -272,6 +275,7 @@ categories:
         brew: gh
         description: GitHub CLI
         completion_zsh: ["gh", "completion", "-s", "zsh"]
+        osv: {ecosystem: Go, name: github.com/cli/cli/v2}
       - name: glab
         bin: glab
         brew: glab
@@ -383,6 +387,7 @@ categories:
         brew: trivy
         description: Vulnerability scanner for containers and IaC
         completion_zsh: ["trivy", "completion", "zsh"]
+        osv: {ecosystem: Go, name: github.com/aquasecurity/trivy}
       - name: grype
         bin: grype
         brew: grype

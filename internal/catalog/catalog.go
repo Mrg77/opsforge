@@ -33,6 +33,16 @@ type Tool struct {
 	// release binary directly — used as a fallback on hosts without
 	// Homebrew (bare Linux servers, CI images).
 	GitHub *GitHubRelease `yaml:"github"`
+	// OSV, when set, maps the tool to an OSV.dev package so `opsforge
+	// audit` can check its installed version for known vulnerabilities.
+	OSV *OSVRef `yaml:"osv"`
+}
+
+// OSVRef maps a tool to its package in the OSV.dev vulnerability
+// database (ecosystem + package name, e.g. Go + helm.sh/helm/v3).
+type OSVRef struct {
+	Ecosystem string `yaml:"ecosystem"`
+	Name      string `yaml:"name"`
 }
 
 // GitHubRelease describes how to fetch a tool's binary from its GitHub
