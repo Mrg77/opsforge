@@ -51,7 +51,10 @@ func TestModulesLoadAndAreNonEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]bool{"prompt": true, "aliases": true, "integrations": true, "guards": true}
+	want := map[string]bool{
+		"prompt": true, "aliases": true, "integrations": true,
+		"completions-special": true, "guards": true,
+	}
 	for _, m := range mods {
 		if !want[m.Name] {
 			t.Errorf("unexpected module %q", m.Name)

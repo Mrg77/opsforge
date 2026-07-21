@@ -46,7 +46,7 @@ type Module struct {
 // matters: aliases before integrations (so integrations can override),
 // guards last (the accept-line widget should wrap everything).
 func Modules() ([]Module, error) {
-	order := []string{"prompt", "aliases", "integrations", "guards"}
+	order := []string{"prompt", "aliases", "integrations", "completions-special", "guards"}
 	var mods []Module
 	for _, name := range order {
 		body, err := moduleFS.ReadFile("modules/" + name + ".zsh")
@@ -125,7 +125,7 @@ if [ -d %[1]q ]; then
 fi
 # opsforge modules (prompt, aliases, integrations, guards)
 if [ -d %[2]q ]; then
-  for _of_m in %[2]q/prompt.zsh %[2]q/aliases.zsh %[2]q/integrations.zsh %[2]q/guards.zsh; do
+  for _of_m in %[2]q/prompt.zsh %[2]q/aliases.zsh %[2]q/integrations.zsh %[2]q/completions-special.zsh %[2]q/guards.zsh; do
     [ -r "$_of_m" ] && source "$_of_m"
   done
   unset _of_m
@@ -147,16 +147,11 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 	}
 	var synced []string
 	for _, t := range tools {
-		if len(t.CompletionZsh) == 0 || !detect.Tool(t).Installed {
+		if !detect.Tool(t).Installed {
 			continue
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		gen := exec.CommandContext(ctx, t.CompletionZsh[0], t.CompletionZsh[1:]...)
-		gen.Env = detect.SafeProbeEnv() // never let a probe trigger cloud auth
-		gen.WaitDelay = time.Second     // children may hold the pipe open
-		out, err := gen.Output()
-		cancel()
-		if err != nil || len(out) == 0 {
+		out := generateCompletion(t)
+		if len(out) == 0 {
 			continue
 		}
 		path := filepath.Join(dir, t.Name+".zsh")
@@ -167,6 +162,58 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 	}
 	sort.Strings(synced)
 	return synced, nil
+}
+
+// generateCompletion produces a tool's zsh completion script. It uses the
+// catalog's explicit CompletionZsh command when present, otherwise tries
+// the common conventions (`<bin> completion zsh`, `<bin> --completion
+// zsh`) so tools without an explicit entry still get completion when they
+// follow the Cobra/urfave standard. Returns nil when nothing works.
+func generateCompletion(t catalog.Tool) []byte {
+	var attempts [][]string
+	if len(t.CompletionZsh) > 0 {
+		attempts = append(attempts, t.CompletionZsh)
+	} else {
+		attempts = [][]string{
+			{t.Bin, "completion", "zsh"},
+			{t.Bin, "--completion", "zsh"},
+		}
+	}
+	for _, argv := range attempts {
+		out := runCompletion(argv)
+		// A real completion script defines a completion function; this
+		// filters out help text or error output that exited zero.
+		if looksLikeCompletion(out) {
+			return out
+		}
+	}
+	return nil
+}
+
+func runCompletion(argv []string) []byte {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	gen := exec.CommandContext(ctx, argv[0], argv[1:]...)
+	gen.Env = detect.SafeProbeEnv() // never let a probe trigger cloud auth
+	gen.WaitDelay = time.Second     // children may hold the pipe open
+	out, err := gen.Output()
+	if err != nil {
+		return nil
+	}
+	return out
+}
+
+// looksLikeCompletion checks the output actually registers a zsh
+// completion, so help/usage text that happens to exit 0 is rejected.
+func looksLikeCompletion(out []byte) bool {
+	if len(out) < 20 {
+		return false
+	}
+	s := string(out)
+	return strings.Contains(s, "#compdef") ||
+		strings.Contains(s, "compdef ") ||
+		strings.Contains(s, "_arguments") ||
+		strings.Contains(s, "autoload")
 }
 
 // InstallToZshrc idempotently adds the eval line to ~/.zshrc inside
