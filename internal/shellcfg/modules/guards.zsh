@@ -5,11 +5,24 @@
 # buffer is inspected before it runs. This is the only reliable place to
 # *cancel* a command in zsh (a preexec hook cannot stop execution).
 # Set OPSFORGE_GUARDS=0 to disable for a session.
+#
+# Like the prompt, this NEVER invokes kubectl — it reads current-context
+# from the kubeconfig file, so it can't trigger an OIDC browser login on
+# machines where kubectl is a cloud-SDK dispatcher.
+
+# _opsforge_current_ctx echoes the current kube context by reading the
+# kubeconfig file directly (no kubectl invocation).
+_opsforge_current_ctx() {
+  local cfg="${KUBECONFIG%%:*}"
+  [[ -z "$cfg" ]] && cfg="$HOME/.kube/config"
+  [[ -r "$cfg" ]] || return 1
+  grep -m1 '^current-context:' "$cfg" 2>/dev/null \
+    | sed 's/current-context:[[:space:]]*//; s/["'\'']//g'
+}
 
 _opsforge_ctx_is_prod() {
-  command -v kubectl >/dev/null 2>&1 || return 1
   local ctx
-  ctx=$(kubectl config current-context 2>/dev/null) || return 1
+  ctx=$(_opsforge_current_ctx) || return 1
   [[ "$ctx" == *prod* || "$ctx" == *production* ]]
 }
 
@@ -30,7 +43,7 @@ _opsforge_accept_line() {
      && _opsforge_is_destructive "$BUFFER" \
      && _opsforge_ctx_is_prod; then
     local ctx
-    ctx=$(kubectl config current-context 2>/dev/null)
+    ctx=$(_opsforge_current_ctx)
     zle -M ""
     print -P "\n%F{red}%B⚠  PRODUCTION context (${ctx})%b%f"
     print -P "%F{yellow}   ${BUFFER}%f"

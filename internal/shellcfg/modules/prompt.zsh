@@ -3,21 +3,29 @@
 # Segments appear only when relevant and are cached per-command so the
 # prompt stays fast. The kube segment turns red on a production-looking
 # context so you notice before running something dangerous.
+#
+# IMPORTANT: the kube segment NEVER runs `kubectl`. On machines where
+# kubectl is a cloud-SDK dispatcher wired to an OIDC exec plugin, even
+# `kubectl config current-context` pops a browser login. We read the
+# current context straight from the kubeconfig file instead — a pure file
+# read that can never trigger authentication. Set OPSFORGE_PROMPT_KUBE=0
+# to disable this segment entirely.
 
-# --- kube context: cluster:namespace, red when it looks like prod ---
+# --- kube context: cluster (+ namespace), red when it looks like prod ---
 _opsforge_kube_segment() {
-  command -v kubectl >/dev/null 2>&1 || return
-  local ctx ns
-  ctx=$(kubectl config current-context 2>/dev/null) || return
+  [[ "$OPSFORGE_PROMPT_KUBE" == "0" ]] && return
+  local cfg="${KUBECONFIG%%:*}"
+  [[ -z "$cfg" ]] && cfg="$HOME/.kube/config"
+  [[ -r "$cfg" ]] || return
+  # Parse `current-context:` without invoking kubectl.
+  local ctx
+  ctx=$(grep -m1 '^current-context:' "$cfg" 2>/dev/null | sed 's/current-context:[[:space:]]*//; s/["'\'']//g')
   [[ -z "$ctx" ]] && return
-  ns=$(kubectl config view --minify -o 'jsonpath={..namespace}' 2>/dev/null)
-  [[ -z "$ns" ]] && ns="default"
   local color="%F{cyan}"
-  # Heuristic: anything that reads like prod is flagged red.
-  if [[ "$ctx" == *prod* || "$ctx" == *production* || "$ns" == *prod* ]]; then
+  if [[ "$ctx" == *prod* || "$ctx" == *production* ]]; then
     color="%F{red}%B"
   fi
-  print -n "${color}⎈ ${ctx}:${ns}%b%f"
+  print -n "${color}⎈ ${ctx}%b%f"
 }
 
 # --- cloud account: active AWS profile / GCP project ---
