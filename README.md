@@ -24,7 +24,7 @@ prompt, and guards that stop you from nuking the wrong cluster.
 
 opsforge is two tools in one binary:
 
-1. **A tool installer** — an interactive picker over a curated catalog of **107
+1. **A tool installer** — an interactive picker over a curated catalog of **106
    DevOps CLIs** (Kubernetes, IaC, cloud, containers, observability, security,
    secrets, serverless…).
    It detects what you already have, what can be upgraded, and installs the rest
@@ -100,8 +100,8 @@ the (re-scanned) menu, `q` quits.
 | `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
 | `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
 | `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
-| `opsforge list` | Catalog with live installed/version status |
-| `opsforge doctor` | Health check: brew, PATH, shell layer, broken tools |
+| `opsforge list` | Your installed tools (`list all` for the full catalog, `list -u` for updates) |
+| `opsforge doctor` | Health check: brew, PATH, shell layer, version manager |
 
 ### Stack profiles
 
@@ -198,10 +198,10 @@ reach your shell.
 
 ## The catalog
 
-107 curated tools across 14 categories: Kubernetes, Infrastructure as Code, Cloud
+106 curated tools across 14 categories: Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, Databases, Security & Compliance, Secrets & Identity, Serverless & PaaS,
-Utilities. The catalog is a single embedded
+Runtime & Versions, Utilities. The catalog is a single embedded
 [YAML file](internal/catalog/catalog.yaml) — adding a tool is a five-line PR.
 
 ### Install backends
