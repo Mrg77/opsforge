@@ -1,23 +1,23 @@
-# opsforge prompt — context-aware DevOps segments on the right prompt.
+# opsforge prompt — optional context segments on the right prompt.
 #
-# Segments appear only when relevant and are cached per-command so the
-# prompt stays fast. The kube segment turns red on a production-looking
-# context so you notice before running something dangerous.
+# By default ONLY the kube-context segment is on, and only when it can be
+# read cheaply from the kubeconfig file. Cloud and terraform segments are
+# opt-in, because probing gcloud/aws on every prompt is slow and noisy.
 #
-# IMPORTANT: the kube segment NEVER runs `kubectl`. On machines where
-# kubectl is a cloud-SDK dispatcher wired to an OIDC exec plugin, even
-# `kubectl config current-context` pops a browser login. We read the
-# current context straight from the kubeconfig file instead — a pure file
-# read that can never trigger authentication. Set OPSFORGE_PROMPT_KUBE=0
-# to disable this segment entirely.
+# Toggle segments with env vars (set in ~/.zshrc, before the eval line):
+#   OPSFORGE_PROMPT_KUBE=0    # disable the kube segment
+#   OPSFORGE_PROMPT_CLOUD=1   # enable the cloud segment (off by default)
+#   OPSFORGE_PROMPT_TF=1      # enable the terraform segment (off by default)
+#
+# The kube segment NEVER runs kubectl (it reads the kubeconfig file), so
+# it can't trigger an OIDC browser login.
 
-# --- kube context: cluster (+ namespace), red when it looks like prod ---
+# --- kube context: cluster name, red when it looks like prod ---
 _opsforge_kube_segment() {
   [[ "$OPSFORGE_PROMPT_KUBE" == "0" ]] && return
   local cfg="${KUBECONFIG%%:*}"
   [[ -z "$cfg" ]] && cfg="$HOME/.kube/config"
   [[ -r "$cfg" ]] || return
-  # Parse `current-context:` without invoking kubectl.
   local ctx
   ctx=$(grep -m1 '^current-context:' "$cfg" 2>/dev/null | sed 's/current-context:[[:space:]]*//; s/["'\'']//g')
   [[ -z "$ctx" ]] && return
@@ -28,30 +28,29 @@ _opsforge_kube_segment() {
   print -n "${color}⎈ ${ctx}%b%f"
 }
 
-# --- cloud account: active AWS profile / GCP project ---
+# --- cloud account: OFF by default. Only reads env vars, never probes
+#     gcloud/aws (which would be slow and surprising). Opt in with
+#     OPSFORGE_PROMPT_CLOUD=1. ---
 _opsforge_cloud_segment() {
-  if [[ -n "$AWS_PROFILE" || -n "$AWS_VAULT" ]]; then
-    print -n " %F{yellow}☁ aws:${AWS_VAULT:-$AWS_PROFILE}%f"
-  elif command -v gcloud >/dev/null 2>&1; then
-    local proj
-    proj=$(gcloud config get-value project 2>/dev/null)
-    [[ -n "$proj" && "$proj" != "(unset)" ]] && print -n " %F{yellow}☁ gcp:${proj}%f"
+  [[ "$OPSFORGE_PROMPT_CLOUD" == "1" ]] || return
+  if [[ -n "$AWS_VAULT" ]]; then
+    print -n " %F{yellow}☁ aws:${AWS_VAULT}%f"
+  elif [[ -n "$AWS_PROFILE" ]]; then
+    print -n " %F{yellow}☁ aws:${AWS_PROFILE}%f"
   fi
 }
 
-# --- terraform workspace, only inside a terraform project ---
+# --- terraform workspace: OFF by default. Opt in with OPSFORGE_PROMPT_TF=1. ---
 _opsforge_tf_segment() {
-  [[ -d .terraform || -f terraform.tf || -f main.tf ]] || return
-  command -v terraform >/dev/null 2>&1 || return
+  [[ "$OPSFORGE_PROMPT_TF" == "1" ]] || return
+  [[ -d .terraform ]] || return
   local ws
-  ws=$(terraform workspace show 2>/dev/null) || return
+  ws=$(cat .terraform/environment 2>/dev/null)
   [[ -n "$ws" && "$ws" != "default" ]] && print -n " %F{magenta}⧉ tf:${ws}%f"
 }
 
 _opsforge_rprompt() {
-  local out
-  out="$(_opsforge_kube_segment)$(_opsforge_cloud_segment)$(_opsforge_tf_segment)"
-  print -n "$out"
+  print -n "$(_opsforge_kube_segment)$(_opsforge_cloud_segment)$(_opsforge_tf_segment)"
 }
 
 # Only claim RPROMPT if the user (or another theme) hasn't already.
