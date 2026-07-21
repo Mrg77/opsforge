@@ -240,7 +240,26 @@ func InstallToZshrc() (string, error) {
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", err
 	}
+	// Drop any stale completion dump: it can hold references to functions
+	// from plugins that are no longer installed, which makes zsh spew
+	// "function definition file not found" on every prompt. zsh rebuilds
+	// it cleanly on next start.
+	clearCompDump(home)
 	return path, nil
+}
+
+// clearCompDump removes zsh's cached completion dump so it is rebuilt
+// fresh, discarding references to uninstalled plugins.
+func clearCompDump(home string) {
+	for _, name := range []string{".zcompdump", ".zcompdump.zwc"} {
+		os.Remove(filepath.Join(home, name))
+	}
+	// Some setups store it under $ZDOTDIR or with a host suffix; a glob
+	// covers the common ~/.zcompdump-<host>-<version> variants.
+	matches, _ := filepath.Glob(filepath.Join(home, ".zcompdump-*"))
+	for _, m := range matches {
+		os.Remove(m)
+	}
 }
 
 // UninstallFromZshrc removes the opsforge block from ~/.zshrc and deletes
