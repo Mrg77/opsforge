@@ -24,7 +24,7 @@ prompt, and guards that stop you from nuking the wrong cluster.
 
 opsforge is two tools in one binary:
 
-1. **A tool installer** — an interactive picker over a curated catalog of **104
+1. **A tool installer** — an interactive picker over a curated catalog of **107
    DevOps CLIs** (Kubernetes, IaC, cloud, containers, observability, security,
    secrets, serverless…).
    It detects what you already have, what can be upgraded, and installs the rest
