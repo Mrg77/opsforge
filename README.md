@@ -97,11 +97,22 @@ the (re-scanned) menu, `q` quits.
 | `opsforge install kubectl helm` | Non-interactive install by name (scriptable) |
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
-| `opsforge upgrade` | Upgrade every installed catalog tool (brew or GitHub backend) |
+| `opsforge upgrade` | Upgrade installed tools — all, `-u` for only outdated, or `upgrade jq yq gh` |
 | `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
 | `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
 | `opsforge list` | Your installed tools (`list all` for the full catalog, `list -u` for updates) |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, version manager |
+
+### Keeping tools current
+
+```sh
+opsforge list -u              # see what has an update
+opsforge upgrade -u           # upgrade only those
+opsforge upgrade jq yq gh     # or upgrade specific tools
+opsforge upgrade              # upgrade everything installed
+```
+
+`update` is an alias for `upgrade`.
 
 ### Stack profiles
 

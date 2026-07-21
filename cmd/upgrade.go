@@ -10,9 +10,15 @@ import (
 	"github.com/Mrg77/opsforge/internal/installer"
 )
 
+var upgradeOutdatedOnly bool
+
 var upgradeCmd = &cobra.Command{
-	Use:   "upgrade",
-	Short: "Upgrade every installed catalog tool through Homebrew",
+	Use:     "upgrade [tool...]",
+	Aliases: []string{"update"},
+	Short:   "Upgrade installed tools — all, only outdated (-u), or named ones",
+	Example: `  opsforge upgrade              # upgrade every installed tool
+  opsforge upgrade -u           # upgrade only tools with an update available
+  opsforge upgrade jq yq gh     # upgrade just these`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if !installer.Available() {
 			return fmt.Errorf("homebrew is required (https://brew.sh)")
@@ -21,12 +27,24 @@ var upgradeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		statuses := detect.All(cat.Tools())
-		upgraded, skipped, failed := 0, 0, 0
-		for _, t := range cat.Tools() {
-			if !statuses[t.Name].Installed {
-				continue
+		statuses := detect.AllWithOutdated(cat.Tools())
+
+		// Resolve the target set from args / flags.
+		targets, err := upgradeTargets(cat, statuses, args)
+		if err != nil {
+			return err
+		}
+		if len(targets) == 0 {
+			if upgradeOutdatedOnly {
+				fmt.Println("Everything installed is already up to date.")
+			} else {
+				fmt.Println("No installed catalog tools to upgrade.")
 			}
+			return nil
+		}
+
+		upgraded, skipped, failed := 0, 0, 0
+		for _, t := range targets {
 			switch res := installer.Upgrade(t); {
 			case res.Err == nil:
 				fmt.Printf("✓ %-16s up to date (%s)\n", t.Name, res.Backend)
@@ -39,7 +57,7 @@ var upgradeCmd = &cobra.Command{
 				failed++
 			}
 		}
-		fmt.Printf("\n%d checked/upgraded, %d skipped, %d failed\n", upgraded, skipped, failed)
+		fmt.Printf("\n%d upgraded, %d skipped, %d failed\n", upgraded, skipped, failed)
 		if failed > 0 {
 			return fmt.Errorf("%d upgrade(s) failed", failed)
 		}
@@ -47,6 +65,48 @@ var upgradeCmd = &cobra.Command{
 	},
 }
 
+// upgradeTargets builds the list of tools to upgrade from the requested
+// names (or all installed), honoring the --outdated filter.
+func upgradeTargets(cat *catalog.Catalog, statuses map[string]detect.Status, names []string) ([]catalog.Tool, error) {
+	var targets []catalog.Tool
+
+	if len(names) > 0 {
+		// Explicit names: validate, require installed, warn if up to date.
+		for _, name := range names {
+			t, ok := cat.Tool(name)
+			if !ok {
+				return nil, fmt.Errorf("unknown tool %q (see `opsforge list all`)", name)
+			}
+			s := statuses[name]
+			if !s.Installed {
+				fmt.Printf("· %-16s not installed — skipping (use `opsforge install %s`)\n", name, name)
+				continue
+			}
+			if upgradeOutdatedOnly && !s.Outdated {
+				fmt.Printf("· %-16s already up to date\n", name)
+				continue
+			}
+			targets = append(targets, t)
+		}
+		return targets, nil
+	}
+
+	// No names: all installed tools, filtered by --outdated when set.
+	for _, t := range cat.Tools() {
+		s := statuses[t.Name]
+		if !s.Installed {
+			continue
+		}
+		if upgradeOutdatedOnly && !s.Outdated {
+			continue
+		}
+		targets = append(targets, t)
+	}
+	return targets, nil
+}
+
 func init() {
+	upgradeCmd.Flags().BoolVarP(&upgradeOutdatedOnly, "outdated", "u", false,
+		"upgrade only tools that have an update available")
 	rootCmd.AddCommand(upgradeCmd)
 }
