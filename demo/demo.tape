@@ -7,7 +7,7 @@ Set Width 1200
 Set Height 760
 Set Padding 24
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 60ms
+Set TypingSpeed 65ms
 Set PlaybackSpeed 1.0
 
 Hide
@@ -17,34 +17,43 @@ Sleep 1s
 
 # --- the cockpit -------------------------------------------------------
 Type "opsforge status"  Sleep 500ms  Enter
-Sleep 6s
+Sleep 7s
 
 Type "clear" Enter
-Sleep 700ms
+Sleep 800ms
 
 # --- the interactive picker (with tabs) --------------------------------
 Type "opsforge"  Sleep 500ms  Enter
-Sleep 3s
-# filter
-Type "/"  Sleep 600ms
-Type "k8s"  Sleep 2500ms
-Escape  Sleep 1500ms
-# tabs: updates then security
-Type "2"  Sleep 3s
-Type "3"  Sleep 5s
-Type "1"  Sleep 1500ms
+# let the full catalog view breathe — this is the richest screen
+Sleep 6s
+# scroll down a touch so the reader sees it is a long, browsable list
+Down Down Down  Sleep 2s
+Down Down Down  Sleep 2500ms
+Up Up Up Up Up Up  Sleep 2s
+
+# filter to k8s
+Type "/"  Sleep 700ms
+Type "k8s"  Sleep 3500ms
+Escape  Sleep 2s
+
+# tab 2: updates only
+Type "2"  Sleep 4s
+# tab 3: live CVE security scan
+Type "3"  Sleep 6s
+# back to tools
+Type "1"  Sleep 2s
 Type "q"  Sleep 1s
 
 Type "clear" Enter
-Sleep 700ms
+Sleep 800ms
 
 # --- themes ------------------------------------------------------------
 Type "opsforge theme"  Sleep 500ms  Enter
-Sleep 6s
+Sleep 7s
 
 Type "clear" Enter
-Sleep 700ms
+Sleep 800ms
 
 # --- doctor ------------------------------------------------------------
 Type "opsforge doctor"  Sleep 500ms  Enter
-Sleep 7s
+Sleep 8s
