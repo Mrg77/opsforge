@@ -22,7 +22,8 @@ var shellHelpGroups = []helpGroup{
 	{"⌨", "Interactive editing", []helpRow{
 		{"↑ / ↓", "walk history filtered by what you've typed (prefix of the line)"},
 		{"→", "accept the WHOLE grey suggestion"},
-		{"Tab", "accept the grey suggestion one word at a time · else complete"},
+		{"Tab", "accept the grey suggestion one word at a time"},
+		{"^Space", "file / command completion"},
 		{"^R", "search your whole history"},
 		{"cmd ?", "that command's --help, nicely rendered"},
 		{"?", "this help panel"},
