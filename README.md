@@ -61,7 +61,7 @@ go install github.com/Mrg77/opsforge@latest   # from source
 ```sh
 opsforge              # interactive picker (tabs: 1 Tools · 2 Updates · 3 Security)
 opsforge status       # one-glance cockpit of your workstation
-opsforge doctor       # full health check
+opsforge doctor       # full health check — incl. CVEs & leaked secrets
 opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
 ```
 
@@ -78,7 +78,7 @@ opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds t
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
 <tr><td><code>opsforge theme [set &lt;name&gt;]</code></td><td>List/preview/persist color themes</td></tr>
-<tr><td><code>opsforge doctor</code></td><td>Full workstation health check</td></tr>
+<tr><td><code>opsforge doctor</code></td><td>Full health check — system, shell, toolbox, <strong>CVEs &amp; leaked secrets</strong></td></tr>
 </table>
 
 ### The picker
