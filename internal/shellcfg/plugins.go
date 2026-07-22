@@ -16,6 +16,11 @@ var InteractivePlugins = []string{
 	"zsh-syntax-highlighting",
 }
 
+// RenderingTools are CLI tools (not zsh plugins) that make the experience
+// nicer when present: bat gives syntax-colored `?` help and file viewing.
+// They degrade gracefully if missing, so install failures are non-fatal.
+var RenderingTools = []string{"bat"}
+
 // PluginStatus reports whether an interactive plugin is installed.
 type PluginStatus struct {
 	Name      string
@@ -39,7 +44,7 @@ func EnsureInteractivePlugins() (installed, failed []string) {
 	if _, err := exec.LookPath("brew"); err != nil {
 		return nil, append([]string(nil), InteractivePlugins...)
 	}
-	for _, p := range InteractivePlugins {
+	for _, p := range append(append([]string{}, InteractivePlugins...), RenderingTools...) {
 		if brewHas(p) {
 			continue
 		}
