@@ -63,7 +63,28 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosu
   ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
   # Don't fire on very long buffers (a pasted block shouldn't flicker).
   ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=80
+  # Tab, when it accepts one word of the suggestion, must extend the gray
+  # text — register forward-word as a partial-accept widget BEFORE sourcing
+  # the plugin so it wraps it.
+  ZSH_AUTOSUGGEST_PARTIAL_ACCEPT_WIDGETS+=(forward-word)
+  # → accepts the WHOLE gray suggestion; that's the plugin default.
   source "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+
+  # --- Tab = accept the gray suggestion word-by-word ------------------
+  # The problem this solves: with a gray history suggestion showing, a
+  # bare Tab used to run FILE completion (jumping `play` → `examples/`).
+  # Instead: when a suggestion is present, Tab accepts just the next word
+  # of it (`play` → `playbooks/`). When there is NO suggestion, Tab does
+  # ordinary completion. → still accepts the whole line.
+  _opsforge_tab() {
+    if [[ -n "$POSTDISPLAY" ]]; then
+      zle forward-word          # a gray suggestion is showing: take one word
+    else
+      zle expand-or-complete    # nothing suggested: normal completion
+    fi
+  }
+  zle -N _opsforge_tab
+  bindkey '^I' _opsforge_tab    # Tab
 fi
 
 # --- zsh-syntax-highlighting: color the command line (load LAST) ---
