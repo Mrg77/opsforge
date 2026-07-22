@@ -1,0 +1,46 @@
+# Example: use opsforge as a CI security gate.
+#
+# Drop this into .github/workflows/ in a repo whose build image ships DevOps
+# CLIs (kubectl, helm, terraform, argocd…). The job installs opsforge, then
+# fails the pipeline if any installed tool carries a HIGH/CRITICAL CVE or a
+# credential is leaking in the checked-out tree — using opsforge's
+# machine-readable output and exit codes.
+name: security-gate
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # weekly re-scan: new CVEs land against pinned versions
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install opsforge
+        run: curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
+
+      # Gate 1 — CVEs in installed tooling. `audit` exits non-zero on
+      # HIGH/CRITICAL, so this step fails the job on its own. --json is
+      # captured as an artifact / for downstream parsing.
+      - name: CVE audit
+        run: |
+          opsforge audit --json | tee cve-report.json
+        # exit code: 0 clean, non-zero when HIGH/CRITICAL CVEs are found.
+
+      # Gate 2 — leaked credentials in the repo/env. Critical leaks fail.
+      - name: Secret scan
+        run: opsforge audit --secrets --json | tee secret-report.json
+
+      # Optional — a full workstation/image health check as JSON, for
+      # dashboards. Does not fail the build (|| true), just records state.
+      - name: Workstation health (report only)
+        run: opsforge doctor --json > doctor-report.json || true
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opsforge-reports
+          path: "*-report.json"
