@@ -494,7 +494,7 @@ categories:
     tools:
       - name: vercel
         bin: vercel
-        brew: vercel-cli
+        brew: vercel
         description: Deploy frontends and serverless functions (Vercel)
       - name: netlify
         bin: netlify
