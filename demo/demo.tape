@@ -1,41 +1,50 @@
-# vhs script for the opsforge demo GIF.
-# Regenerate with:  vhs demo/demo.tape   (from the repo root)
-# Requires the `opsforge` binary on PATH or in the repo root.
-
-Output demo/opsforge.gif
+# opsforge demo — regenerate with: vhs demo.tape
+Output opsforge.gif
 
 Set Shell "zsh"
-Set FontSize 18
-Set Width 1100
-Set Height 750
-Set Padding 20
+Set FontSize 16
+Set Width 1200
+Set Height 760
+Set Padding 24
 Set Theme "Catppuccin Mocha"
-Set TypingSpeed 60ms
+Set TypingSpeed 55ms
+Set PlaybackSpeed 1.0
 
-# --- profiles: show the stack presets ---
-Type "opsforge profiles"  Sleep 400ms  Enter
+Hide
+Type "clear" Enter
+Show
+Sleep 800ms
+
+# --- the cockpit -------------------------------------------------------
+Type "opsforge status"  Sleep 400ms  Enter
 Sleep 3s
 
-# --- list: catalog with live installed/version status ---
-Type "opsforge list | head -20"  Sleep 400ms  Enter
-Sleep 3s
+Type "clear" Enter
+Sleep 400ms
 
-# --- the interactive picker ---
+# --- the interactive picker (with tabs) --------------------------------
 Type "opsforge"  Sleep 400ms  Enter
-Sleep 1500ms
+Sleep 2s
+# filter
+Type "/"  Sleep 400ms
+Type "k8s"  Sleep 1500ms
+Escape  Sleep 700ms
+# tabs: updates then security
+Type "2"  Sleep 1800ms
+Type "3"  Sleep 3500ms
+Type "1"  Sleep 800ms
+Type "q"  Sleep 800ms
 
-# filter to kubernetes tools
-Type "/"  Sleep 500ms
-Type "k9s"  Sleep 1500ms
-Escape  Sleep 800ms
+Type "clear" Enter
+Sleep 400ms
 
-# browse and toggle a couple of tools
-Down Sleep 300ms
-Down Sleep 300ms
-Down Sleep 300ms
-Type " "  Sleep 600ms
-Down Sleep 300ms
-Type " "  Sleep 800ms
+# --- themes ------------------------------------------------------------
+Type "opsforge theme"  Sleep 400ms  Enter
+Sleep 3s
 
-# quit without installing (demo stays fast and side-effect free)
-Type "q"  Sleep 1s
+Type "clear" Enter
+Sleep 400ms
+
+# --- doctor ------------------------------------------------------------
+Type "opsforge doctor"  Sleep 400ms  Enter
+Sleep 3s

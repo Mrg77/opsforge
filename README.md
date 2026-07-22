@@ -5,191 +5,128 @@
 **Your DevOps workstation, forged in minutes.**
 
 Pick your CLIs from an interactive terminal UI, install them in one go, and turn
-your zsh into a context-aware DevOps environment — completions, a prod-aware
+your zsh into a context-aware DevOps environment — live completion, a prod-aware
 prompt, and guards that stop you from nuking the wrong cluster.
 
 [![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
-[![Go Reference](https://pkg.go.dev/badge/github.com/Mrg77/opsforge.svg)](https://pkg.go.dev/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 ![opsforge demo](demo/opsforge.gif)
+
+**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
 
 </div>
 
 ---
 
-## What it does
+## What it is
 
-opsforge is three tools in one binary:
+opsforge is **three tools in one binary**:
 
-1. **A tool installer** — an interactive picker over a curated catalog of **106
-   DevOps CLIs** (Kubernetes, IaC, cloud, containers, observability, security,
-   secrets, serverless…).
-   It detects what you already have, what can be upgraded, and installs the rest
-   via Homebrew *or* direct GitHub-release binaries (so it works on a bare Linux
-   server with no package manager).
+| | | |
+|:--:|---|---|
+| 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have, what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
+| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: a live completion menu, inline `?` help, a prod-aware prompt, and guards on destructive commands. No shell replacement, no lock-in. |
+| 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup to one YAML; `opsforge apply <url>` rebuilds it anywhere. Your machine becomes reproducible infrastructure. |
 
-2. **A DevOps shell environment** — one command turns your own zsh into a
-   Warp/Fish-like experience: a **live completion menu** as you type (no TAB),
-   gray inline suggestions, syntax coloring, **inline `?` help** for any command,
-   a prod-aware prompt, and **guards that make you confirm destructive commands
-   on a prod cluster**.
+> **Why:** setting up (or rebuilding) a DevOps workstation means installing 20+
+> CLIs, then wiring completions, aliases and a useful prompt for each — by hand,
+> again, on every new machine. opsforge makes it a two-minute session and keeps
+> your shell in sync as your toolbox grows.
 
-3. **Workstation-as-code** — `opsforge snapshot` exports your whole setup
-   (tools, profiles, shell state) to one YAML file; `opsforge apply <url>`
-   rebuilds it on any machine. Your workstation becomes infrastructure.
-
-No shell replacement, no lock-in: your scripts and CI keep working, and
-`opsforge shell uninstall` restores everything.
-
-## Why
-
-Setting up (or rebuilding) a DevOps workstation means installing 20+ CLIs, then
-wiring completions, aliases and a useful prompt for each — by hand, again, on
-every new machine. opsforge turns that into a two-minute interactive session and
-keeps your shell in sync as your toolbox evolves.
+---
 
 ## Install
-
-**One-liner (macOS & Linux):**
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
-Downloads the right binary for your OS/arch from the latest GitHub release into
-`~/.local/bin` (override with `OPSFORGE_INSTALL_DIR`, pin a version with
-`OPSFORGE_VERSION=v1.2.3`).
-
-**Alternatives:**
+Downloads the right binary for your OS/arch into `~/.local/bin` (override with
+`OPSFORGE_INSTALL_DIR`, pin with `OPSFORGE_VERSION=v1.2.3`).
 
 ```sh
 go install github.com/Mrg77/opsforge@latest   # from source
-# or grab an archive from the releases page
 ```
 
-> **Windows:** not supported natively (the installer backend is Homebrew and the
-> shell layer targets zsh) — it works fine under WSL. Native support via
-> winget/scoop + PowerShell completions is on the roadmap.
+> **Windows:** use WSL — the installer backend is Homebrew and the shell layer
+> targets zsh. Native winget/scoop + PowerShell support is on the roadmap.
 
-## The tool installer
+---
 
-Launching the bare binary opens the interactive picker — browse by category,
-check what you want, hit install. It detects what you already have and what can
-be upgraded, at a glance.
-
-**Views (k9s-style tabs):** `1` Tools (full catalog) · `2` Updates (only what's
-outdated) · `3` Security (live CVE scan of your installed tools).
-
-**Keys:** `space` toggle · `u` select all updates · `a` select all
-not-installed · `s` save selection as a profile · `/` filter · `i` install ·
-after a run, `enter`/`m` returns to the (re-scanned) menu, `q` quits.
-
-**At-a-glance markers:**
-
-| Marker | Meaning |
-|---|---|
-| `[✓]` green | installed and up to date (shows the detected version) |
-| `[✓]` orange | installed, **newer version available** (select it to upgrade) |
-| `[▸]` cyan | selected for install/upgrade this run |
-| `[ ]` grey | not installed |
-
-### Commands
-
-| Command | What it does |
-|---|---|
-| `opsforge` / `opsforge install` | Interactive picker: browse the catalog, check tools, install them |
-| `opsforge status` | One-glance cockpit: tools, updates, shell, theme |
-| `opsforge theme [name]` | List/preview color themes (`OPSFORGE_THEME` to set) |
-| `opsforge install kubectl helm` | Non-interactive install by name (scriptable) |
-| `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
-| `opsforge profiles` | List stack profiles with installed/total counts |
-| `opsforge upgrade` | Upgrade installed tools — all, `-u` for only outdated, or `upgrade jq yq gh` |
-| `opsforge audit` | Scan installed tools for CVEs (`--secrets`: find leaked credentials too) |
-| `opsforge explain --last` | AI-explain your last command — or just type `??` in the shell |
-| `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
-| `opsforge snapshot` | Export your whole workstation setup to one shareable YAML |
-| `opsforge apply <file-or-url>` | Rebuild a workstation from a snapshot (plan + confirm first) |
-| `opsforge list` | Your installed tools (`list all` for the full catalog, `list -u` for updates) |
-| `opsforge doctor` | Health check: brew, PATH, shell layer, version manager |
-
-### Keeping tools current
+## A quick tour
 
 ```sh
-opsforge list -u              # see what has an update
-opsforge upgrade -u           # upgrade only those
-opsforge upgrade jq yq gh     # or upgrade specific tools
-opsforge upgrade              # upgrade everything installed
+opsforge              # interactive picker (tabs: 1 Tools · 2 Updates · 3 Security)
+opsforge status       # one-glance cockpit of your workstation
+opsforge doctor       # full health check
+opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
 ```
 
-`update` is an alias for `upgrade`.
+<table>
+<tr><th align="left">Command</th><th align="left">What it does</th></tr>
+<tr><td><code>opsforge</code></td><td>Interactive picker — browse, check, install</td></tr>
+<tr><td><code>opsforge status</code></td><td>Cockpit: tools, updates, shell, theme at a glance</td></tr>
+<tr><td><code>opsforge install kubectl helm</code></td><td>Non-interactive install by name (scriptable)</td></tr>
+<tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
+<tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
+<tr><td><code>opsforge audit [--secrets]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan</td></tr>
+<tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
+<tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
+<tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates</td></tr>
+<tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
+<tr><td><code>opsforge theme [set &lt;name&gt;]</code></td><td>List/preview/persist color themes</td></tr>
+<tr><td><code>opsforge doctor</code></td><td>Full workstation health check</td></tr>
+</table>
+
+### The picker
+
+Launch the bare binary to browse by category and install what you check.
+
+- **Tabs (k9s-style):** `1` Tools · `2` Updates (only outdated) · `3` Security
+  (live CVE scan of installed tools)
+- **Keys:** `space` toggle · `u` all updates · `a` all not-installed · `s` save
+  selection as a profile · `/` filter · `i` install · `q` quit
+- **Markers:** `[✓]` green installed · `[✓]` orange update available · `[▸]` cyan
+  selected · `[ ]` grey not installed
 
 ### Stack profiles
 
-Install a whole stack in one command instead of picking tools one by one:
+Install a whole stack in one command — or save your own:
 
 ```sh
-opsforge install --profile aws-k8s   # aws, eksctl, kubectl, helm, k9s, terraform, docker…
-opsforge profiles                    # list all profiles with install status
+opsforge install --profile aws-k8s   # aws, eksctl, kubectl, helm, k9s, terraform…
+opsforge profiles                    # list all with install status
 ```
 
-Built-in profiles: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`.
-
-**Save your own.** In the picker, select the tools that make up *your* stack and
-press `s` to save them as a named profile. It's written to
-`~/.config/opsforge/profiles.yaml`, so you can reproduce your exact environment
-on any machine:
-
-```sh
-opsforge install --profile my-stack   # reinstall your saved stack anywhere
-```
+Built-in: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
+`security`. In the picker, select your tools and press `s` to save a personal
+profile to `~/.config/opsforge/profiles.yaml` — then
+`opsforge install --profile my-stack` reproduces it anywhere.
 
 ### Workstation as code
 
-Your machine setup shouldn't be a snowflake you rebuild by hand. Capture it
-once, version it, reproduce it anywhere:
+Your machine setup shouldn't be a snowflake you rebuild by hand:
 
 ```sh
-# on your current machine
-opsforge snapshot -o my-setup.yaml        # tools + profiles + shell state
-git -C ~/dotfiles add my-setup.yaml       # version it with your dotfiles
-
-# on a brand-new machine
-opsforge apply https://raw.githubusercontent.com/you/dotfiles/main/my-setup.yaml
+opsforge snapshot -o my-setup.yaml    # tools + profiles + shell state → one file
+opsforge apply <file-or-url>          # rebuild it on any machine
 ```
 
-`apply` shows the full plan first (what will be installed, what's already
-there, anything unknown) and asks before changing a thing (`--yes` for
-scripts). Perfect for new laptops, and for teams: onboarding a new engineer
-becomes one command.
-
-### Pinning tool versions
-
-Need a specific version to reproduce or debug something (`terraform@1.5` behaves
-differently than `1.6`)? opsforge delegates to a real version manager instead of
-reinventing one:
-
-```sh
-opsforge install mise             # once
-opsforge use terraform@1.5        # pins it in this directory
-```
-
-`opsforge use` prefers **mise** (its one-shot `mise use` installs and pins) and
-falls back to **asdf**, writing the project's `mise.toml` / `.tool-versions`. It
-works for any runtime those managers support, not just catalog tools.
+`apply` shows the full plan and asks before changing anything (`--yes` for
+scripts). Onboarding a new engineer becomes one command.
 
 ### Security audit
 
 ```sh
-opsforge audit
+opsforge audit             # CVEs in your installed tools
+opsforge audit --secrets   # + credentials leaking in history / rc / .env
 ```
 
-Cross-references your **installed** tool versions against the
-[OSV.dev](https://osv.dev) vulnerability database and reports the tools with
-known CVEs, sorted by severity, with the version that fixes each one:
+Cross-references installed versions against [OSV.dev](https://osv.dev), sorted by
+severity, with the fix version:
 
 ```
 ⚠ argocd         2.11.0
@@ -198,30 +135,21 @@ known CVEs, sorted by severity, with the version that fixes each one:
 ✓ helm           4.2.3 — no known vulnerabilities
 ```
 
-Version matching is done client-side against OSV's affected ranges, so a CVE
-fixed before your version (or only in a future major) is not reported — you see
-only what actually affects the version you run.
+Matching is client-side against OSV's affected ranges, so a CVE fixed before
+your version (or only in a future major) isn't reported. `--secrets` scans shell
+history, rc files and local `.env`s for AWS/GitHub/GitLab/Slack tokens, private
+keys, `--from-literal`, `docker login -p`… with values always masked.
 
-**Leaked-credentials scan.** `opsforge audit --secrets` checks the places
-secrets habitually leak on a workstation — shell history (`kubectl create
-secret --from-literal`, `export GITHUB_TOKEN=…`, `docker login -p`), shell rc
-files, local `.env` files — against gitleaks-style rules (AWS keys,
-GitHub/GitLab/Slack tokens, private keys, JWTs…). Values are always masked;
-exits non-zero on critical findings so you can wire it into CI.
+### Pinning tool versions
 
-### `?` — the shell cheat-sheet
+```sh
+opsforge install mise
+opsforge use terraform@1.5   # pins it in this directory
+```
 
-Press `?` on an empty line and opsforge shows a themed help panel: the
-interactive-editing keys, kube helpers (`kx`/`kn`), aliases, what each prompt
-segment means, the prod guards, and the management commands. It's the same
-content as `opsforge shell help`.
+Delegates to **mise** (preferred) or **asdf** — no version-manager reinvention.
 
-### `??` — explain my last failure
-
-Command failed? Type `??` and an AI explains what went wrong and gives the fix,
-using your last command + exit code. The backend is pluggable: the `claude` CLI
-if installed, else `ollama`, else any command via `OPSFORGE_AI_CMD`. Also works
-directly: `opsforge explain "kubectl drain"`.
+---
 
 ## The DevOps shell environment
 
@@ -229,145 +157,133 @@ directly: `opsforge explain "kubectl drain"`.
 opsforge shell install && exec zsh
 ```
 
-This turns your **own zsh** into a DevOps-aware environment, delivered as small
-modules under `~/.config/opsforge/shell/`:
+Turns your **own zsh** into a DevOps-aware environment (modules under
+`~/.config/opsforge/shell/`, `shell uninstall` restores everything):
 
+- **Live completion menu** — a menu of matching subcommands/flags opens as you
+  type (no TAB), navigable with arrows; plus grey inline history suggestions
+  (→ accepts) and syntax coloring. Even terraform (which ships no zsh completion)
+  and opsforge itself are covered.
+- **`?` help** — press `?` on an empty line for a themed cheat-sheet; type
+  `kubectl get ?` for that command's help, rendered under a framed header with
+  `bat`-colored man syntax; type `??` to have an AI explain your last failure.
 - **Context prompt** — kube `cluster:namespace` (**red on a prod-looking
-  context** so you notice before a mistake), active cloud account (AWS profile /
-  GCP project), and terraform workspace. Each segment shows only when relevant.
+  context**), cloud account, terraform workspace — each shown only when relevant.
+  Plus a clean left prompt: repo-relative dir, git branch with
+  dirty/ahead/behind markers, last-command duration, and a `❯` that reddens on
+  failure. Reads only local git — never a cloud or cluster.
 - **Prod guards** — before a destructive command (`kubectl delete`,
-  `terraform destroy`, `helm uninstall`…) runs against a production context,
-  opsforge makes you type `yes`. Disable per-session with `OPSFORGE_GUARDS=0`.
+  `terraform destroy`, `helm uninstall`…) on a production context, opsforge makes
+  you type `yes`. `OPSFORGE_GUARDS=0` to disable.
 - **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
-  context/namespace (fzf picker when available). All guarded on the tool being
-  installed, so nothing shadows a command you don't have.
-- **A clean left prompt** — current directory (repo-relative in a git repo),
-  git branch with a dirty/ahead/behind marker, the duration of the last slow
-  command, and a `❯` that turns red on failure. Reads only local git — never
-  queries a cloud or cluster. Skips an existing prompt framework (starship,
-  p10k…); force with `OPSFORGE_PROMPT=1`, disable with `=0`.
-- **Live completion menu** — as you type, a menu of matching subcommands/flags
-  appears automatically (no TAB), navigable with arrows; plus gray inline
-  suggestions from history (→ accepts) and green/red syntax coloring. Powered by
-  zsh-autocomplete / zsh-autosuggestions / zsh-syntax-highlighting, installed for
-  you.
-- **Inline help with `?`** — type `?` at the end of any command (e.g.
-  `kubectl get ?`) to instantly see its help, without losing your line. It
-  renders an elegant framed header (the command + its one-line gist) over a
-  `bat`-colored body (man syntax — orange sections, green flags), and pages
-  cleanly (quits if it fits, `q` to close otherwise). `bat` is installed for
-  you; it falls back to a light colorizer if absent. Runs with a neutralized
-  `KUBECONFIG` so it never triggers cluster auth. Disable with `OPSFORGE_HELP=0`.
-- **Integrations** — `fzf`, `zoxide` and `atuin` are wired up when present, so
-  history search and directory jumping just work.
-- **Completions** — cached zsh completions for every installed tool (including
-  opsforge itself), with static completion for tools like terraform that ship
-  none.
+  context/namespace (fzf picker when available).
+- **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
 reach your shell.
 
-### Shell commands
+<table>
+<tr><th align="left">Shell command</th><th align="left">What it does</th></tr>
+<tr><td><code>opsforge shell install</code></td><td>Install the zsh environment into <code>~/.zshrc</code> (idempotent)</td></tr>
+<tr><td><code>opsforge shell uninstall</code></td><td>Remove it cleanly (restores <code>~/.zshrc</code>)</td></tr>
+<tr><td><code>opsforge shell doctor</code></td><td>Show what's provided and its state</td></tr>
+<tr><td><code>opsforge shell sync</code></td><td>Regenerate cached completions</td></tr>
+</table>
 
-| Command | What it does |
-|---|---|
-| `opsforge shell install` | Install the DevOps zsh environment into `~/.zshrc` (idempotent) |
-| `opsforge shell uninstall` | Remove it cleanly (restores `~/.zshrc`, deletes modules) |
-| `opsforge shell doctor` | Show what the shell environment provides and its state |
-| `opsforge shell sync` | Regenerate cached zsh completions for installed tools |
-| `opsforge shell env` | Print the zsh snippet (`eval "$(opsforge shell env)"`) |
+---
 
 ## The catalog
 
-106 curated tools across 14 categories: Kubernetes, Infrastructure as Code, Cloud
+**106 tools across 14 categories** — Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, Databases, Security & Compliance, Secrets & Identity, Serverless & PaaS,
-Runtime & Versions, Utilities. The catalog is a single embedded
+Runtime & Versions, Utilities. It's a single embedded
 [YAML file](internal/catalog/catalog.yaml) — adding a tool is a five-line PR.
 
-### Install backends
+**Two install backends, picked per tool at runtime:**
 
-opsforge picks a backend per tool at runtime:
-
-- **Homebrew** (default when `brew` is on PATH) — always the latest released
-  version; `opsforge upgrade` refreshes the whole toolbox.
-- **GitHub releases** — for hosts without Homebrew (bare Linux servers, CI
-  images), tools carrying a `github:` block (k9s, kind, kubectx, stern, argocd,
-  flux, grype, syft, gitleaks, cosign, lazygit, lazydocker, zoxide, eza…) are
-  installed by downloading and extracting their release binary into
+- **Homebrew** (when on PATH) — always the latest release; `opsforge upgrade`
+  refreshes the whole toolbox.
+- **GitHub releases** — for hosts without Homebrew (bare Linux, CI images), tools
+  with a `github:` block are installed by downloading their release binary into
   `~/.local/bin`. No package manager required.
 
-Force a backend with `OPSFORGE_BACKEND=brew|github`; change the binary target
-dir with `OPSFORGE_BIN_DIR`.
+Force one with `OPSFORGE_BACKEND=brew|github`; set the target dir with
+`OPSFORGE_BIN_DIR`.
+
+---
 
 ## Themes
 
-opsforge's whole visual identity is themeable — one shared palette drives every
-command. Pick one with `OPSFORGE_THEME` in your `~/.zshrc`:
+The whole UI is themeable — one palette drives every command:
 
 ```sh
-opsforge theme            # list all themes with a color preview
-opsforge theme dracula    # preview one
-export OPSFORGE_THEME=nord # forge (default), nord, dracula, gruvbox, light, mono, or auto
+opsforge theme              # list all themes with a color preview
+opsforge theme dracula      # preview one
+opsforge theme set dracula  # persist it — every command follows, no reload
 ```
 
+Themes: `forge` (default), `nord`, `dracula`, `gruvbox`, `light`, `mono`, `auto`.
 `auto` matches your terminal background; `mono` is color-free for logs/CI.
+Precedence: `$OPSFORGE_THEME` › saved (`theme set`) › auto.
+
+---
 
 ## Engineering highlights
 
-The parts I'd point a reviewer to:
+The parts worth pointing a reviewer to:
 
-- **CVE audit with real version matching.** `opsforge audit` queries OSV.dev per
-  installed tool, then filters vulnerabilities *client-side* against OSV's
-  affected ranges (semver `introduced`/`fixed`) and dedupes CVEs that appear
-  under multiple advisory IDs — so it reports only what affects the version you
-  actually run, with the fix version on your branch.
-- **Auth-safe version detection.** Probing `kubectl --version` on a machine
-  where kubectl is a cloud-SDK dispatcher wired to an OIDC plugin can pop a
-  browser login. Every probe runs with a neutralized `KUBECONFIG` and a
-  `WaitDelay`, so detection never triggers auth or hangs on a wrapper CLI that
-  keeps the output pipe open.
-- **The catalog can't lie.** A CI job validates all 68 brew references against
-  the Homebrew API and every GitHub asset template against the tool's real
-  latest release, across darwin/linux × amd64/arm64 — so a renamed formula or a
-  wrong asset name is caught before a user hits it mid-install.
-- **Homebrew edge cases handled.** Auto-taps third-party taps
-  (`hashicorp/tap`, `fluxcd/tap`…) and recovers from link conflicts
-  (`brew link --overwrite`) that otherwise fail a `docker` upgrade.
-- **Never breaks your shell.** Shell modules are `zsh -n`-checked in CI; the
-  `shell env` snippet does only PATH lookups (no subprocesses) to keep startup
-  fast; slow work happens in `shell sync`.
+- **CVE audit with real version matching.** Queries OSV.dev per tool, filters
+  vulnerabilities *client-side* against OSV's affected ranges (semver
+  `introduced`/`fixed`) and dedupes CVEs listed under multiple advisory IDs — so
+  it reports only what affects the version you run, with the fix on your branch.
+- **Auth-safe detection.** Probing `kubectl --version` where kubectl is a
+  cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
+  probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
+  never triggers auth or hangs on a wrapper CLI holding the output pipe.
+- **The catalog can't lie.** A CI job validates all 106 brew references against
+  the Homebrew API and every GitHub asset template against the tool's real latest
+  release (darwin/linux × amd64/arm64) — a renamed formula is caught before a
+  user hits it mid-install.
+- **Homebrew edge cases handled.** Auto-taps third-party taps and recovers from
+  link conflicts (`brew link --overwrite`) that otherwise fail a docker upgrade.
+- **Never breaks your shell.** Modules are `zsh -n`-checked in CI; the `shell
+  env` snippet does only PATH lookups (no subprocesses) for fast startup.
 
-## Architecture
+### Architecture
 
 ```
-cmd/                Cobra commands (install, list, profiles, upgrade, doctor, shell)
+cmd/                Cobra commands (install, status, audit, snapshot, doctor, shell, theme…)
 internal/catalog/   Embedded YAML catalog + brew/github validation
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download
-internal/tui/        Bubble Tea picker & install progress UI
-internal/shellcfg/  zsh environment modules, completion cache, ~/.zshrc management
+internal/audit/     OSV.dev client + client-side version matching
+internal/secrets/   Leaked-credential scanner
+internal/snapshot/  Workstation capture / apply
+internal/tui/       Bubble Tea picker with tabs
+internal/shellcfg/  zsh environment modules + completion cache
+internal/ui/        Shared visual identity + themes
 ```
 
-## Roadmap
-
-- [ ] bash & fish support for the shell layer
-- [ ] Native Windows support (winget/scoop + PowerShell completions)
-- [ ] User config file for custom tools and profiles (`~/.config/opsforge/`)
-- [ ] More `github:` templates for full brew-less coverage
+---
 
 ## Development
 
 ```sh
-go test ./...                          # unit tests
+go test ./...                                   # unit tests
 OPSFORGE_SKIP_BREW_VALIDATION=1 go test ./...   # skip the network catalog checks
-go vet ./...
 go build -o opsforge .
 ```
 
-CI runs gofmt, vet, race-enabled tests on Linux and macOS, validates the catalog
-against upstream, and cross-compiles all release targets. Releases are built and
-published by GoReleaser on tag push.
+CI runs gofmt, vet, race tests on Linux & macOS, validates the catalog against
+upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
+
+## Roadmap
+
+- [ ] bash & fish support for the shell layer
+- [ ] Native Windows (winget/scoop + PowerShell completions)
+- [ ] User config file for custom tools and profiles
+- [ ] More `github:` templates for full brew-less coverage
 
 ## License
 
