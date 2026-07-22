@@ -64,21 +64,49 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosu
   # Don't fire on very long buffers (a pasted block shouldn't flicker).
   ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=80
 
-  # Tab accepts the gray suggestion one word at a time. zsh-autosuggestions
-  # wraps `forward-word` as a partial-accept widget: when a suggestion is
-  # showing and forward-word is invoked *directly from the keybinding*, the
-  # wrapper reads the suggestion and materializes its next word. This only
-  # works as a direct binding (not re-dispatched from another widget), so
-  # we register forward-word as the accept widget and bind Tab straight to
-  # it. → still accepts the whole line.
-  ZSH_AUTOSUGGEST_PARTIAL_ACCEPT_WIDGETS+=(forward-word)
-
   source "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 
-  bindkey '^I' forward-word     # Tab → accept one word of the suggestion
-  # Keep real completion available on a second key (Ctrl-Space) for when
-  # you want file/command completion rather than accepting history.
-  bindkey '^ ' expand-or-complete
+  # --- Tab = accept the gray suggestion one word at a time ------------
+  # Why not just bind Tab to `forward-word`? The plugin only wraps a
+  # widget's partial-accept behavior lazily, on first keypress, and its
+  # $POSTDISPLAY isn't reliably readable from a custom widget — so a naive
+  # approach silently does nothing (the exact symptom: Tab not advancing).
+  #
+  # Instead we ask the plugin for the suggestion SYNCHRONOUSLY via its own
+  # `_zsh_autosuggest_fetch_suggestion` (it fills a local `suggestion` from
+  # the current $BUFFER), take its next shell word, and append it. This
+  # doesn't depend on POSTDISPLAY or lazy wrapping, so it always fires.
+  # With no suggestion, Tab falls back to normal completion.
+  _opsforge_accept_word() {
+    local suggestion
+    if typeset -f _zsh_autosuggest_fetch_suggestion >/dev/null; then
+      _zsh_autosuggest_fetch_suggestion "$BUFFER"   # sets $suggestion
+    fi
+    # The suggestion is the whole line; the part after BUFFER is the gray
+    # tail. BUFFER may end mid-word (e.g. "ansible-play"), so the tail can
+    # start with the rest of that word ("ook …").
+    local tail="${suggestion#$BUFFER}"
+    if [[ -n "$tail" ]]; then
+      # Chunk = leading spaces (if any) + the next run of non-space chars
+      # (finishes the current word / takes the next one) + the spaces that
+      # follow it, so one Tab lands the cursor on the next argument.
+      local lead="${tail%%[^[:space:]]*}"       # leading spaces
+      local afterlead="${tail#$lead}"
+      local wordpart="${afterlead%%[[:space:]]*}" # up to next space
+      local afterword="${afterlead#$wordpart}"
+      local trail="${afterword%%[^[:space:]]*}"   # trailing spaces
+      local chunk="$lead$wordpart$trail"
+      if [[ -n "$chunk" ]]; then
+        BUFFER="$BUFFER$chunk"
+        CURSOR=$#BUFFER
+        zle autosuggest-fetch 2>/dev/null  # redraw remaining gray suggestion
+      fi
+    else
+      zle expand-or-complete    # no suggestion → normal completion
+    fi
+  }
+  zle -N _opsforge_accept_word
+  bindkey '^I' _opsforge_accept_word   # Tab
 fi
 
 # --- zsh-syntax-highlighting: color the command line (load LAST) ---
