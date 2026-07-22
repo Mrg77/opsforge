@@ -189,10 +189,20 @@ modules under `~/.config/opsforge/shell/`:
 - **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
   context/namespace (fzf picker when available). All guarded on the tool being
   installed, so nothing shadows a command you don't have.
+- **Live completion menu** — as you type, a menu of matching subcommands/flags
+  appears automatically (no TAB), navigable with arrows; plus gray inline
+  suggestions from history (→ accepts) and green/red syntax coloring. Powered by
+  zsh-autocomplete / zsh-autosuggestions / zsh-syntax-highlighting, installed for
+  you.
+- **Inline help with `?`** — type `?` at the end of any command (e.g.
+  `kubectl get ?`) to instantly see its `--help`, colorized and paged, without
+  losing your line. Runs with a neutralized `KUBECONFIG` so it never triggers
+  cluster auth. Disable with `OPSFORGE_HELP=0`.
 - **Integrations** — `fzf`, `zoxide` and `atuin` are wired up when present, so
   history search and directory jumping just work.
-- **Completions** — cached zsh completions for every installed tool, loaded with
-  a guarded `compinit` (no double-init slowdown).
+- **Completions** — cached zsh completions for every installed tool (including
+  opsforge itself), with static completion for tools like terraform that ship
+  none.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
 reach your shell.
