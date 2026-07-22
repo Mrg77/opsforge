@@ -31,11 +31,11 @@ opsforge is two tools in one binary:
    via Homebrew *or* direct GitHub-release binaries (so it works on a bare Linux
    server with no package manager).
 
-2. **A DevOps shell environment** — one command wires your own zsh into a
-   context-aware setup: a prompt that shows your kube cluster, cloud account and
-   terraform workspace; **guards that make you confirm destructive commands on a
-   prod cluster**; curated aliases; and cached completions for every tool you
-   install.
+2. **A DevOps shell environment** — one command turns your own zsh into a
+   Warp/Fish-like experience: a **live completion menu** as you type (no TAB),
+   gray inline suggestions, syntax coloring, **inline `?` help** for any command,
+   a prod-aware prompt, and **guards that make you confirm destructive commands
+   on a prod cluster**.
 
 No shell replacement, no lock-in: your scripts and CI keep working, and
 `opsforge shell uninstall` restores everything.
@@ -195,9 +195,12 @@ modules under `~/.config/opsforge/shell/`:
   zsh-autocomplete / zsh-autosuggestions / zsh-syntax-highlighting, installed for
   you.
 - **Inline help with `?`** — type `?` at the end of any command (e.g.
-  `kubectl get ?`) to instantly see its `--help`, colorized and paged, without
-  losing your line. Runs with a neutralized `KUBECONFIG` so it never triggers
-  cluster auth. Disable with `OPSFORGE_HELP=0`.
+  `kubectl get ?`) to instantly see its help, without losing your line. It
+  renders an elegant framed header (the command + its one-line gist) over a
+  `bat`-colored body (man syntax — orange sections, green flags), and pages
+  cleanly (quits if it fits, `q` to close otherwise). `bat` is installed for
+  you; it falls back to a light colorizer if absent. Runs with a neutralized
+  `KUBECONFIG` so it never triggers cluster auth. Disable with `OPSFORGE_HELP=0`.
 - **Integrations** — `fzf`, `zoxide` and `atuin` are wired up when present, so
   history search and directory jumping just work.
 - **Completions** — cached zsh completions for every installed tool (including
