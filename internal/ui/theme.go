@@ -2,9 +2,12 @@ package ui
 
 import (
 	"os"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 )
 
 // Theme is a named palette. opsforge ships a few; the active one is
@@ -25,44 +28,104 @@ type Theme struct {
 
 // Themes are keyed by name. "auto" is resolved to a concrete theme at
 // startup based on the terminal background.
+// Themes use distinct accent hues so they're recognizable at a glance:
+// forge=pink/orange, nord=blue, dracula=purple/magenta, gruvbox=orange/olive,
+// light=inks for light terminals, mono=monochrome.
 var Themes = map[string]Theme{
-	"forge": { // default — pink accent on the classic 256-color palette
+	"forge": { // default — hot pink brand, electric blue headers
 		Name:  "forge",
-		Brand: "212", Blue: "39", Green: "42", Orange: "214",
-		Red: "196", Cyan: "51", Yellow: "220", Grey: "241", Faint: "238",
+		Brand: "205", Blue: "39", Green: "48", Orange: "214",
+		Red: "196", Cyan: "51", Yellow: "220", Grey: "245", Faint: "238",
 	},
-	"nord": { // cool blues, easy on the eyes
+	"nord": { // cool arctic blues throughout
 		Name:  "nord",
-		Brand: "110", Blue: "111", Green: "108", Orange: "180",
+		Brand: "111", Blue: "67", Green: "108", Orange: "180",
 		Red: "167", Cyan: "116", Yellow: "222", Grey: "245", Faint: "239",
 	},
-	"dracula": { // vivid, high-contrast
+	"dracula": { // purple brand, cyan headers — the signature look
 		Name:  "dracula",
-		Brand: "212", Blue: "117", Green: "84", Orange: "215",
+		Brand: "141", Blue: "117", Green: "84", Orange: "215",
 		Red: "203", Cyan: "159", Yellow: "228", Grey: "244", Faint: "238",
 	},
-	"gruvbox": { // warm, retro
+	"gruvbox": { // warm retro — burnt orange, olive green
 		Name:  "gruvbox",
-		Brand: "208", Blue: "109", Green: "142", Orange: "214",
-		Red: "167", Cyan: "108", Yellow: "214", Grey: "245", Faint: "239",
+		Brand: "166", Blue: "109", Green: "142", Orange: "208",
+		Red: "124", Cyan: "108", Yellow: "172", Grey: "245", Faint: "239",
 	},
-	"light": { // for light-background terminals (darker inks)
+	"light": { // dark inks for light-background terminals
 		Name:  "light",
 		Brand: "162", Blue: "26", Green: "28", Orange: "130",
 		Red: "124", Cyan: "31", Yellow: "136", Grey: "240", Faint: "250",
 	},
-	"mono": { // no color, just weight — for logs/CI/accessibility
+	"mono": { // monochrome — for logs, CI, accessibility
 		Name:  "mono",
-		Brand: "255", Blue: "255", Green: "255", Orange: "255",
-		Red: "255", Cyan: "255", Yellow: "255", Grey: "245", Faint: "240",
+		Brand: "255", Blue: "252", Green: "252", Orange: "250",
+		Red: "255", Cyan: "252", Yellow: "250", Grey: "245", Faint: "240",
 	},
 }
 
-// Active is the theme in use. Set at package init from OPSFORGE_THEME.
+// Active is the theme in use. Set at package init.
 var Active Theme
 
 func init() {
-	SetTheme(os.Getenv("OPSFORGE_THEME"))
+	forceColor()
+	// Precedence: OPSFORGE_THEME env var wins (per-command override),
+	// else the persisted choice (opsforge theme set), else auto.
+	if env := os.Getenv("OPSFORGE_THEME"); env != "" {
+		SetTheme(env)
+		return
+	}
+	SetTheme(persistedTheme())
+}
+
+// themeFile is where `opsforge theme set` stores the chosen theme.
+func themeFile() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "opsforge", "theme")
+}
+
+// ThemePersisted reports whether a theme has been saved via `theme set`.
+func ThemePersisted() bool { return persistedTheme() != "" }
+
+// persistedTheme reads the saved theme name, or "" if none.
+func persistedTheme() string {
+	f := themeFile()
+	if f == "" {
+		return ""
+	}
+	data, err := os.ReadFile(f)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// SaveTheme persists a theme choice so every future opsforge command uses
+// it — no env var, no `export`, no shell reload. Validates the name.
+func SaveTheme(name string) error {
+	if name != "auto" {
+		if _, ok := Themes[name]; !ok {
+			return errUnknownTheme(name)
+		}
+	}
+	f := themeFile()
+	if err := os.MkdirAll(filepath.Dir(f), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(f, []byte(name+"\n"), 0o644); err != nil {
+		return err
+	}
+	SetTheme(name)
+	return nil
+}
+
+type errUnknownTheme string
+
+func (e errUnknownTheme) Error() string {
+	return "unknown theme " + string(e) + " (available: " + strings.Join(ThemeNames(), ", ") + ")"
 }
 
 // SetTheme selects a theme by name (case-insensitive), resolving "" and
@@ -100,6 +163,17 @@ func ThemeNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// forceColor makes lipgloss emit 256-color codes even when stdout isn't a
+// TTY (piped through a pager, captured, etc.), unless the user opts out
+// with NO_COLOR. Without this, `opsforge … | less`/`| cat` and the '?'
+// help panel (which pipes through less) would come out uncolored.
+func forceColor() {
+	if os.Getenv("NO_COLOR") != "" {
+		return
+	}
+	lipgloss.SetColorProfile(termenv.ANSI256)
 }
 
 // applyTheme rebinds the exported color vars and styles to a theme.

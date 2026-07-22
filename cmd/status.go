@@ -83,11 +83,14 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 			backend = "Homebrew + GitHub"
 		}
 		fmt.Printf("  %s %s\n", ui.Label("Backend", 10), ui.Dim.Render(backend))
-		theme := ui.Active.Name
-		if os.Getenv("OPSFORGE_THEME") == "" {
-			theme += ui.Dim.Render(" (auto)")
+		theme := ui.Accent.Render(ui.Active.Name)
+		switch {
+		case os.Getenv("OPSFORGE_THEME") != "":
+			theme += ui.Dim.Render(" (from $OPSFORGE_THEME)")
+		case !ui.ThemePersisted():
+			theme += ui.Dim.Render(" (auto — `opsforge theme set <name>` to change)")
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Theme", 10), ui.Accent.Render(theme))
+		fmt.Printf("  %s %s\n", ui.Label("Theme", 10), theme)
 
 		if len(userps) > 0 {
 			names := make([]string, 0, len(userps))

@@ -51,8 +51,9 @@ background.
 		ui.SetTheme(current) // restore
 
 		fmt.Println()
-		fmt.Println(ui.Dim.Render("  Preview one:  ") + ui.Accent.Render("opsforge theme dracula"))
-		fmt.Println(ui.Dim.Render("  Apply it:     ") + ui.Accent.Render("echo 'export OPSFORGE_THEME=dracula' >> ~/.zshrc && exec zsh"))
+		fmt.Println(ui.Dim.Render("  Preview:  ") + ui.Accent.Render("opsforge theme dracula"))
+		fmt.Println(ui.Dim.Render("  Apply:    ") + ui.Accent.Render("opsforge theme set dracula") +
+			ui.Dim.Render("  (persists — no reload, no env var)"))
 		return nil
 	},
 }
@@ -90,6 +91,22 @@ func previewTheme(name string) {
 	fmt.Println("  " + ui.Bar(3, 5, 20))
 }
 
+var themeSetCmd = &cobra.Command{
+	Use:   "set <name>",
+	Short: "Persist a theme — used by every opsforge command, no reload needed",
+	Args:  cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := ui.SaveTheme(args[0]); err != nil {
+			return err
+		}
+		fmt.Printf("%s theme set to %s\n", ui.OKMark(), ui.Accent.Render(args[0]))
+		previewTheme(ui.Active.Name)
+		fmt.Println(ui.Dim.Render("\n  Applied everywhere. Reload your shell (`exec zsh`) for the prompt to follow."))
+		return nil
+	},
+}
+
 func init() {
+	themeCmd.AddCommand(themeSetCmd)
 	rootCmd.AddCommand(themeCmd)
 }
