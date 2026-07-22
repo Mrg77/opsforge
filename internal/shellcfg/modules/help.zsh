@@ -13,6 +13,14 @@
 # command; otherwise it inserts a literal "?" so globbing/other uses are
 # unaffected.
 _opsforge_help_widget() {
+  # "?" on an empty line — show the opsforge shell help panel.
+  if [[ -z "$BUFFER" ]]; then
+    print
+    _opsforge_help_panel
+    zle reset-prompt
+    return
+  fi
+
   # "??" — the buffer already holds one "?" and the user typed a second:
   # explain the LAST command via AI (opsforge explain --last).
   if [[ "$BUFFER" == "?" ]]; then
@@ -94,6 +102,19 @@ _opsforge_help_page() {
   else
     cat
   fi
+}
+
+# _opsforge_help_panel renders the opsforge shell cheat-sheet — the help
+# you get by pressing "?" on an empty line. It's rendered by opsforge
+# itself (single source of truth, themed), falling back to a plain panel.
+_opsforge_help_panel() {
+  if command -v opsforge >/dev/null 2>&1; then
+    opsforge shell help 2>/dev/null && return
+  fi
+  # Fallback if the binary is unavailable for some reason.
+  print -P "%F{212}%B  opsforge shell%b%f — press ? for help, ?? to explain the last command"
+  print -P "  %F{39}Interactive%f  type to get a live menu · <cmd> ? for that command's help"
+  print -P "  %F{39}Aliases%f      k=kubectl · tf=terraform · dc=docker compose · kx/kn switch ctx/ns"
 }
 
 # Track the last command + exit status so `??` (and `opsforge explain

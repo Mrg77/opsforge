@@ -209,6 +209,13 @@ files, local `.env` files — against gitleaks-style rules (AWS keys,
 GitHub/GitLab/Slack tokens, private keys, JWTs…). Values are always masked;
 exits non-zero on critical findings so you can wire it into CI.
 
+### `?` — the shell cheat-sheet
+
+Press `?` on an empty line and opsforge shows a themed help panel: the
+interactive-editing keys, kube helpers (`kx`/`kn`), aliases, what each prompt
+segment means, the prod guards, and the management commands. It's the same
+content as `opsforge shell help`.
+
 ### `??` — explain my last failure
 
 Command failed? Type `??` and an AI explains what went wrong and gives the fix,
