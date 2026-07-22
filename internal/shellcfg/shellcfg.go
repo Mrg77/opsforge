@@ -138,7 +138,15 @@ fi
 
 // Sync regenerates cached completion scripts for every installed tool
 // exposing a native zsh completion command. Returns the synced names.
+//
+// It also re-materializes the feature modules (prompt, aliases,
+// interactive, guards…) so that upgrading opsforge and running `shell
+// sync` actually ships the new module behavior — otherwise the shell keeps
+// running the modules written at first `shell install`.
 func Sync(tools []catalog.Tool) ([]string, error) {
+	if _, err := WriteModules(); err != nil {
+		return nil, err
+	}
 	dir, err := CompletionsDir()
 	if err != nil {
 		return nil, err

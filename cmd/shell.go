@@ -48,7 +48,7 @@ var shellEnvCmd = &cobra.Command{
 
 var shellSyncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Regenerate cached zsh completions for installed tools",
+	Short: "Refresh the shell modules and cached completions (run after upgrading opsforge)",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {
