@@ -25,14 +25,13 @@ _opsforge_help_widget() {
     return
   fi
 
-  # Build the help target: the command line so far, minus a trailing
-  # partial word, with --help appended. e.g. "kubectl get " -> kubectl get --help
+  # Build the help target from the whole current line. The '?' that
+  # triggered this widget has NOT been inserted into $BUFFER yet, so the
+  # buffer already holds exactly the command the user wants help for —
+  # e.g. "kubectl get node" -> kubectl get node --help. We keep every
+  # token (trailing spaces are just dropped by word-splitting).
   local -a parts
   parts=(${(z)BUFFER})
-  # Drop an incomplete last token (no trailing space means still typing it).
-  if [[ "${BUFFER[-1]}" != " " && ${#parts} -gt 1 ]]; then
-    parts=(${parts[1,-2]})
-  fi
 
   # Render below the prompt, keep the line intact.
   print                     # newline after the current line
