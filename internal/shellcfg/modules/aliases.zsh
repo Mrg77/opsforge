@@ -41,3 +41,17 @@ command -v helm      >/dev/null 2>&1 && alias h='helm'
 command -v git       >/dev/null 2>&1 && { alias gst='git status'; alias gd='git diff'; }
 command -v bat       >/dev/null 2>&1 && alias cat='bat --paging=never'
 command -v eza       >/dev/null 2>&1 && alias ls='eza'
+
+# `history` (the zsh builtin) shows only ~16 lines by default. Make the
+# bare command show the last 200, while keeping `history 50`, `history -50`,
+# `history 1` (everything) and every other argument working as before.
+history() {
+  if (( $# == 0 )); then
+    builtin fc -l -200      # last 200; `history 1` still shows everything
+  else
+    builtin fc -l "$@"
+  fi
+}
+# `hg <term>` — grep your whole history fast. For a DevOps-tool view,
+# `opsforge history kube` groups it by family (kube/git/tf/docker/cloud…).
+hg() { builtin fc -l 1 | grep -i -- "$@"; }

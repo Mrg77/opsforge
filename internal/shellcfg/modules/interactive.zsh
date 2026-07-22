@@ -34,26 +34,22 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autocomplete/zsh-autocompl
   zstyle ':autocomplete:*' insert-unambiguous yes
 
   # --- history-first menu ---------------------------------------------
-  # The whole point: when you type `kubectl`, your recent *actual*
-  # `kubectl …` command lines surface at the TOP of the live menu, above
-  # the subcommand/flag completions — so you re-run what you did before
-  # instead of retyping it. zsh-autocomplete already blends history into
-  # the menu; we bias it toward real history and give it room.
-  #   - reserve the first lines of the menu for history matches
-  zstyle ':autocomplete:*' default-context history-incremental-search-backward
-  zstyle ':autocomplete:history-search:*' list-lines 6
-  #   - match anywhere in the line isn't what we want here: we want the
-  #     line to START with what you typed (prefix), like fish.
-  zstyle ':autocomplete:*' history-search-syntax prefix
-  #   - keep the current session's commands weighted as most recent
-  setopt SHARE_HISTORY INC_APPEND_HISTORY HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS
+  # zsh-autocomplete's default ↑ (and its menu) already match the WHOLE
+  # line you've typed against your history as a PREFIX — type
+  # `kubectl get pods -n prod | grep` and pressing ↑ walks past commands
+  # that begin exactly that way (or nothing, if you never ran it).
+  #
+  # We deliberately DON'T set default-context to
+  # history-incremental-search-backward: that matches the word under the
+  # cursor (`grep`) and ignores everything before it — the wrong behavior
+  # you'd get with a naive Ctrl-R. Leaving the default keeps prefix-of-line
+  # search, which is what you want.
+  #
+  # De-dupe history so one command doesn't fill the menu, and keep the
+  # session's own commands available immediately.
+  setopt HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS INC_APPEND_HISTORY SHARE_HISTORY
 
   source "$_of_brew_share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
-
-  # Up-arrow does a prefix history search (type `kubectl`, press ↑ to walk
-  # only your kubectl history) — the behavior most people expect.
-  zstyle ':autocomplete:up:*'   fzf-completion no
-  zstyle ':autocomplete:down:*' fzf-completion no
 fi
 
 # --- zsh-autosuggestions: gray inline suggestion as you type ---
