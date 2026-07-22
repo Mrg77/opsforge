@@ -4,38 +4,17 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
-)
-
-var (
-	profileName = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	profileDesc = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	profileMeta = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	toolOK      = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green: installed
-	toolUpdate  = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // orange: update available
-	toolMissing = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // grey: not installed
-	barFilled   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	barEmpty    = lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
 )
 
 // toolCol is the fixed column width for a tool cell (marker + name),
 // picked to fit the longest catalog tool name with breathing room.
 const toolCol = 18
-
-// progressBar renders a filled/empty bar, e.g. ███████░░░ for 7/10.
-func progressBar(done, total, width int) string {
-	if total == 0 {
-		return barEmpty.Render(strings.Repeat("░", width))
-	}
-	filled := done * width / total
-	return barFilled.Render(strings.Repeat("█", filled)) +
-		barEmpty.Render(strings.Repeat("░", width-filled))
-}
 
 var profilesCmd = &cobra.Command{
 	Use:   "profiles",
@@ -48,26 +27,27 @@ var profilesCmd = &cobra.Command{
 		statuses := detect.AllWithOutdated(cat.Tools())
 		userps, _ := userprofiles.Load()
 
+		fmt.Println(ui.Header("opsforge profiles", "install a whole stack with `opsforge install --profile <name>`"))
 		fmt.Println()
-		fmt.Println(profileMeta.Render("  BUILT-IN"))
+
+		fmt.Println(ui.Section("Built-in"))
 		for _, p := range cat.Profiles {
 			printProfile(p, statuses, false)
 		}
 
 		if len(userps) > 0 {
-			fmt.Println(profileMeta.Render("  YOURS"))
+			fmt.Println(ui.Section("Yours"))
 			for _, p := range userps {
 				printProfile(p, statuses, true)
 			}
 		} else {
-			fmt.Println(profileMeta.Render(
-				"  Tip: in the picker, select tools and press s to save your own profile.\n"))
+			fmt.Println(ui.Dim.Render("  Tip: in the picker, select tools and press s to save your own profile.\n"))
 		}
 
 		fmt.Printf("  %s   %s   %s\n\n",
-			toolOK.Render("● installed"),
-			toolUpdate.Render("● update available"),
-			toolMissing.Render("● not installed"))
+			ui.OK.Render("● installed"),
+			ui.Warn.Render("● update available"),
+			ui.Dim.Render("● not installed"))
 		return nil
 	},
 }
@@ -86,10 +66,10 @@ func printProfile(p catalog.Profile, statuses map[string]detect.Status, own bool
 		desc = "your saved stack"
 	}
 	fmt.Printf("  %s  %s  %s\n",
-		profileName.Render(fmt.Sprintf("%-14s", p.Name)),
-		progressBar(installed, len(p.Tools), 12),
-		profileMeta.Render(fmt.Sprintf("%d/%d", installed, len(p.Tools))))
-	fmt.Printf("  %s\n", profileDesc.Render(desc))
+		ui.Heading.Render(fmt.Sprintf("%-14s", p.Name)),
+		ui.Bar(installed, len(p.Tools), 12),
+		ui.Dim.Render(fmt.Sprintf("%d/%d", installed, len(p.Tools))))
+	fmt.Printf("  %s\n", ui.Dim.Render(desc))
 
 	const cols = 4
 	for i, name := range p.Tools {
@@ -103,12 +83,12 @@ func printProfile(p catalog.Profile, statuses map[string]detect.Status, own bool
 
 // renderCell formats one tool as a fixed-width, colored, state-marked cell.
 func renderCell(name string, s detect.Status) string {
-	var marker, style = "○", toolMissing
+	marker, style := "○", ui.Dim
 	switch {
 	case s.Outdated:
-		marker, style = "↑", toolUpdate
+		marker, style = "↑", ui.Warn
 	case s.Installed:
-		marker, style = "●", toolOK
+		marker, style = "●", ui.OK
 	}
 	cell := fmt.Sprintf("%s %s", marker, name)
 	// Pad to a fixed visible width before applying color (ANSI codes

@@ -232,6 +232,11 @@ modules under `~/.config/opsforge/shell/`:
 - **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
   context/namespace (fzf picker when available). All guarded on the tool being
   installed, so nothing shadows a command you don't have.
+- **A clean left prompt** — current directory (repo-relative in a git repo),
+  git branch with a dirty/ahead/behind marker, the duration of the last slow
+  command, and a `❯` that turns red on failure. Reads only local git — never
+  queries a cloud or cluster. Skips an existing prompt framework (starship,
+  p10k…); force with `OPSFORGE_PROMPT=1`, disable with `=0`.
 - **Live completion menu** — as you type, a menu of matching subcommands/flags
   appears automatically (no TAB), navigable with arrows; plus gray inline
   suggestions from history (→ accepts) and green/red syntax coloring. Powered by

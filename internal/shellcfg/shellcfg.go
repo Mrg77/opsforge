@@ -46,7 +46,7 @@ type Module struct {
 // matters: aliases before integrations (so integrations can override),
 // guards last (the accept-line widget should wrap everything).
 func Modules() ([]Module, error) {
-	order := []string{"prompt", "aliases", "integrations", "completions-special", "interactive", "help", "guards"}
+	order := []string{"leftprompt", "prompt", "aliases", "integrations", "completions-special", "interactive", "help", "guards"}
 	var mods []Module
 	for _, name := range order {
 		body, err := moduleFS.ReadFile("modules/" + name + ".zsh")
@@ -125,7 +125,7 @@ if [ -d %[1]q ]; then
 fi
 # opsforge modules (prompt, aliases, integrations, guards)
 if [ -d %[2]q ]; then
-  for _of_m in %[2]q/prompt.zsh %[2]q/aliases.zsh %[2]q/integrations.zsh %[2]q/completions-special.zsh %[2]q/interactive.zsh %[2]q/help.zsh %[2]q/guards.zsh; do
+  for _of_m in %[2]q/leftprompt.zsh %[2]q/prompt.zsh %[2]q/aliases.zsh %[2]q/integrations.zsh %[2]q/completions-special.zsh %[2]q/interactive.zsh %[2]q/help.zsh %[2]q/guards.zsh; do
     [ -r "$_of_m" ] && source "$_of_m"
   done
   unset _of_m

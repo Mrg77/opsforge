@@ -3,18 +3,11 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
-)
-
-var (
-	listCategory = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	listOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green: installed
-	listUpdate   = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // orange: update available
-	listDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
+	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 // listFilter decides which tools a list invocation shows.
@@ -46,7 +39,6 @@ func runList(filter listFilter) error {
 			if s.Outdated {
 				outdated++
 			}
-			// Apply the filter.
 			switch filter {
 			case filterInstalled:
 				if !s.Installed {
@@ -61,9 +53,9 @@ func runList(filter listFilter) error {
 			shown++
 		}
 		if len(rows) == 0 {
-			continue // hide categories with nothing to show under this filter
+			continue
 		}
-		fmt.Println(listCategory.Render(c.Name))
+		fmt.Println(ui.Section(c.Name))
 		for _, r := range rows {
 			fmt.Println(r)
 		}
@@ -74,47 +66,48 @@ func runList(filter listFilter) error {
 }
 
 func formatRow(t catalog.Tool, s detect.Status) string {
-	mark, note := listDim.Render("·"), listDim.Render(t.Description)
+	mark, note := ui.MissMark(), ui.Dim.Render(t.Description)
 	switch {
 	case s.Outdated:
-		mark = listUpdate.Render("✓")
+		mark = ui.Warn.Render(ui.MarkOK)
 		label := "update available"
 		if s.Version != "" {
-			label = s.Version + "  · update available"
+			label = s.Version + "  " + ui.MarkMissing + " update available"
 		}
-		note = listUpdate.Render(label)
+		note = ui.Warn.Render(label)
 	case s.Installed:
-		mark = listOK.Render("✓")
+		mark = ui.OKMark()
 		if s.Version != "" {
-			note = listDim.Render(s.Version)
+			note = ui.Dim.Render(s.Version)
 		}
 	}
 	return fmt.Sprintf("  %s %-16s %s", mark, t.Name, note)
 }
 
 func printListFooter(filter listFilter, shown, installed, outdated, total int) {
+	fmt.Println()
 	switch filter {
 	case filterInstalled:
 		if shown == 0 {
-			fmt.Println(listDim.Render("No catalog tools installed yet. Run `opsforge` to pick some, or `opsforge list all`."))
+			fmt.Println(ui.Dim.Render("No catalog tools installed yet. Run `opsforge` to pick some, or `opsforge list all`."))
 			return
 		}
-		fmt.Printf("\n%s   %s\n",
-			listDim.Render(fmt.Sprintf("%d installed", installed)),
-			listDim.Render("`opsforge list all` shows the full catalog"))
+		fmt.Printf("%s   %s\n",
+			ui.Dim.Render(fmt.Sprintf("%d installed", installed)),
+			ui.Dim.Render("`opsforge list all` shows the full catalog"))
 	case filterOutdated:
 		if shown == 0 {
-			fmt.Println(listOK.Render("Everything installed is up to date."))
+			fmt.Println(ui.OK.Render("Everything installed is up to date."))
 			return
 		}
-		fmt.Printf("\n%s   %s\n",
-			listUpdate.Render(fmt.Sprintf("%d update(s) available", outdated)),
-			listDim.Render("run `opsforge upgrade` or select them in the picker"))
-	default: // filterAll
-		fmt.Printf("\n%s   %s   %s\n",
-			listOK.Render(fmt.Sprintf("✓ %d installed", installed)),
-			listUpdate.Render(fmt.Sprintf("✓ %d to update", outdated)),
-			listDim.Render(fmt.Sprintf("· %d total", total)))
+		fmt.Printf("%s   %s\n",
+			ui.Warn.Render(fmt.Sprintf("%d update(s) available", outdated)),
+			ui.Dim.Render("run `opsforge upgrade` or select them in the picker"))
+	default:
+		fmt.Printf("%s   %s   %s\n",
+			ui.OK.Render(fmt.Sprintf("%s %d installed", ui.MarkOK, installed)),
+			ui.Warn.Render(fmt.Sprintf("%s %d to update", ui.MarkOK, outdated)),
+			ui.Dim.Render(fmt.Sprintf("%s %d total", ui.MarkMissing, total)))
 	}
 }
 
