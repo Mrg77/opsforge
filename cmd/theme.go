@@ -30,18 +30,29 @@ background.
 			return nil
 		}
 
-		fmt.Println(ui.Header("opsforge themes", "set OPSFORGE_THEME=<name> in your ~/.zshrc (or 'auto')"))
+		fmt.Println(ui.Header("opsforge themes", "your active theme is shown with a ✓"))
 		fmt.Println()
 		current := ui.Active.Name
 		for _, name := range ui.ThemeNames() {
 			ui.SetTheme(name)
 			marker := "  "
+			label := name
 			if name == current {
 				marker = ui.OK.Render(ui.MarkOK + " ")
+				label = name + " (active)"
 			}
-			fmt.Printf("%s%s  %s\n", marker, ui.Title.Render(fmt.Sprintf("%-9s", name)), swatches())
+			// Pad the plain label, then color — keeps the swatches aligned.
+			padded := label
+			if p := 18 - len([]rune(label)); p > 0 {
+				padded += fmt.Sprintf("%*s", p, "")
+			}
+			fmt.Printf("%s%s%s\n", marker, ui.Title.Render(padded), swatches())
 		}
 		ui.SetTheme(current) // restore
+
+		fmt.Println()
+		fmt.Println(ui.Dim.Render("  Preview one:  ") + ui.Accent.Render("opsforge theme dracula"))
+		fmt.Println(ui.Dim.Render("  Apply it:     ") + ui.Accent.Render("echo 'export OPSFORGE_THEME=dracula' >> ~/.zshrc && exec zsh"))
 		return nil
 	},
 }

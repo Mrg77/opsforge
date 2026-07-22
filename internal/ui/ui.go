@@ -87,6 +87,16 @@ func Section(name string) string {
 	return Heading.Render(name)
 }
 
+// Label renders a heading padded to a fixed width. Padding is applied to
+// the plain text BEFORE coloring, so ANSI codes never break alignment
+// (the classic bug of `fmt.Sprintf("%-12s", styled)`).
+func Label(name string, width int) string {
+	if pad := width - len([]rune(name)); pad > 0 {
+		name += strings.Repeat(" ", pad)
+	}
+	return Heading.Render(name)
+}
+
 // Bar renders a filled/empty progress bar, e.g. ███████░░░.
 func Bar(done, total, width int) string {
 	if total <= 0 {

@@ -47,19 +47,19 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		fmt.Println()
 
 		// Toolbox line with a coverage bar.
-		fmt.Printf("  %-12s %s  %s\n",
-			ui.Heading.Render("Toolbox"),
+		fmt.Printf("  %s %s  %s\n",
+			ui.Label("Toolbox", 10),
 			ui.Bar(installed, total, 20),
 			ui.Dim.Render(fmt.Sprintf("%d/%d installed", installed, total)))
 
 		// Updates.
 		if outdated > 0 {
-			fmt.Printf("  %-12s %s %s\n",
-				ui.Heading.Render("Updates"),
+			fmt.Printf("  %s %s %s\n",
+				ui.Label("Updates", 10),
 				ui.Warn.Render(fmt.Sprintf("%s %d available", ui.MarkUpdate, outdated)),
 				ui.Dim.Render("— run `opsforge upgrade -u`"))
 		} else if installed > 0 {
-			fmt.Printf("  %-12s %s\n", ui.Heading.Render("Updates"),
+			fmt.Printf("  %s %s\n", ui.Label("Updates", 10),
 				ui.OK.Render(ui.MarkOK+" everything up to date"))
 		}
 
@@ -68,33 +68,33 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		if shellOn {
 			shellVal = ui.OK.Render(ui.MarkOK + " active")
 		}
-		fmt.Printf("  %-12s %s\n", ui.Heading.Render("Shell"), shellVal)
+		fmt.Printf("  %s %s\n", ui.Label("Shell", 10), shellVal)
 
 		// Version manager.
 		vm := ui.Dim.Render("none — install mise for `opsforge use`")
 		if mgr := versions.Detect(); mgr != versions.None {
 			vm = ui.OK.Render(ui.MarkOK + " " + string(mgr))
 		}
-		fmt.Printf("  %-12s %s\n", ui.Heading.Render("Versions"), vm)
+		fmt.Printf("  %s %s\n", ui.Label("Versions", 10), vm)
 
 		// Backend + theme footer.
 		backend := "GitHub releases"
 		if installer.BrewAvailable() {
 			backend = "Homebrew + GitHub"
 		}
-		fmt.Printf("  %-12s %s\n", ui.Heading.Render("Backend"), ui.Dim.Render(backend))
+		fmt.Printf("  %s %s\n", ui.Label("Backend", 10), ui.Dim.Render(backend))
 		theme := ui.Active.Name
 		if os.Getenv("OPSFORGE_THEME") == "" {
 			theme += ui.Dim.Render(" (auto)")
 		}
-		fmt.Printf("  %-12s %s\n", ui.Heading.Render("Theme"), ui.Accent.Render(theme))
+		fmt.Printf("  %s %s\n", ui.Label("Theme", 10), ui.Accent.Render(theme))
 
 		if len(userps) > 0 {
 			names := make([]string, 0, len(userps))
 			for _, p := range userps {
 				names = append(names, p.Name)
 			}
-			fmt.Printf("  %-12s %s\n", ui.Heading.Render("Profiles"),
+			fmt.Printf("  %s %s\n", ui.Label("Profiles", 10),
 				ui.Dim.Render(strings.Join(names, ", ")))
 		}
 

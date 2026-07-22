@@ -113,15 +113,16 @@ func Env() (string, error) {
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n", markerStart)
-	// compinit may already have run; the compdef guard avoids a slow
-	// second invocation.
-	fmt.Fprintf(&b, `if ! typeset -f compdef >/dev/null 2>&1; then
+	// Put cached completions on fpath BEFORE compinit so #compdef files
+	// are autoloaded (not sourced — sourcing a #compdef file at top level
+	// calls _arguments outside a completion context and errors). Then run
+	// compinit, guarded so a shell that already ran it isn't slowed twice.
+	fmt.Fprintf(&b, `if [ -d %[1]q ]; then fpath=(%[1]q $fpath); fi
+if ! typeset -f compdef >/dev/null 2>&1; then
   autoload -Uz compinit && compinit -u
-fi
-# cached tool completions
-if [ -d %[1]q ]; then
-  for _of_c in %[1]q/*.zsh(N); do source "$_of_c"; done
-  unset _of_c
+else
+  # completions dir was added after the user's compinit — reload it
+  autoload -Uz compinit && compinit -u -C
 fi
 # opsforge modules (prompt, aliases, integrations, guards)
 if [ -d %[2]q ]; then
@@ -145,11 +146,20 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
+	// Drop legacy *.zsh completion files: we now write fpath-style _<bin>
+	// files (autoloaded), and sourcing the old .zsh ones broke on
+	// #compdef scripts like bat's.
+	if old, _ := filepath.Glob(filepath.Join(dir, "*.zsh")); old != nil {
+		for _, f := range old {
+			os.Remove(f)
+		}
+	}
+
 	var synced []string
 	// Always generate opsforge's own completion first — the tool that
 	// manages everyone else's completions should have its own.
 	if out := runCompletion([]string{"opsforge", "completion", "zsh"}); looksLikeCompletion(out) {
-		if err := os.WriteFile(filepath.Join(dir, "opsforge.zsh"), out, 0o644); err == nil {
+		if err := os.WriteFile(filepath.Join(dir, "_opsforge"), out, 0o644); err == nil {
 			synced = append(synced, "opsforge")
 		}
 	}
@@ -161,7 +171,9 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 		if len(out) == 0 {
 			continue
 		}
-		path := filepath.Join(dir, t.Name+".zsh")
+		// fpath convention: the file is named _<bin> so compinit
+		// autoloads it for that command.
+		path := filepath.Join(dir, "_"+t.Bin)
 		if err := os.WriteFile(path, out, 0o644); err != nil {
 			return synced, fmt.Errorf("writing %s: %w", path, err)
 		}

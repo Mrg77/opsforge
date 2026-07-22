@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
@@ -14,6 +15,14 @@ import (
 	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/versions"
 )
+
+// plural returns "N thing" or "N things".
+func plural(n int, word string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", word)
+	}
+	return fmt.Sprintf("%d %ss", n, word)
+}
 
 // checkResult is one health check outcome.
 type checkResult int
@@ -87,7 +96,9 @@ var doctorCmd = &cobra.Command{
 		if mgr := versions.Detect(); mgr != versions.None {
 			r.line(pass, "Version manager", string(mgr)+" — `opsforge use <tool>@<ver>` works", "")
 		} else {
-			r.line(warn, "Version manager", "none", "install mise for `opsforge use terraform@1.5`")
+			// Optional feature — a note, not a warning.
+			r.line(pass, "Version manager",
+				ui.Dim.Render("not installed (optional — `opsforge install mise` enables `opsforge use`)"), "")
 		}
 		fmt.Println()
 
@@ -117,7 +128,9 @@ var doctorCmd = &cobra.Command{
 		// --- Toolbox --------------------------------------------------------
 		fmt.Println(ui.Section("Toolbox"))
 		statuses := detect.AllWithOutdated(cat.Tools())
-		installed, outdated, broken := 0, 0, []string{}
+		installed := 0
+		var outdatedTools []string
+		var broken []string
 		for _, t := range cat.Tools() {
 			s := statuses[t.Name]
 			if !s.Installed {
@@ -125,7 +138,12 @@ var doctorCmd = &cobra.Command{
 			}
 			installed++
 			if s.Outdated {
-				outdated++
+				v := audit.NormalizeVersion(s.Version)
+				if v != "" {
+					outdatedTools = append(outdatedTools, fmt.Sprintf("%s (%s)", t.Name, v))
+				} else {
+					outdatedTools = append(outdatedTools, t.Name)
+				}
 			}
 			if s.Version == "" {
 				broken = append(broken, t.Name)
@@ -133,15 +151,18 @@ var doctorCmd = &cobra.Command{
 		}
 		r.line(pass, "Installed tools",
 			fmt.Sprintf("%d of %d catalog tools", installed, len(cat.Tools())), "")
-		if outdated > 0 {
-			r.line(warn, "Updates available", fmt.Sprintf("%d tool(s)", outdated),
-				"run `opsforge upgrade -u`")
+		if len(outdatedTools) > 0 {
+			r.line(warn, "Updates available",
+				fmt.Sprintf("%d tool(s): %s", len(outdatedTools), strings.Join(outdatedTools, ", ")),
+				"run `opsforge upgrade -u` to update them all")
 		} else {
 			r.line(pass, "Updates", "everything up to date", "")
 		}
 		if len(broken) > 0 {
-			r.line(warn, "Version probe failed", strings.Join(broken, ", "),
-				"these tools didn't report a version")
+			// krew and similar report no --version; it's cosmetic, not a fault.
+			r.line(pass, "Version probe",
+				ui.Dim.Render(fmt.Sprintf("%s report no version (cosmetic): %s",
+					plural(len(broken), "tool"), strings.Join(broken, ", "))), "")
 		}
 		fmt.Println()
 
