@@ -13,7 +13,7 @@ prompt, and guards that stop you from nuking the wrong cluster.
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-![opsforge demo](demo/opsforge.gif)
+![opsforge demo](demo/demo-v0.3.gif)
 
 **[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
 
