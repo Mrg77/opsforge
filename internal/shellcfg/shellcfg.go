@@ -146,6 +146,13 @@ func Sync(tools []catalog.Tool) ([]string, error) {
 		return nil, err
 	}
 	var synced []string
+	// Always generate opsforge's own completion first — the tool that
+	// manages everyone else's completions should have its own.
+	if out := runCompletion([]string{"opsforge", "completion", "zsh"}); looksLikeCompletion(out) {
+		if err := os.WriteFile(filepath.Join(dir, "opsforge.zsh"), out, 0o644); err == nil {
+			synced = append(synced, "opsforge")
+		}
+	}
 	for _, t := range tools {
 		if !detect.Tool(t).Installed {
 			continue
