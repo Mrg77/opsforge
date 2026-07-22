@@ -113,7 +113,7 @@ _opsforge_help_panel() {
   fi
   # Fallback if the binary is unavailable for some reason.
   print -P "%F{212}%B  opsforge shell%b%f — press ? for help, ?? to explain the last command"
-  print -P "  %F{39}Interactive%f  type to get a live menu · <cmd> ? for that command's help"
+  print -P "  %F{39}Interactive%f  ↑ history by prefix · → accept suggestion · <cmd> ? for its help"
   print -P "  %F{39}Aliases%f      k=kubectl · tf=terraform · dc=docker compose · kx/kn switch ctx/ns"
 }
 

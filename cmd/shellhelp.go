@@ -20,8 +20,10 @@ type helpGroup struct {
 
 var shellHelpGroups = []helpGroup{
 	{"⌨", "Interactive editing", []helpRow{
-		{"type…", "a completion menu opens automatically (↑↓ or Tab to pick)"},
+		{"↑ / ↓", "walk history filtered by what you've typed (prefix of the line)"},
 		{"→", "accept the grey inline suggestion from history"},
+		{"Tab", "complete the current word (menu on a second Tab)"},
+		{"^R", "search your whole history"},
 		{"cmd ?", "that command's --help, nicely rendered"},
 		{"?", "this help panel"},
 		{"??", "AI explains your last command / why it failed"},

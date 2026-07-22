@@ -96,8 +96,9 @@ var shellInstallCmd = &cobra.Command{
 
 		fmt.Printf("\nopsforge shell environment installed in %s\n", path)
 		fmt.Println("Run `exec zsh` (or open a new terminal) to activate it — then just")
-		fmt.Println("start typing: suggestions appear inline (→ to accept), a menu opens")
-		fmt.Println("automatically, and your command line is colored as you go.")
+		fmt.Println("start typing: a gray suggestion appears inline (→ to accept), ↑ walks")
+		fmt.Println("your history by what you've typed, Tab completes, and the line is")
+		fmt.Println("colored as you go. (Prefer an always-on menu? OPSFORGE_AUTOMENU=1.)")
 		return nil
 	},
 }
