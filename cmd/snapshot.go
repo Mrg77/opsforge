@@ -5,19 +5,14 @@ import (
 	"os"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/snapshot"
+	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
-)
-
-var (
-	snapOK  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	snapDim = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 var snapshotOut string
@@ -35,7 +30,11 @@ workstation anywhere with:  opsforge apply <file-or-url>`,
 		if err != nil {
 			return err
 		}
-		fmt.Println(snapDim.Render("Scanning your workstation…"))
+		if snapshotOut != "-" {
+			fmt.Println(ui.Header("opsforge snapshot", "export your whole workstation to one shareable file"))
+			fmt.Println()
+			fmt.Println(ui.Dim.Render("Scanning your workstation…"))
+		}
 		statuses := detect.All(cat.Tools())
 		profiles, _ := userprofiles.Load()
 
@@ -53,14 +52,14 @@ workstation anywhere with:  opsforge apply <file-or-url>`,
 			return err
 		}
 
-		fmt.Printf("%s %s\n", snapOK.Render("✓"), snapshotOut)
-		fmt.Printf("  %s\n", snapDim.Render(fmt.Sprintf(
+		fmt.Printf("%s %s\n", ui.OK.Render("✓"), snapshotOut)
+		fmt.Printf("  %s\n", ui.Dim.Render(fmt.Sprintf(
 			"%d tool(s) · %d profile(s) · shell environment: %v",
 			len(s.Tools), len(s.Profiles), s.Shell.Enabled)))
 		fmt.Println()
 		fmt.Println("Rebuild this workstation anywhere:")
 		fmt.Printf("  opsforge apply %s\n", snapshotOut)
-		fmt.Println(snapDim.Render("  (commit it to your dotfiles repo and apply from its raw URL)"))
+		fmt.Println(ui.Dim.Render("  (commit it to your dotfiles repo and apply from its raw URL)"))
 		return nil
 	},
 }

@@ -3,21 +3,21 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 var (
-	upOK  = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	upNew = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42")) // green: new version
-	upOld = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))           // orange: old version
-	upDim = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	upErr = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
+	upOK  = ui.OK
+	upNew = ui.OKBold // green: new version
+	upOld = ui.Warn   // orange: old version
+	upDim = ui.Dim
+	upErr = ui.Err
 )
 
 var upgradeOutdatedOnly bool

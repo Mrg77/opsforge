@@ -6,7 +6,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
@@ -14,16 +13,18 @@ import (
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/snapshot"
+	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
 )
 
+// apply* aliases keep the command body readable while using the shared ui.
 var (
-	applyOK   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	applyNew  = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("42"))
-	applyDim  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	applyWarn = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	applyErr  = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	applyHead = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	applyOK   = ui.OK
+	applyNew  = ui.OKBold
+	applyDim  = ui.Dim
+	applyWarn = ui.Warn
+	applyErr  = ui.Err
+	applyHead = ui.Heading
 )
 
 var applyYes bool
@@ -48,6 +49,8 @@ Shows the full plan and asks for confirmation before changing anything
 		if err != nil {
 			return err
 		}
+		fmt.Println(ui.Header("opsforge apply", "rebuild this workstation from a snapshot"))
+		fmt.Println()
 		fmt.Println(applyDim.Render("Scanning this machine…"))
 		statuses := detect.All(cat.Tools())
 		plan := snapshot.BuildPlan(snap, cat, statuses)

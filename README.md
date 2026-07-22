@@ -101,6 +101,8 @@ after a run, `enter`/`m` returns to the (re-scanned) menu, `q` quits.
 | Command | What it does |
 |---|---|
 | `opsforge` / `opsforge install` | Interactive picker: browse the catalog, check tools, install them |
+| `opsforge status` | One-glance cockpit: tools, updates, shell, theme |
+| `opsforge theme [name]` | List/preview color themes (`OPSFORGE_THEME` to set) |
 | `opsforge install kubectl helm` | Non-interactive install by name (scriptable) |
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
@@ -290,6 +292,19 @@ opsforge picks a backend per tool at runtime:
 
 Force a backend with `OPSFORGE_BACKEND=brew|github`; change the binary target
 dir with `OPSFORGE_BIN_DIR`.
+
+## Themes
+
+opsforge's whole visual identity is themeable — one shared palette drives every
+command. Pick one with `OPSFORGE_THEME` in your `~/.zshrc`:
+
+```sh
+opsforge theme            # list all themes with a color preview
+opsforge theme dracula    # preview one
+export OPSFORGE_THEME=nord # forge (default), nord, dracula, gruvbox, light, mono, or auto
+```
+
+`auto` matches your terminal background; `mono` is color-free for logs/CI.
 
 ## Engineering highlights
 

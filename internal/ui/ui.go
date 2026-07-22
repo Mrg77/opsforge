@@ -13,32 +13,31 @@ import (
 	"golang.org/x/term"
 )
 
-// Palette — the single source of truth for opsforge colors. 256-color
-// codes chosen to read well on both dark and light terminals.
+// Palette and styles — the single source of truth for opsforge colors.
+// These are bound by the active theme (see theme.go, applyTheme); do not
+// initialize them here, or the theme selected at init() would be
+// overwritten by these declarations.
 var (
-	Brand   = lipgloss.Color("212") // pink — the opsforge accent
-	Blue    = lipgloss.Color("39")  // category / section headers
-	Green   = lipgloss.Color("42")  // ok / installed / success
-	Orange  = lipgloss.Color("214") // update available / warning
-	Red     = lipgloss.Color("196") // error / critical
-	Cyan    = lipgloss.Color("51")  // selected / interactive
-	Yellow  = lipgloss.Color("220") // highlights, versions
-	Grey    = lipgloss.Color("241") // secondary / dim text
-	GreyDim = lipgloss.Color("238") // very dim (bar backgrounds, hints)
-)
+	Brand   lipgloss.Color
+	Blue    lipgloss.Color
+	Green   lipgloss.Color
+	Orange  lipgloss.Color
+	Red     lipgloss.Color
+	Cyan    lipgloss.Color
+	Yellow  lipgloss.Color
+	Grey    lipgloss.Color
+	GreyDim lipgloss.Color
 
-// Text styles.
-var (
-	Title    = lipgloss.NewStyle().Bold(true).Foreground(Brand)
-	Heading  = lipgloss.NewStyle().Bold(true).Foreground(Blue)
-	OK       = lipgloss.NewStyle().Foreground(Green)
-	OKBold   = lipgloss.NewStyle().Bold(true).Foreground(Green)
-	Warn     = lipgloss.NewStyle().Foreground(Orange)
-	Err      = lipgloss.NewStyle().Foreground(Red)
-	Selected = lipgloss.NewStyle().Foreground(Cyan)
-	Accent   = lipgloss.NewStyle().Foreground(Yellow)
-	Dim      = lipgloss.NewStyle().Foreground(Grey)
-	Faint    = lipgloss.NewStyle().Foreground(GreyDim)
+	Title    lipgloss.Style
+	Heading  lipgloss.Style
+	OK       lipgloss.Style
+	OKBold   lipgloss.Style
+	Warn     lipgloss.Style
+	Err      lipgloss.Style
+	Selected lipgloss.Style
+	Accent   lipgloss.Style
+	Dim      lipgloss.Style
+	Faint    lipgloss.Style
 )
 
 // Status markers — used identically across list, profiles, doctor, audit.

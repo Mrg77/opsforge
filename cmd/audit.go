@@ -14,6 +14,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/secrets"
+	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 var (
@@ -64,6 +65,13 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 		if err != nil {
 			return err
 		}
+
+		sub := "installed tool versions vs the OSV.dev vulnerability database"
+		if auditSecrets {
+			sub = "CVEs in your tools + credentials leaking on your workstation"
+		}
+		fmt.Println(ui.Header("opsforge audit", sub))
+		fmt.Println()
 
 		if auditSecrets {
 			if err := runSecretsScan(); err != nil {
