@@ -80,9 +80,12 @@ Launching the bare binary opens the interactive picker — browse by category,
 check what you want, hit install. It detects what you already have and what can
 be upgraded, at a glance.
 
+**Views (k9s-style tabs):** `1` Tools (full catalog) · `2` Updates (only what's
+outdated) · `3` Security (live CVE scan of your installed tools).
+
 **Keys:** `space` toggle · `u` select all updates · `a` select all
-not-installed · `/` filter · `i` install · after a run, `enter`/`m` returns to
-the (re-scanned) menu, `q` quits.
+not-installed · `s` save selection as a profile · `/` filter · `i` install ·
+after a run, `enter`/`m` returns to the (re-scanned) menu, `q` quits.
 
 **At-a-glance markers:**
 
@@ -102,7 +105,8 @@ the (re-scanned) menu, `q` quits.
 | `opsforge install --profile aws-k8s` | Install a whole stack preset in one command |
 | `opsforge profiles` | List stack profiles with installed/total counts |
 | `opsforge upgrade` | Upgrade installed tools — all, `-u` for only outdated, or `upgrade jq yq gh` |
-| `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
+| `opsforge audit` | Scan installed tools for CVEs (`--secrets`: find leaked credentials too) |
+| `opsforge explain --last` | AI-explain your last command — or just type `??` in the shell |
 | `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
 | `opsforge snapshot` | Export your whole workstation setup to one shareable YAML |
 | `opsforge apply <file-or-url>` | Rebuild a workstation from a snapshot (plan + confirm first) |
@@ -195,6 +199,20 @@ known CVEs, sorted by severity, with the version that fixes each one:
 Version matching is done client-side against OSV's affected ranges, so a CVE
 fixed before your version (or only in a future major) is not reported — you see
 only what actually affects the version you run.
+
+**Leaked-credentials scan.** `opsforge audit --secrets` checks the places
+secrets habitually leak on a workstation — shell history (`kubectl create
+secret --from-literal`, `export GITHUB_TOKEN=…`, `docker login -p`), shell rc
+files, local `.env` files — against gitleaks-style rules (AWS keys,
+GitHub/GitLab/Slack tokens, private keys, JWTs…). Values are always masked;
+exits non-zero on critical findings so you can wire it into CI.
+
+### `??` — explain my last failure
+
+Command failed? Type `??` and an AI explains what went wrong and gives the fix,
+using your last command + exit code. The backend is pluggable: the `claude` CLI
+if installed, else `ollama`, else any command via `OPSFORGE_AI_CMD`. Also works
+directly: `opsforge explain "kubectl drain"`.
 
 ## The DevOps shell environment
 

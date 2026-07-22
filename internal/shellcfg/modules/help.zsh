@@ -13,6 +13,16 @@
 # command; otherwise it inserts a literal "?" so globbing/other uses are
 # unaffected.
 _opsforge_help_widget() {
+  # "??" — the buffer already holds one "?" and the user typed a second:
+  # explain the LAST command via AI (opsforge explain --last).
+  if [[ "$BUFFER" == "?" ]]; then
+    BUFFER=""
+    print
+    opsforge explain --last
+    zle reset-prompt
+    return
+  fi
+
   if [[ $CURSOR -ne ${#BUFFER} || -z "${BUFFER// /}" ]]; then
     zle self-insert
     return
@@ -85,6 +95,18 @@ _opsforge_help_page() {
     cat
   fi
 }
+
+# Track the last command + exit status so `??` (and `opsforge explain
+# --last`) know what to explain. Cheap: two tiny file writes per prompt.
+_opsforge_track_last() {
+  local code=$?
+  local dir="$HOME/.cache/opsforge"
+  [[ -d "$dir" ]] || mkdir -p "$dir" 2>/dev/null
+  print -r -- "$code" >| "$dir/last-status" 2>/dev/null
+  fc -ln -1 2>/dev/null | sed 's/^[[:space:]]*//' >| "$dir/last-cmd" 2>/dev/null
+}
+autoload -Uz add-zsh-hook 2>/dev/null
+add-zsh-hook precmd _opsforge_track_last 2>/dev/null
 
 # Install the widget only in an interactive shell with ZLE.
 if [[ -o interactive ]] && zle -l >/dev/null 2>&1; then
