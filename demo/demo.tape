@@ -1,5 +1,5 @@
 # opsforge demo — regenerate with: vhs demo.tape
-Output demo-v0.3.gif
+Output demo-v0.3.2.gif
 
 Set Shell "zsh"
 Set FontSize 16
