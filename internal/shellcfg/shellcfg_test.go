@@ -69,7 +69,7 @@ func TestModulesLoadAndAreNonEmpty(t *testing.T) {
 	}
 }
 
-func TestGuardsModuleCoversProdAndDestructive(t *testing.T) {
+func TestGuardsModuleDelegatesToPolicyEngine(t *testing.T) {
 	mods, _ := Modules()
 	var guards string
 	for _, m := range mods {
@@ -77,7 +77,10 @@ func TestGuardsModuleCoversProdAndDestructive(t *testing.T) {
 			guards = m.Body
 		}
 	}
-	for _, needle := range []string{"kubectl delete", "terraform destroy", "prod", "accept-line"} {
+	// The rules now live in the Go policy engine; the module must wire the
+	// accept-line widget, delegate the decision to `opsforge guard check`,
+	// keep a cheap prefilter, and still document the escape hatch.
+	for _, needle := range []string{"accept-line", "opsforge guard check", "_opsforge_looks_dangerous", "OPSFORGE_GUARDS=0"} {
 		if !strings.Contains(guards, needle) {
 			t.Errorf("guards module missing expected content %q", needle)
 		}

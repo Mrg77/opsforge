@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -38,6 +40,7 @@ var installCmd = &cobra.Command{
 // runPicker opens the interactive TUI; it is also the default behavior
 // when the binary is launched without any subcommand.
 func runPicker(cat *catalog.Catalog) error {
+	maybeOnboard()
 	rescan := func() map[string]detect.Status {
 		return detect.AllWithOutdated(cat.Tools())
 	}
@@ -66,6 +69,45 @@ func runPicker(cat *catalog.Catalog) error {
 		return postInstall(cat)
 	}
 	return nil
+}
+
+// configDir is opsforge's config directory (~/.config/opsforge); its
+// absence is what we treat as a first launch.
+func configDir() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "opsforge")
+}
+
+// maybeOnboard shows a short welcome panel the very first time the picker
+// runs, so a newcomer understands what opsforge is before the grid of
+// tools appears. It marks the config dir as created so it never shows
+// twice. Best-effort: any error just skips onboarding silently.
+func maybeOnboard() {
+	dir := configDir()
+	if dir == "" {
+		return
+	}
+	if _, err := os.Stat(dir); err == nil {
+		return // not a first launch
+	}
+	// Create the dir up front so the panel shows exactly once, even if the
+	// user quits the picker immediately without installing anything.
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return
+	}
+
+	fmt.Println(ui.Header("Welcome to opsforge", "your DevOps workstation, forged in minutes"))
+	fmt.Println()
+	fmt.Printf("  %s pick & install CLIs (k8s, IaC, cloud, containers…) from the picker below\n", ui.OK.Render(ui.MarkOK))
+	fmt.Printf("  %s a wired zsh layer: completions, aliases, a kube-aware prompt (`opsforge shell install`)\n", ui.OK.Render(ui.MarkOK))
+	fmt.Printf("  %s a security audit of your tools & leaked secrets (`opsforge audit --secrets`)\n", ui.OK.Render(ui.MarkOK))
+	fmt.Println()
+	fmt.Println(ui.Dim.Render("  In the picker: 1/2/3 switch tabs · space selects · i installs · q quits."))
+	fmt.Println(ui.Dim.Render("  In the shell:  press ? for the cheatsheet · ?? explains your last error."))
+	fmt.Println()
 }
 
 // installNonInteractive resolves the requested tool names (explicit args

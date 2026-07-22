@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -14,11 +15,18 @@ import (
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/secrets"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/versions"
 )
+
+// ansiRe strips SGR escape sequences so JSON `detail` fields are plain
+// text (several checks pass already-styled detail strings to line()).
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string { return ansiRe.ReplaceAllString(s, "") }
 
 // doctorSkipSecurity disables the network CVE scan (for --quick / offline).
 var doctorSkipSecurity bool
@@ -40,23 +48,41 @@ const (
 	failed
 )
 
-// doctorReport accumulates checks so we can score and summarize.
+// doctorCheck is one health-check result in machine-readable form.
+type doctorCheck struct {
+	Section string `json:"section"`
+	Name    string `json:"name"`
+	Status  string `json:"status"` // "pass" | "warn" | "fail"
+	Detail  string `json:"detail,omitempty"`
+	Fix     string `json:"fix,omitempty"`
+}
+
+// doctorReport accumulates checks so we can score, summarize and emit JSON.
 type doctorReport struct {
 	pass, warn, fail int
+	section          string
+	checks           []doctorCheck
 }
 
 func (r *doctorReport) line(res checkResult, label, detail, fix string) {
-	var mark string
+	var mark, status string
 	switch res {
 	case pass:
-		mark = ui.OKMark()
+		mark, status = ui.OKMark(), "pass"
 		r.pass++
 	case warn:
-		mark = ui.WarnMark()
+		mark, status = ui.WarnMark(), "warn"
 		r.warn++
 	default:
-		mark = ui.ErrMark()
+		mark, status = ui.ErrMark(), "fail"
 		r.fail++
+	}
+	r.checks = append(r.checks, doctorCheck{
+		Section: r.section, Name: label, Status: status,
+		Detail: stripANSI(detail), Fix: fix,
+	})
+	if output.JSON {
+		return
 	}
 	line := fmt.Sprintf("  %s %s", mark, label)
 	if detail != "" {
@@ -66,6 +92,34 @@ func (r *doctorReport) line(res checkResult, label, detail, fix string) {
 	if fix != "" && res != pass {
 		fmt.Printf("      %s %s\n", ui.Dim.Render(ui.MarkArrow), ui.Dim.Render(fix))
 	}
+}
+
+// section records the current section and prints its header unless we're
+// emitting JSON. Commands call this instead of ui.Section directly so the
+// JSON path stays quiet and each check knows its section.
+func (r *doctorReport) beginSection(name string) {
+	r.section = name
+	if !output.JSON {
+		fmt.Println(ui.Section(name))
+	}
+}
+
+// jsonReport is the machine-readable shape of a full doctor run.
+func (r *doctorReport) jsonReport() any {
+	status := "healthy"
+	switch {
+	case r.fail > 0:
+		status = "failing"
+	case r.warn > 0:
+		status = "warnings"
+	}
+	return struct {
+		Status string        `json:"status"` // healthy | warnings | failing
+		Passed int           `json:"passed"`
+		Warned int           `json:"warnings"`
+		Failed int           `json:"failed"`
+		Checks []doctorCheck `json:"checks"`
+	}{status, r.pass, r.warn, r.fail, r.checks}
 }
 
 func boolRes(ok bool) checkResult {
@@ -85,11 +139,13 @@ var doctorCmd = &cobra.Command{
 		}
 		r := &doctorReport{}
 
-		fmt.Println(ui.Header("opsforge doctor", "a full health check of your DevOps workstation"))
-		fmt.Println()
+		if !output.JSON {
+			fmt.Println(ui.Header("opsforge doctor", "a full health check of your DevOps workstation"))
+			fmt.Println()
+		}
 
 		// --- System ---------------------------------------------------------
-		fmt.Println(ui.Section("System"))
+		r.beginSection("System")
 		brew := installer.BrewAvailable()
 		r.line(boolRes(brew), "Homebrew", brewDetail(brew),
 			"install from https://brew.sh (opsforge can also install via GitHub releases)")
@@ -107,10 +163,10 @@ var doctorCmd = &cobra.Command{
 			r.line(pass, "Version manager",
 				ui.Dim.Render("not installed (optional — `opsforge install mise` enables `opsforge use`)"), "")
 		}
-		fmt.Println()
+		doctorBlank()
 
 		// --- Shell environment ---------------------------------------------
-		fmt.Println(ui.Section("Shell environment"))
+		r.beginSection("Shell environment")
 		shellOn := shellcfg.InstalledInZshrc()
 		r.line(boolRes(shellOn), "opsforge shell layer", shellStateDetail(shellOn),
 			"run `opsforge shell install`")
@@ -130,10 +186,10 @@ var doctorCmd = &cobra.Command{
 			}
 			r.line(res, p.Name, "", "installed by `opsforge shell install`")
 		}
-		fmt.Println()
+		doctorBlank()
 
 		// --- Toolbox --------------------------------------------------------
-		fmt.Println(ui.Section("Toolbox"))
+		r.beginSection("Toolbox")
 		statuses := detect.AllWithOutdated(cat.Tools())
 		installed := 0
 		var outdatedTools []string
@@ -171,21 +227,34 @@ var doctorCmd = &cobra.Command{
 				ui.Dim.Render(fmt.Sprintf("%s report no version (cosmetic): %s",
 					plural(len(broken), "tool"), strings.Join(broken, ", "))), "")
 		}
-		fmt.Println()
+		doctorBlank()
 
 		// --- Security -------------------------------------------------------
-		fmt.Println(ui.Section("Security"))
+		r.beginSection("Security")
 		checkCVEs(r, cat)
 		checkSecrets(r)
-		fmt.Println()
+		doctorBlank()
 
 		// --- Summary --------------------------------------------------------
-		printDoctorSummary(r)
+		if output.JSON {
+			if err := output.Emit(r.jsonReport()); err != nil {
+				return err
+			}
+		} else {
+			printDoctorSummary(r)
+		}
 		if r.fail > 0 {
 			return fmt.Errorf("%d check(s) failed", r.fail)
 		}
 		return nil
 	},
+}
+
+// doctorBlank prints a blank separator line in human mode only.
+func doctorBlank() {
+	if !output.JSON {
+		fmt.Println()
+	}
 }
 
 // checkCVEs scans installed tools against OSV.dev and reports known

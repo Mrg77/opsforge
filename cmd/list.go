@@ -7,8 +7,18 @@ import (
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/ui"
 )
+
+// listItem is the machine-readable shape of one tool in `list --json`.
+type listItem struct {
+	Name      string `json:"name"`
+	Category  string `json:"category"`
+	Installed bool   `json:"installed"`
+	Outdated  bool   `json:"outdated"`
+	Version   string `json:"version,omitempty"`
+}
 
 // listFilter decides which tools a list invocation shows.
 type listFilter int
@@ -27,6 +37,10 @@ func runList(filter listFilter) error {
 		return err
 	}
 	statuses := detect.AllWithOutdated(cat.Tools())
+
+	if output.JSON {
+		return listJSON(cat, statuses, filter)
+	}
 
 	shown, installed, outdated := 0, 0, 0
 	for _, c := range cat.Categories {
@@ -63,6 +77,34 @@ func runList(filter listFilter) error {
 
 	printListFooter(filter, shown, installed, outdated, len(cat.Tools()))
 	return nil
+}
+
+// listJSON emits the (filtered) catalog as a JSON array for scripting/CI.
+func listJSON(cat *catalog.Catalog, statuses map[string]detect.Status, filter listFilter) error {
+	items := []listItem{}
+	for _, c := range cat.Categories {
+		for _, t := range c.Tools {
+			s := statuses[t.Name]
+			switch filter {
+			case filterInstalled:
+				if !s.Installed {
+					continue
+				}
+			case filterOutdated:
+				if !s.Outdated {
+					continue
+				}
+			}
+			items = append(items, listItem{
+				Name:      t.Name,
+				Category:  c.Name,
+				Installed: s.Installed,
+				Outdated:  s.Outdated,
+				Version:   s.Version,
+			})
+		}
+	}
+	return output.Emit(items)
 }
 
 func formatRow(t catalog.Tool, s detect.Status) string {

@@ -7,13 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
-)
 
-var (
-	explainDim  = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	explainHead = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 var explainLast bool
@@ -59,15 +55,15 @@ The AI backend is pluggable:
 			if lastCmd == "" {
 				return fmt.Errorf("no last command recorded yet")
 			}
-			fmt.Printf("%s %s %s\n\n", explainHead.Render("Explaining:"), lastCmd,
-				explainDim.Render("(exit "+lastStatus+")"))
+			fmt.Printf("%s %s %s\n\n", ui.Heading.Render("Explaining:"), lastCmd,
+				ui.Dim.Render("(exit "+lastStatus+")"))
 			prompt = fmt.Sprintf(
 				"I ran this shell command on macOS and it exited with code %s:\n\n  %s\n\n"+
 					"Explain briefly what likely went wrong and give the corrected command. "+
 					"Be concise: a short diagnosis and the fix.", lastStatus, lastCmd)
 		case len(args) > 0:
 			target := strings.Join(args, " ")
-			fmt.Printf("%s %s\n\n", explainHead.Render("Explaining:"), target)
+			fmt.Printf("%s %s\n\n", ui.Heading.Render("Explaining:"), target)
 			prompt = fmt.Sprintf(
 				"Explain this shell command concisely: what it does, its risks, and a usage example:\n\n  %s",
 				target)
@@ -96,7 +92,7 @@ func runAI(prompt string) error {
 		c.Stdout, c.Stderr = os.Stdout, os.Stderr
 		return c.Run()
 	}
-	fmt.Println(explainDim.Render(`No AI backend found. Configure one of:
+	fmt.Println(ui.Dim.Render(`No AI backend found. Configure one of:
   - install the Claude CLI (https://claude.com/claude-code), or
   - install ollama (https://ollama.com) and pull a model, or
   - set OPSFORGE_AI_CMD to any command that reads a prompt on stdin`))

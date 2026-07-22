@@ -13,17 +13,9 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/secrets"
 	"github.com/Mrg77/opsforge/internal/ui"
-)
-
-var (
-	sevCritical = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("196"))
-	sevHigh     = lipgloss.NewStyle().Foreground(lipgloss.Color("202"))
-	sevMedium   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	sevLow      = lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
-	auditOK     = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	auditDim    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
 var auditSecrets bool
@@ -51,6 +43,89 @@ func CollectOSVTargets(cat *catalog.Catalog) []audit.ToolTarget {
 	return targets
 }
 
+// auditJSON runs the same scans as the human path but emits a structured
+// report and sets a non-zero exit on HIGH/CRITICAL CVEs or critical
+// secret leaks — the shape a CI gate consumes.
+func auditJSON(cat *catalog.Catalog) error {
+	type vulnJSON struct {
+		ID       string `json:"id"`
+		Severity string `json:"severity"`
+		Summary  string `json:"summary"`
+		FixedIn  string `json:"fixed_in,omitempty"`
+	}
+	type toolJSON struct {
+		Tool            string     `json:"tool"`
+		Version         string     `json:"version"`
+		TopSeverity     string     `json:"top_severity"`
+		Vulnerable      bool       `json:"vulnerable"`
+		Vulnerabilities []vulnJSON `json:"vulnerabilities"`
+	}
+	type secretJSON struct {
+		Source   string `json:"source"`
+		Line     int    `json:"line"`
+		Rule     string `json:"rule"`
+		Severity string `json:"severity"`
+		Excerpt  string `json:"excerpt"`
+	}
+
+	targets := CollectOSVTargets(cat)
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	findings := audit.ScanTools(ctx, targets)
+	sort.Slice(findings, func(a, b int) bool {
+		if findings[a].TopSeverity() != findings[b].TopSeverity() {
+			return findings[a].TopSeverity() > findings[b].TopSeverity()
+		}
+		return findings[a].Tool < findings[b].Tool
+	})
+
+	tools := make([]toolJSON, 0, len(findings))
+	highOrWorse := 0
+	for _, f := range findings {
+		vulns := make([]vulnJSON, 0, len(f.Vulns))
+		for _, v := range f.Vulns {
+			vulns = append(vulns, vulnJSON{v.ID, v.Severity.String(), v.Summary, v.FixedIn})
+		}
+		if f.TopSeverity() >= audit.SevHigh {
+			highOrWorse++
+		}
+		tools = append(tools, toolJSON{
+			Tool: f.Tool, Version: f.Version, TopSeverity: f.TopSeverity().String(),
+			Vulnerable: len(f.Vulns) > 0, Vulnerabilities: vulns,
+		})
+	}
+
+	var leaks []secretJSON
+	criticalSecrets := 0
+	if auditSecrets {
+		for _, s := range secrets.ScanWorkstation() {
+			if s.Rule.Severity == secrets.SevCritical {
+				criticalSecrets++
+			}
+			leaks = append(leaks, secretJSON{
+				Source: s.Source, Line: s.Line, Rule: s.Rule.Desc,
+				Severity: s.Rule.Severity.String(), Excerpt: s.Excerpt,
+			})
+		}
+	}
+
+	if err := output.Emit(struct {
+		ToolsScanned    int          `json:"tools_scanned"`
+		HighOrCritical  int          `json:"high_or_critical"`
+		Tools           []toolJSON   `json:"tools"`
+		SecretsScanned  bool         `json:"secrets_scanned"`
+		CriticalSecrets int          `json:"critical_secrets"`
+		Secrets         []secretJSON `json:"secrets"`
+	}{len(targets), highOrWorse, tools, auditSecrets, criticalSecrets, leaks}); err != nil {
+		return err
+	}
+	if highOrWorse > 0 || criticalSecrets > 0 {
+		return fmt.Errorf("audit found %d HIGH/CRITICAL CVE tool(s) and %d critical secret(s)",
+			highOrWorse, criticalSecrets)
+	}
+	return nil
+}
+
 var auditCmd = &cobra.Command{
 	Use:   "audit",
 	Short: "Scan installed tools for CVEs — and your workstation for leaked secrets",
@@ -64,6 +139,10 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 		cat, err := catalog.Load()
 		if err != nil {
 			return err
+		}
+
+		if output.JSON {
+			return auditJSON(cat)
 		}
 
 		sub := "installed tool versions vs the OSV.dev vulnerability database"
@@ -103,8 +182,8 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 		highOrWorse := 0
 		for _, f := range findings {
 			if len(f.Vulns) == 0 {
-				fmt.Printf("%s %-14s %s\n", auditOK.Render("✓"), f.Tool,
-					auditDim.Render(f.Version+" — no known vulnerabilities"))
+				fmt.Printf("%s %-14s %s\n", ui.OK.Render("✓"), f.Tool,
+					ui.Dim.Render(f.Version+" — no known vulnerabilities"))
 				continue
 			}
 			vulnerable++
@@ -112,13 +191,13 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 				highOrWorse++
 			}
 			fmt.Printf("%s %-14s %s\n", sevStyle(f.TopSeverity()).Render("⚠"), f.Tool,
-				auditDim.Render(f.Version))
+				ui.Dim.Render(f.Version))
 			for _, v := range f.Vulns {
 				fix := ""
 				if v.FixedIn != "" {
-					fix = auditDim.Render("  → fixed in " + v.FixedIn)
+					fix = ui.Dim.Render("  → fixed in " + v.FixedIn)
 				}
-				id := hyperlink(vulnURL(v.ID), v.ID)
+				id := ui.Hyperlink(vulnURL(v.ID), v.ID)
 				summary := truncate(v.Summary, 90-len(v.ID))
 				fmt.Printf("    %s %s %s%s\n",
 					sevStyle(v.Severity).Render(fmt.Sprintf("[%s]", v.Severity)),
@@ -128,11 +207,11 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 
 		fmt.Println()
 		if vulnerable == 0 {
-			fmt.Println(auditOK.Render("All audited tools are free of known vulnerabilities."))
+			fmt.Println(ui.OK.Render("All audited tools are free of known vulnerabilities."))
 			return nil
 		}
 		fmt.Printf("%s in %d tool(s). Run `opsforge upgrade` or update the affected tools.\n",
-			sevHigh.Render("Found vulnerabilities"), vulnerable)
+			ui.SevHigh.Render("Found vulnerabilities"), vulnerable)
 		// Non-zero exit on HIGH/CRITICAL so `opsforge audit` can gate CI.
 		if highOrWorse > 0 {
 			return fmt.Errorf("%d tool(s) with HIGH or CRITICAL vulnerabilities", highOrWorse)
@@ -144,13 +223,13 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 func sevStyle(s audit.Severity) lipgloss.Style {
 	switch s {
 	case audit.SevCritical:
-		return sevCritical
+		return ui.SevCritical
 	case audit.SevHigh:
-		return sevHigh
+		return ui.SevHigh
 	case audit.SevMedium:
-		return sevMedium
+		return ui.SevMedium
 	default:
-		return sevLow
+		return ui.SevLow
 	}
 }
 
@@ -173,24 +252,16 @@ func vulnURL(id string) string {
 	return "https://osv.dev/vulnerability/" + id
 }
 
-// hyperlink wraps text in an OSC 8 terminal hyperlink escape sequence.
-// Terminals that support it (iTerm2, WezTerm, Ghostty, kitty, modern
-// gnome-terminal) render `text` as a clickable link to `url`; others
-// simply show `text` unchanged.
-func hyperlink(url, text string) string {
-	return "\x1b]8;;" + url + "\x1b\\" + text + "\x1b]8;;\x1b\\"
-}
-
 // runSecretsScan scans the workstation for leaked credentials and prints
 // masked findings grouped by file.
 func runSecretsScan() error {
 	fmt.Println("Scanning your workstation for leaked secrets…")
-	fmt.Println(auditDim.Render("  (shell history, shell rc files, local .env files — values are masked)"))
+	fmt.Println(ui.Dim.Render("  (shell history, shell rc files, local .env files — values are masked)"))
 	fmt.Println()
 
 	findings := secrets.ScanWorkstation()
 	if len(findings) == 0 {
-		fmt.Println(auditOK.Render("✓ No leaked credentials found."))
+		fmt.Println(ui.OK.Render("✓ No leaked credentials found."))
 		return nil
 	}
 
@@ -206,23 +277,23 @@ func runSecretsScan() error {
 
 	critical := 0
 	for _, src := range order {
-		fmt.Printf("%s\n", sevHigh.Render(src))
+		fmt.Printf("%s\n", ui.SevHigh.Render(src))
 		for _, f := range bySource[src] {
-			style := sevMedium
+			style := ui.SevMedium
 			if f.Rule.Severity == secrets.SevCritical {
-				style = sevCritical
+				style = ui.SevCritical
 				critical++
 			}
 			fmt.Printf("  %s line %-6d %s  %s\n",
 				style.Render(fmt.Sprintf("[%s]", f.Rule.Severity)),
-				f.Line, f.Rule.Desc, auditDim.Render(f.Excerpt))
+				f.Line, f.Rule.Desc, ui.Dim.Render(f.Excerpt))
 		}
 	}
 
 	fmt.Println()
 	fmt.Printf("%s in %d location(s).\n",
-		sevHigh.Render(fmt.Sprintf("Found %d potential leak(s)", len(findings))), len(order))
-	fmt.Println(auditDim.Render(`  Clean up: rotate any real credentials, then remove the lines
+		ui.SevHigh.Render(fmt.Sprintf("Found %d potential leak(s)", len(findings))), len(order))
+	fmt.Println(ui.Dim.Render(`  Clean up: rotate any real credentials, then remove the lines
   (history: edit ~/.zsh_history · prefer 'read -s' or a secrets manager next time)`))
 	if critical > 0 {
 		return fmt.Errorf("%d critical secret leak(s) found", critical)

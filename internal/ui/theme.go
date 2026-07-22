@@ -198,4 +198,12 @@ func applyTheme(t Theme) {
 	Accent = lipgloss.NewStyle().Foreground(Yellow)
 	Dim = lipgloss.NewStyle().Foreground(Grey)
 	Faint = lipgloss.NewStyle().Foreground(GreyDim)
+
+	// Severity ramp reuses the theme palette: red (bold) for critical,
+	// orange for high, yellow for medium, grey for low — so the whole
+	// audit output follows the active theme.
+	SevCritical = lipgloss.NewStyle().Bold(true).Foreground(Red)
+	SevHigh = lipgloss.NewStyle().Foreground(Orange)
+	SevMedium = lipgloss.NewStyle().Foreground(Yellow)
+	SevLow = lipgloss.NewStyle().Foreground(Grey)
 }

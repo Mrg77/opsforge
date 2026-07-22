@@ -1,62 +1,80 @@
-# opsforge guards — confirm before destructive commands run against a
-# production-looking Kubernetes context.
+# opsforge guards — policy-as-code for destructive commands.
 #
 # Implemented as an accept-line ZLE widget: when you press Enter, the
 # buffer is inspected before it runs. This is the only reliable place to
 # *cancel* a command in zsh (a preexec hook cannot stop execution).
-# Set OPSFORGE_GUARDS=0 to disable for a session.
 #
-# Like the prompt, this NEVER invokes kubectl — it reads current-context
-# from the kubeconfig file, so it can't trigger an OIDC browser login on
-# machines where kubectl is a cloud-SDK dispatcher.
+# The policy itself lives in ~/.config/opsforge/guards.yaml (or a built-in
+# default). The decision is made by `opsforge guard check`, which is fast
+# and reads the context passively — it NEVER invokes kubectl, so it can't
+# trigger an OIDC browser login on machines where kubectl is a cloud-SDK
+# dispatcher.
+#
+# Set OPSFORGE_GUARDS=0 to disable for a session.
 
-# _opsforge_current_ctx echoes the current kube context by reading the
-# kubeconfig file directly (no kubectl invocation).
-_opsforge_current_ctx() {
-  local cfg="${KUBECONFIG%%:*}"
-  [[ -z "$cfg" ]] && cfg="$HOME/.kube/config"
-  [[ -r "$cfg" ]] || return 1
-  grep -m1 '^current-context:' "$cfg" 2>/dev/null \
-    | sed 's/current-context:[[:space:]]*//; s/["'\'']//g'
-}
+# PERF: the widget runs on every command. To stay cheap we first do a
+# zero-subprocess prefilter — only commands mentioning a potentially
+# destructive verb reach the Go binary. Tune the list with
+# OPSFORGE_GUARD_PREFILTER (a zsh extended-glob alternation).
+: ${OPSFORGE_GUARD_PREFILTER:='(kubectl|helm|terraform|kubens|kubectx|k) *'}
 
-_opsforge_ctx_is_prod() {
-  local ctx
-  ctx=$(_opsforge_current_ctx) || return 1
-  [[ "$ctx" == *prod* || "$ctx" == *production* ]]
-}
-
-# Commands destructive enough to confirm in prod.
-_opsforge_is_destructive() {
-  local cmd="$1"
-  case "$cmd" in
-    *"kubectl delete"*|*"kubectl drain"*|*"kubectl cordon"*) return 0 ;;
-    *"kubectl apply"*|*"kubectl replace"*)                   return 0 ;;
-    *"helm uninstall"*|*"helm delete"*|*"helm rollback"*)    return 0 ;;
-    *"terraform destroy"*|*"terraform apply"*)               return 0 ;;
-    *) return 1 ;;
+# _opsforge_looks_dangerous is a cheap, in-shell gate: true only when the
+# buffer might match a rule, so most commands skip the Go call entirely.
+_opsforge_looks_dangerous() {
+  setopt localoptions extendedglob
+  local buf="$1"
+  case "$buf" in
+    *delete*|*destroy*|*drain*|*cordon*|*apply*|*replace*|*uninstall*|*rollback*)
+      return 0 ;;
   esac
+  return 1
 }
 
 _opsforge_accept_line() {
   if [[ "$OPSFORGE_GUARDS" != "0" ]] \
-     && _opsforge_is_destructive "$BUFFER" \
-     && _opsforge_ctx_is_prod; then
-    local ctx
-    ctx=$(_opsforge_current_ctx)
-    zle -M ""
-    print -P "\n%F{red}%B⚠  PRODUCTION context (${ctx})%b%f"
-    print -P "%F{yellow}   ${BUFFER}%f"
-    print -n "Type 'yes' to run this: "
-    local answer
-    read -r answer
-    if [[ "$answer" != "yes" ]]; then
-      print -P "%F{red}Aborted by opsforge guard.%f"
-      # Discard the line without running it.
-      BUFFER=""
-      zle reset-prompt
-      return
-    fi
+     && _opsforge_looks_dangerous "$BUFFER" \
+     && (( $+commands[opsforge] )); then
+    local reply action message
+    # `guard check` reads the current context itself (passively). Output is
+    # "action" or "action|message".
+    reply=$(opsforge guard check "$BUFFER" 2>/dev/null)
+    action="${reply%%|*}"
+    message="${reply#*|}"
+    [[ "$message" == "$action" ]] && message=""
+
+    case "$action" in
+      deny)
+        zle -M ""
+        print -P "\n%F{red}%B✗  Blocked by opsforge guard%b%f"
+        [[ -n "$message" ]] && print -P "%F{red}   ${message}%f"
+        print -P "%F{yellow}   ${BUFFER}%f"
+        print -P "%F{242}   (disable guards for this session with OPSFORGE_GUARDS=0)%f"
+        BUFFER=""
+        zle reset-prompt
+        return
+        ;;
+      warn)
+        zle -M ""
+        print -P "\n%F{yellow}%B⚠  ${message:-opsforge guard}%b%f"
+        # warn does not stop the command; fall through to run it.
+        ;;
+      confirm)
+        zle -M ""
+        print -P "\n%F{red}%B⚠  opsforge guard%b%f"
+        [[ -n "$message" ]] && print -P "%F{red}   ${message}%f"
+        print -P "%F{yellow}   ${BUFFER}%f"
+        print -P "%F{242}   (to skip guards this session: OPSFORGE_GUARDS=0)%f"
+        print -n "Type 'yes' to run this: "
+        local answer
+        read -r answer
+        if [[ "$answer" != "yes" ]]; then
+          print -P "%F{red}Aborted by opsforge guard.%f"
+          BUFFER=""
+          zle reset-prompt
+          return
+        fi
+        ;;
+    esac
   fi
   zle .accept-line
 }

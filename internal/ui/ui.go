@@ -38,6 +38,14 @@ var (
 	Accent   lipgloss.Style
 	Dim      lipgloss.Style
 	Faint    lipgloss.Style
+
+	// Severity styles for audit / CVE output, ordered from most to least
+	// severe. Like the styles above they are theme-bound (see applyTheme),
+	// so `opsforge theme set …` recolors audit reports too.
+	SevCritical lipgloss.Style
+	SevHigh     lipgloss.Style
+	SevMedium   lipgloss.Style
+	SevLow      lipgloss.Style
 )
 
 // Status markers — used identically across list, profiles, doctor, audit.

@@ -10,6 +10,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
@@ -43,6 +44,32 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		userps, _ := userprofiles.Load()
 		shellOn := shellcfg.InstalledInZshrc()
 
+		vm := ""
+		if mgr := versions.Detect(); mgr != versions.None {
+			vm = string(mgr)
+		}
+		backend := "github"
+		if installer.BrewAvailable() {
+			backend = "homebrew+github"
+		}
+
+		if output.JSON {
+			names := make([]string, 0, len(userps))
+			for _, p := range userps {
+				names = append(names, p.Name)
+			}
+			return output.Emit(struct {
+				ToolsInstalled int      `json:"tools_installed"`
+				ToolsTotal     int      `json:"tools_total"`
+				UpdatesPending int      `json:"updates_pending"`
+				ShellLayer     bool     `json:"shell_layer"`
+				VersionManager string   `json:"version_manager,omitempty"`
+				Backend        string   `json:"backend"`
+				Theme          string   `json:"theme"`
+				Profiles       []string `json:"profiles"`
+			}{installed, total, outdated, shellOn, vm, backend, ui.Active.Name, names})
+		}
+
 		fmt.Println(ui.Header("opsforge", "your DevOps workstation at a glance"))
 		fmt.Println()
 
@@ -71,18 +98,18 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		fmt.Printf("  %s %s\n", ui.Label("Shell", 10), shellVal)
 
 		// Version manager.
-		vm := ui.Dim.Render("none — install mise for `opsforge use`")
-		if mgr := versions.Detect(); mgr != versions.None {
-			vm = ui.OK.Render(ui.MarkOK + " " + string(mgr))
+		vmLine := ui.Dim.Render("none — install mise for `opsforge use`")
+		if vm != "" {
+			vmLine = ui.OK.Render(ui.MarkOK + " " + vm)
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Versions", 10), vm)
+		fmt.Printf("  %s %s\n", ui.Label("Versions", 10), vmLine)
 
 		// Backend + theme footer.
-		backend := "GitHub releases"
+		backendLine := "GitHub releases"
 		if installer.BrewAvailable() {
-			backend = "Homebrew + GitHub"
+			backendLine = "Homebrew + GitHub"
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Backend", 10), ui.Dim.Render(backend))
+		fmt.Printf("  %s %s\n", ui.Label("Backend", 10), ui.Dim.Render(backendLine))
 		theme := ui.Accent.Render(ui.Active.Name)
 		switch {
 		case os.Getenv("OPSFORGE_THEME") != "":
@@ -103,6 +130,8 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 
 		fmt.Println()
 		fmt.Println(ui.Dim.Render("  Run `opsforge` to open the picker · `opsforge doctor` for a full check"))
+		// One discreet pointer to a non-obvious feature, so it gets found.
+		fmt.Println(ui.Faint.Render("  Tip: `opsforge audit --secrets` scans your tools for CVEs and your shell for leaked credentials"))
 		return nil
 	},
 }

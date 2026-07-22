@@ -19,6 +19,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 type phase int
@@ -44,17 +45,16 @@ type installDoneMsg struct {
 	result   installer.Result
 }
 
-var (
-	styleTitle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
-	styleCategory = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
-	styleDim      = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-	styleCursor   = lipgloss.NewStyle().Foreground(lipgloss.Color("212"))
-	styleOK       = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))  // green: installed
-	styleUpdate   = lipgloss.NewStyle().Foreground(lipgloss.Color("214")) // orange: update available
-	styleSelected = lipgloss.NewStyle().Foreground(lipgloss.Color("51"))  // cyan: queued for install
-	styleErr      = lipgloss.NewStyle().Foreground(lipgloss.Color("196"))
-	styleHelp     = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
-)
+// All picker styling comes from internal/ui, so the active theme
+// (OPSFORGE_THEME or `opsforge theme set`) colors the picker exactly like
+// every other command. The mapping is:
+//   ui.Title    bold brand — screen title & tab cursor
+//   ui.Heading  bold blue  — category headers
+//   ui.OK       green      — installed / up to date
+//   ui.Warn     orange     — update available
+//   ui.Selected cyan       — queued for install
+//   ui.Err      red        — failed
+//   ui.Dim      grey       — help, notes, secondary text
 
 // Rescanner re-detects installed/outdated status for all tools. The TUI
 // calls it after an install/upgrade batch so the list reflects the new
@@ -261,6 +261,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // secScanDoneMsg carries the security scan results back to the model.
 type secScanDoneMsg struct{ findings []audit.Finding }
 
+// sevStyle maps a CVE severity to a theme-bound ui style so the security
+// tab colors findings like `opsforge audit`.
+func sevStyle(s audit.Severity) lipgloss.Style {
+	switch s {
+	case audit.SevCritical:
+		return ui.SevCritical
+	case audit.SevHigh:
+		return ui.SevHigh
+	case audit.SevMedium:
+		return ui.SevMedium
+	default:
+		return ui.SevLow
+	}
+}
+
 // startSecurityScan fires the OSV scan for the security tab.
 func (m Model) startSecurityScan() tea.Cmd {
 	targets := m.secTargets
@@ -352,9 +367,9 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.nameInput.Blur()
 			if name != "" && m.saveProfile != nil {
 				if err := m.saveProfile(name, m.selectedToolNames()); err != nil {
-					m.notice = styleErr.Render("save failed: " + err.Error())
+					m.notice = ui.Err.Render("save failed: " + err.Error())
 				} else {
-					m.notice = styleOK.Render(fmt.Sprintf("saved profile '%s' (%d tools)",
+					m.notice = ui.OK.Render(fmt.Sprintf("saved profile '%s' (%d tools)",
 						name, len(m.selectedToolNames())))
 				}
 			}
@@ -396,18 +411,31 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filtering = true
 		return m, m.filter.Focus()
 	case "s":
-		// Save current selection as a named user profile.
-		if m.saveProfile != nil && len(m.selected) > 0 {
+		// Save current selection as a named user profile. When there is
+		// nothing selected (or saving is disabled), the key is a no-op —
+		// tell the user why instead of appearing broken.
+		switch {
+		case m.saveProfile == nil:
+			m.notice = ui.Dim.Render("saving profiles isn't available here")
+		case len(m.selected) == 0:
+			m.notice = ui.Warn.Render("nothing to save — select some tools first (space)")
+		default:
 			m.saving = true
 			m.notice = ""
 			return m, m.nameInput.Focus()
 		}
 	case "u":
 		// Select every outdated tool at once — the "update all" shortcut.
+		before := len(m.selected)
 		for i, r := range m.rows {
 			if !r.isHeader() && r.status.Outdated {
 				m.selected[i] = true
 			}
+		}
+		if len(m.selected) == before {
+			m.notice = ui.OK.Render("everything is already up to date — nothing to update")
+		} else {
+			m.notice = ""
 		}
 	case "a":
 		// Toggle-select every not-yet-installed tool currently visible
@@ -417,6 +445,7 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.selected[i] = true
 			}
 		}
+		m.notice = ""
 	case " ":
 		sel := m.selectable()
 		if len(sel) == 0 {
@@ -425,13 +454,17 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		i := sel[m.cursor]
 		// Toggle when the tool is not installed, or installed but
 		// outdated (selecting it queues an upgrade). Up-to-date tools
-		// are locked — nothing to do.
+		// are locked — say so rather than silently ignoring the key.
 		st := m.rows[i].status
 		if !st.Installed || st.Outdated {
 			m.selected[i] = !m.selected[i]
+			m.notice = ""
+		} else {
+			m.notice = ui.Dim.Render(m.rows[i].tool.Name + " is already up to date — nothing to do")
 		}
 	case "i", "enter":
 		if len(m.selected) == 0 {
+			m.notice = ui.Warn.Render("nothing selected — press space to pick tools, then i to install")
 			break
 		}
 		m.queue = nil
@@ -470,7 +503,7 @@ func (m Model) View() string {
 	case phaseInstall, phaseDone:
 		return m.viewInstall()
 	case phaseRescan:
-		return styleTitle.Render("opsforge") + "\n\n" +
+		return ui.Title.Render("opsforge") + "\n\n" +
 			m.spin.View() + " re-scanning your tools…\n"
 	default:
 		if m.tab == 2 {
@@ -489,22 +522,23 @@ func (m Model) tabBar() string {
 	var parts []string
 	for i, n := range names {
 		if i == m.tab {
-			parts = append(parts, styleTitle.Render("["+n+"]"))
+			parts = append(parts, ui.Title.Render("["+n+"]"))
 		} else {
-			parts = append(parts, styleHelp.Render(" "+n+" "))
+			parts = append(parts, ui.Dim.Render(" "+n+" "))
 		}
 	}
-	return strings.Join(parts, styleHelp.Render("·"))
+	return strings.Join(parts, ui.Dim.Render("·"))
 }
 
 // viewSecurity renders the CVE findings for installed tools.
 func (m Model) viewSecurity() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render("opsforge — security") + "  " + m.tabBar() + "\n\n")
+	b.WriteString(ui.Title.Render("opsforge — security") + "  " + m.tabBar() + "\n\n")
 
 	if m.secLoading {
 		b.WriteString(m.spin.View() + " scanning " +
-			fmt.Sprintf("%d installed tool(s) against OSV.dev…\n", len(m.secTargets)))
+			fmt.Sprintf("%d installed tool(s) against OSV.dev…\n\n", len(m.secTargets)))
+		b.WriteString(ui.Dim.Render("1/2/3 tabs · q quit"))
 		return b.String()
 	}
 
@@ -512,21 +546,18 @@ func (m Model) viewSecurity() string {
 	vulnerable := 0
 	for _, f := range m.secFindings {
 		if len(f.Vulns) == 0 {
-			lines = append(lines, styleOK.Render("✓ ")+fmt.Sprintf("%-14s", f.Tool)+
-				styleDim.Render(f.Version+" — no known vulnerabilities"))
+			lines = append(lines, ui.OK.Render("✓ ")+fmt.Sprintf("%-14s", f.Tool)+
+				ui.Dim.Render(f.Version+" — no known vulnerabilities"))
 			continue
 		}
 		vulnerable++
-		lines = append(lines, styleErr.Render("⚠ ")+fmt.Sprintf("%-14s", f.Tool)+
-			styleDim.Render(f.Version))
+		lines = append(lines, ui.Err.Render("⚠ ")+fmt.Sprintf("%-14s", f.Tool)+
+			ui.Dim.Render(f.Version))
 		for _, v := range f.Vulns {
-			sev := styleUpdate
-			if v.Severity >= audit.SevCritical {
-				sev = styleErr
-			}
+			sev := sevStyle(v.Severity)
 			fix := ""
 			if v.FixedIn != "" {
-				fix = styleDim.Render("  → fixed in " + v.FixedIn)
+				fix = ui.Dim.Render("  → fixed in " + v.FixedIn)
 			}
 			text := v.ID + " " + v.Summary
 			if len(text) > 80 {
@@ -541,11 +572,11 @@ func (m Model) viewSecurity() string {
 
 	b.WriteString("\n")
 	if vulnerable == 0 {
-		b.WriteString(styleOK.Render("All audited tools are free of known vulnerabilities.") + "\n")
+		b.WriteString(ui.OK.Render("All audited tools are free of known vulnerabilities.") + "\n")
 	} else {
-		b.WriteString(styleUpdate.Render(fmt.Sprintf("%d vulnerable tool(s) — upgrade them from the Updates tab.", vulnerable)) + "\n")
+		b.WriteString(ui.Warn.Render(fmt.Sprintf("%d vulnerable tool(s) — upgrade them from the Updates tab.", vulnerable)) + "\n")
 	}
-	b.WriteString(styleHelp.Render("1 tools · 2 updates · q quit"))
+	b.WriteString(ui.Dim.Render("1/2/3 tabs · q quit"))
 	return b.String()
 }
 
@@ -555,9 +586,9 @@ func (m Model) viewSelect() string {
 	if m.tab == 1 {
 		title = "opsforge — updates"
 	}
-	b.WriteString(styleTitle.Render(title) + "  " + m.tabBar() + "\n")
+	b.WriteString(ui.Title.Render(title) + "  " + m.tabBar() + "\n")
 	if m.saving {
-		b.WriteString(m.nameInput.View() + styleHelp.Render("  (enter to save · esc to cancel)") + "\n")
+		b.WriteString(m.nameInput.View() + ui.Dim.Render("  (enter to save · esc to cancel)") + "\n")
 	} else if m.filtering || m.filter.Value() != "" {
 		b.WriteString(m.filter.View() + "\n")
 	}
@@ -573,12 +604,12 @@ func (m Model) viewSelect() string {
 	for _, i := range m.visible() {
 		r := m.rows[i]
 		if r.isHeader() {
-			lines = append(lines, styleCategory.Render("▸ "+r.header))
+			lines = append(lines, ui.Heading.Render("▸ "+r.header))
 			continue
 		}
 		cursor := "  "
 		if i == cursorRow {
-			cursor = styleCursor.Render("❯ ")
+			cursor = ui.Title.Render("❯ ")
 			cursorLine = len(lines)
 		}
 		// The box always reflects selection first, so toggling any row —
@@ -593,25 +624,25 @@ func (m Model) viewSelect() string {
 		var note string
 		switch {
 		case r.status.Outdated:
-			note = styleUpdate.Render("update available")
+			note = ui.Warn.Render("update available")
 			if r.status.Version != "" {
-				note = styleUpdate.Render(r.status.Version + "  · update available")
+				note = ui.Warn.Render(r.status.Version + "  · update available")
 			}
 		case r.status.Installed:
-			note = styleDim.Render(r.tool.Description)
+			note = ui.Dim.Render(r.tool.Description)
 			if r.status.Version != "" {
-				note = styleDim.Render(r.status.Version)
+				note = ui.Dim.Render(r.status.Version)
 			}
 		default:
-			note = styleDim.Render(r.tool.Description)
+			note = ui.Dim.Render(r.tool.Description)
 		}
 		switch {
 		case m.selected[i]:
-			box = styleSelected.Render("[▸]")
+			box = ui.Selected.Render("[▸]")
 		case r.status.Outdated:
-			box = styleUpdate.Render("[✓]")
+			box = ui.Warn.Render("[✓]")
 		case r.status.Installed:
-			box = styleOK.Render("[✓]")
+			box = ui.OK.Render("[✓]")
 		default:
 			box = "[ ]"
 		}
@@ -623,9 +654,9 @@ func (m Model) viewSelect() string {
 		b.WriteString(l + "\n")
 	}
 
-	legend := styleOK.Render("[✓] installed") + styleHelp.Render(" · ") +
-		styleUpdate.Render("[✓] update available") + styleHelp.Render(" · ") +
-		styleSelected.Render("[▸] selected")
+	legend := ui.OK.Render("[✓] installed") + ui.Dim.Render(" · ") +
+		ui.Warn.Render("[✓] update available") + ui.Dim.Render(" · ") +
+		ui.Selected.Render("[▸] selected")
 	b.WriteString("\n" + legend + "\n")
 
 	if m.notice != "" {
@@ -634,14 +665,32 @@ func (m Model) viewSelect() string {
 
 	status := fmt.Sprintf("%d selected", len(m.selected))
 	if n := m.outdatedCount(); n > 0 {
-		status += styleUpdate.Render(fmt.Sprintf(" · %d update(s) available — press u to select all", n))
+		status += ui.Warn.Render(fmt.Sprintf(" · %d update(s) available — press u to select all", n))
 	}
-	help := "space toggle · u update-all · a select-all · / filter · i install · q quit"
+	help := "space toggle · u update-all · a select-all · / filter · i install · 1/2/3 tabs · q quit"
 	if m.saveProfile != nil {
-		help = "space toggle · u update-all · a select-all · s save-profile · / filter · i install · q quit"
+		help = "space toggle · u update-all · a select-all · s save-profile · / filter · i install · 1/2/3 tabs · q quit"
 	}
-	b.WriteString(styleHelp.Render(status + "\n" + help))
+	b.WriteString(ui.Dim.Render(status + "\n" + help + "\n"))
+	b.WriteString(ui.Faint.Render("Tip: " + m.tip()))
 	return b.String()
+}
+
+// tips are discreet, non-obvious pointers surfaced at the bottom of the
+// picker so the deeper features (security audit, secret scanning, shell
+// layer) get discovered without a wall of help text.
+var tips = []string{
+	"press 3 to scan your installed tools for known CVEs (OSV.dev)",
+	"`opsforge audit --secrets` sweeps shell history & .env files for leaked credentials",
+	"`opsforge shell install` wires completions, aliases and a kube-aware prompt",
+	"in the opsforge shell, `??` explains your last failed command with AI",
+}
+
+// tip rotates through tips so a different one shows each render tick; it
+// keys off the selection count and outdated count to feel non-static
+// without needing extra state.
+func (m Model) tip() string {
+	return tips[(len(m.selected)+m.outdatedCount())%len(tips)]
 }
 
 // outdatedCount counts installed tools with an available update.
@@ -677,17 +726,17 @@ func window(lines []string, cursorLine, height int) []string {
 	}
 	out := append([]string{}, lines[start:start+height]...)
 	if start > 0 {
-		out[0] = styleDim.Render("  ↑ more")
+		out[0] = ui.Dim.Render("  ↑ more")
 	}
 	if start+height < len(lines) {
-		out[len(out)-1] = styleDim.Render("  ↓ more")
+		out[len(out)-1] = ui.Dim.Render("  ↓ more")
 	}
 	return out
 }
 
 func (m Model) viewInstall() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render("opsforge — installing") + "\n\n")
+	b.WriteString(ui.Title.Render("opsforge — installing") + "\n\n")
 	var lines []string
 	activeLine := 0
 	for pos, i := range m.queue {
@@ -697,14 +746,14 @@ func (m Model) viewInstall() string {
 			activeLine = len(lines)
 			lines = append(lines, fmt.Sprintf("%s installing %s", m.spin.View(), name))
 		case pos >= m.qpos && m.phase == phaseInstall:
-			lines = append(lines, styleDim.Render(fmt.Sprintf("  queued     %s", name)))
+			lines = append(lines, ui.Dim.Render(fmt.Sprintf("  queued     %s", name)))
 		default:
 			res := m.results[i]
 			if res.Err != nil {
-				lines = append(lines, styleErr.Render(fmt.Sprintf("✗ failed     %s", name)))
-				lines = append(lines, styleDim.Render(indent(res.OutputTail, "    ")))
+				lines = append(lines, ui.Err.Render(fmt.Sprintf("✗ failed     %s", name)))
+				lines = append(lines, ui.Dim.Render(indent(res.OutputTail, "    ")))
 			} else {
-				lines = append(lines, styleOK.Render(fmt.Sprintf("✓ installed  %s", name)))
+				lines = append(lines, ui.OK.Render(fmt.Sprintf("✓ installed  %s", name)))
 			}
 		}
 	}
@@ -717,7 +766,7 @@ func (m Model) viewInstall() string {
 	if m.phase == phaseDone {
 		ok, failed := m.Summary()
 		b.WriteString(fmt.Sprintf("\n%d installed, %d failed\n", ok, failed))
-		b.WriteString(styleHelp.Render("enter/m back to menu · q quit"))
+		b.WriteString(ui.Dim.Render("enter/m back to menu · q quit"))
 	}
 	return b.String()
 }
