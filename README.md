@@ -22,7 +22,7 @@ prompt, and guards that stop you from nuking the wrong cluster.
 
 ## What it does
 
-opsforge is two tools in one binary:
+opsforge is three tools in one binary:
 
 1. **A tool installer** — an interactive picker over a curated catalog of **106
    DevOps CLIs** (Kubernetes, IaC, cloud, containers, observability, security,
@@ -36,6 +36,10 @@ opsforge is two tools in one binary:
    gray inline suggestions, syntax coloring, **inline `?` help** for any command,
    a prod-aware prompt, and **guards that make you confirm destructive commands
    on a prod cluster**.
+
+3. **Workstation-as-code** — `opsforge snapshot` exports your whole setup
+   (tools, profiles, shell state) to one YAML file; `opsforge apply <url>`
+   rebuilds it on any machine. Your workstation becomes infrastructure.
 
 No shell replacement, no lock-in: your scripts and CI keep working, and
 `opsforge shell uninstall` restores everything.
@@ -100,6 +104,8 @@ the (re-scanned) menu, `q` quits.
 | `opsforge upgrade` | Upgrade installed tools — all, `-u` for only outdated, or `upgrade jq yq gh` |
 | `opsforge audit` | Scan installed tools for known CVEs via OSV.dev |
 | `opsforge use terraform@1.5` | Pin a tool version in this dir (delegates to mise/asdf) |
+| `opsforge snapshot` | Export your whole workstation setup to one shareable YAML |
+| `opsforge apply <file-or-url>` | Rebuild a workstation from a snapshot (plan + confirm first) |
 | `opsforge list` | Your installed tools (`list all` for the full catalog, `list -u` for updates) |
 | `opsforge doctor` | Health check: brew, PATH, shell layer, version manager |
 
@@ -134,6 +140,25 @@ on any machine:
 ```sh
 opsforge install --profile my-stack   # reinstall your saved stack anywhere
 ```
+
+### Workstation as code
+
+Your machine setup shouldn't be a snowflake you rebuild by hand. Capture it
+once, version it, reproduce it anywhere:
+
+```sh
+# on your current machine
+opsforge snapshot -o my-setup.yaml        # tools + profiles + shell state
+git -C ~/dotfiles add my-setup.yaml       # version it with your dotfiles
+
+# on a brand-new machine
+opsforge apply https://raw.githubusercontent.com/you/dotfiles/main/my-setup.yaml
+```
+
+`apply` shows the full plan first (what will be installed, what's already
+there, anything unknown) and asks before changing a thing (`--yes` for
+scripts). Perfect for new laptops, and for teams: onboarding a new engineer
+becomes one command.
 
 ### Pinning tool versions
 
