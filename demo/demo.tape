@@ -59,6 +59,21 @@ Down Down Down Down  Sleep 3s
 Type "clear" Enter
 Sleep 800ms
 
-# --- doctor ------------------------------------------------------------
+# --- prod guards: policy-as-code for the shell (the differentiator) -----
+# declarative rules block destructive commands on a prod context
+Type "opsforge guard list"  Sleep 500ms  Enter
+Sleep 5s
+
+Type "clear" Enter
+Sleep 700ms
+
+# simulate: what happens if you run `terraform destroy` on prod?
+Type "opsforge guard test 'terraform destroy' --context prod"  Sleep 500ms  Enter
+Sleep 5s
+
+Type "clear" Enter
+Sleep 800ms
+
+# --- doctor: full health check incl. CVEs & leaked secrets -------------
 Type "opsforge doctor"  Sleep 500ms  Enter
 Sleep 8s

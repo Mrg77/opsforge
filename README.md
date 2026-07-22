@@ -6,7 +6,7 @@
 
 Pick your CLIs from an interactive terminal UI, install them in one go, and turn
 your zsh into a context-aware DevOps environment — live completion, a prod-aware
-prompt, and guards that stop you from nuking the wrong cluster.
+prompt, and **policy-as-code guards** that stop you from nuking the wrong cluster.
 
 [![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
@@ -15,7 +15,7 @@ prompt, and guards that stop you from nuking the wrong cluster.
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
+**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -28,7 +28,7 @@ opsforge is **three tools in one binary**:
 | | | |
 |:--:|---|---|
 | 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have, what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
-| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: a live completion menu, inline `?` help, a prod-aware prompt, and guards on destructive commands. No shell replacement, no lock-in. |
+| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: a live completion menu, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
 | 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup to one YAML; `opsforge apply <url>` rebuilds it anywhere. Your machine becomes reproducible infrastructure. |
 
 > **Why:** setting up (or rebuilding) a DevOps workstation means installing 20+
@@ -63,6 +63,8 @@ opsforge              # interactive picker (tabs: 1 Tools · 2 Updates · 3 Secu
 opsforge status       # one-glance cockpit of your workstation
 opsforge doctor       # full health check — incl. CVEs & leaked secrets
 opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
+opsforge guard test "terraform destroy" --context prod   # simulate a guard rule
+opsforge audit --json # machine-readable output for CI (non-zero exit on HIGH/CRITICAL)
 ```
 
 <table>
@@ -72,14 +74,19 @@ opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds t
 <tr><td><code>opsforge install kubectl helm</code></td><td>Non-interactive install by name (scriptable)</td></tr>
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
-<tr><td><code>opsforge audit [--secrets]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan</td></tr>
+<tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
+<tr><td><code>opsforge guard [init|list|test]</code></td><td>Policy-as-code guards on destructive commands (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
-<tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates</td></tr>
+<tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
 <tr><td><code>opsforge theme [set &lt;name&gt;]</code></td><td>List/preview/persist color themes</td></tr>
-<tr><td><code>opsforge doctor</code></td><td>Full health check — system, shell, toolbox, <strong>CVEs &amp; leaked secrets</strong></td></tr>
+<tr><td><code>opsforge doctor</code></td><td>Full health check — system, shell, toolbox, <strong>CVEs &amp; leaked secrets</strong> (<code>--json</code>)</td></tr>
 </table>
+
+> **Machine-readable everywhere.** A global `--json` flag makes `list`, `status`,
+> `doctor` and `audit` emit structured JSON instead of the TUI — see
+> [CI / machine-readable output](#ci--machine-readable-output).
 
 ### The picker
 
@@ -172,9 +179,10 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   Plus a clean left prompt: repo-relative dir, git branch with
   dirty/ahead/behind markers, last-command duration, and a `❯` that reddens on
   failure. Reads only local git — never a cloud or cluster.
-- **Prod guards** — before a destructive command (`kubectl delete`,
-  `terraform destroy`, `helm uninstall`…) on a production context, opsforge makes
-  you type `yes`. `OPSFORGE_GUARDS=0` to disable.
+- **Policy-as-code guards** — before a destructive command (`kubectl delete`,
+  `terraform destroy`, `helm uninstall`…) on a production context, opsforge can
+  confirm, warn, or block — driven by [declarative rules](#policy-as-code-guards),
+  not hard-coded checks. `OPSFORGE_GUARDS=0` to disable.
 - **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
   context/namespace (fzf picker when available).
 - **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
@@ -189,6 +197,99 @@ reach your shell.
 <tr><td><code>opsforge shell doctor</code></td><td>Show what's provided and its state</td></tr>
 <tr><td><code>opsforge shell sync</code></td><td>Regenerate cached completions</td></tr>
 </table>
+
+---
+
+## Policy-as-code guards
+
+This is the part no other tool does. Homebrew Bundle, mise, chezmoi and aqua
+install your CLIs — none of them **guard how you use them**. opsforge turns the
+prod-safety layer of the shell into a small policy engine: a declarative set of
+rules that decides whether a destructive command should run, warn, confirm, or be
+refused — based on the context you're actually in.
+
+Rules live in a single file, `~/.config/opsforge/guards.yaml`. Each rule matches a
+**command** regex and a **context** regex, and picks an action:
+
+| Action | Effect |
+|:--|:--|
+| `allow` | run normally (also the result when nothing matches) |
+| `warn` | print the message, then run |
+| `confirm` | require typing `yes` before running |
+| `deny` | block the command outright |
+
+```yaml
+# ~/.config/opsforge/guards.yaml  (first match wins)
+version: 1
+rules:
+  - name: "confirm destructive kubectl on prod"
+    match:
+      command: "kubectl (delete|drain|cordon|apply|replace)"
+      context: "prod|production"
+    action: confirm
+    message: "This changes PRODUCTION Kubernetes resources."
+
+  - name: "never delete namespaces on prod"
+    match:
+      command: "kubectl delete (ns|namespace)"
+      context: "prod"
+    action: deny
+    message: "Deleting a prod namespace is forbidden by policy."
+```
+
+```sh
+opsforge guard init                                    # write a commented starter guards.yaml
+opsforge guard list                                    # show the active rules (built-in or yours)
+opsforge guard test "terraform destroy" --context prod # simulate: which rule fires, and the action
+```
+
+- **Context is read passively.** The context string is built from your kubeconfig
+  `current-context`, `AWS_PROFILE`/`AWS_VAULT`, and the terraform workspace —
+  opsforge **never runs `kubectl` or `gcloud`** to figure out where you are, so
+  evaluating a rule can't trigger an OIDC browser login or hang on a wrapper CLI.
+- **Zero-config by default.** With no `guards.yaml`, a built-in policy reproduces
+  the old prod-confirm behavior exactly — upgrading changes nothing until you opt
+  into custom rules.
+- **Fast on the hot path.** The shell pre-filters cheaply and only calls the
+  engine (`opsforge guard check`, used internally) on commands that look
+  destructive, so your prompt stays instant.
+- **Fails open, loudly.** A broken `guards.yaml` can never wedge your shell: the
+  command runs, and the parse error is printed to stderr so you can fix your YAML.
+
+Disable everything for one session with `OPSFORGE_GUARDS=0`.
+
+---
+
+## CI / machine-readable output
+
+opsforge isn't just a pretty TUI — a global `--json` flag makes `list`, `status`,
+`doctor` and `audit` emit structured JSON, so the same binary you use interactively
+also drives scripts and pipelines.
+
+```sh
+opsforge audit --json | jq '.tools[] | select(.vulnerable)'   # only the affected tools
+opsforge doctor --json | jq '.status'                         # "healthy" | "warnings" | "failing"
+opsforge list all --json | jq '.[] | select(.outdated).name'  # tools with an update
+```
+
+The security commands also set **meaningful exit codes**, which is what turns
+opsforge into a one-line gate:
+
+- `opsforge audit` (and `--json`) exits **non-zero on any HIGH/CRITICAL CVE**.
+- `opsforge audit --secrets` adds leaked credentials to the report; a **critical
+  leak** exits non-zero too.
+- `opsforge doctor --json` returns `{status, passed, warnings, failed, checks[]}`
+  and fails when a check fails.
+
+Ready-to-use GitHub Actions workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml)
+— it installs opsforge and fails the pipeline on any HIGH/CRITICAL CVE or leaked
+credential, uploading the JSON reports as artifacts.
+
+```yaml
+# excerpt — audit exits non-zero on HIGH/CRITICAL, failing the job on its own
+- name: CVE audit
+  run: opsforge audit --json | tee cve-report.json
+```
 
 ---
 
@@ -211,6 +312,13 @@ Runtime & Versions, Utilities. It's a single embedded
 Force one with `OPSFORGE_BACKEND=brew|github`; set the target dir with
 `OPSFORGE_BIN_DIR`.
 
+**Supply-chain: checksum verification.** Before a GitHub-release binary is made
+executable, opsforge verifies its **SHA-256 against a published checksum** —
+`checksums.txt`, `<asset>.sha256`, or a template declared per tool via the
+catalog's `checksum:` field. A mismatch **refuses the install**; a release that
+publishes no checksum is a warning, not a failure (best-effort, so the ~85% of
+projects that ship none still install).
+
 ---
 
 ## Themes
@@ -224,8 +332,10 @@ opsforge theme set dracula  # persist it — every command follows, no reload
 ```
 
 Themes: `forge` (default), `nord`, `dracula`, `gruvbox`, `light`, `mono`, `auto`.
-`auto` matches your terminal background; `mono` is color-free for logs/CI.
-Precedence: `$OPSFORGE_THEME` › saved (`theme set`) › auto.
+`auto` matches your terminal background; `mono` is color-free for logs/CI. The
+theme now drives **every command *and* the interactive picker** — one palette, no
+stray default colors anywhere. Precedence: `$OPSFORGE_THEME` › saved (`theme
+set`) › auto.
 
 ---
 
@@ -233,10 +343,25 @@ Precedence: `$OPSFORGE_THEME` › saved (`theme set`) › auto.
 
 The parts worth pointing a reviewer to:
 
+- **Policy engine for the shell.** Prod guards aren't hard-coded `if`s — they're a
+  declarative policy (regex × context → allow/warn/confirm/deny), first-match-wins,
+  validated on load, with a behavior-preserving built-in default. Context is read
+  passively (kubeconfig / env / tf workspace) so evaluation never triggers an OIDC
+  login, and the shell only calls the engine on commands that look destructive.
 - **CVE audit with real version matching.** Queries OSV.dev per tool, filters
   vulnerabilities *client-side* against OSV's affected ranges (semver
   `introduced`/`fixed`) and dedupes CVEs listed under multiple advisory IDs — so
   it reports only what affects the version you run, with the fix on your branch.
+  Severity comes from a real **CVSS v3.1 base-score computation** off the OSV
+  vector, so a critical CVE is never mis-ranked or missed.
+- **Supply-chain checksum verification.** GitHub-release binaries are SHA-256
+  checked against a published checksum (`checksums.txt`, `<asset>.sha256`, or a
+  catalog `checksum:` template) *before* they're made executable — a mismatch
+  refuses the install; a release with no checksum degrades to a warning.
+- **Machine-readable, with exit codes that mean something.** A global `--json`
+  flag renders `list`/`status`/`doctor`/`audit` as structured JSON; `audit` exits
+  non-zero on HIGH/CRITICAL CVEs (and critical secret leaks with `--secrets`), so
+  it drops into CI as a security gate with no wrapper script.
 - **Auth-safe detection.** Probing `kubectl --version` where kubectl is a
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
@@ -253,15 +378,16 @@ The parts worth pointing a reviewer to:
 ### Architecture
 
 ```
-cmd/                Cobra commands (install, status, audit, snapshot, doctor, shell, theme…)
+cmd/                Cobra commands (install, status, audit, guard, snapshot, doctor, shell, theme…)
 internal/catalog/   Embedded YAML catalog + brew/github validation
 internal/detect/    Concurrent PATH + version detection + brew-outdated
-internal/installer/ Backend router: Homebrew + GitHub-releases download
-internal/audit/     OSV.dev client + client-side version matching
+internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify)
+internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
 internal/secrets/   Leaked-credential scanner
+internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply
-internal/tui/       Bubble Tea picker with tabs
-internal/shellcfg/  zsh environment modules + completion cache
+internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
+internal/shellcfg/  zsh environment modules + completion cache + guard policy engine (policy.go)
 internal/ui/        Shared visual identity + themes
 ```
 
