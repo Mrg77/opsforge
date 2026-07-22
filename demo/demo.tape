@@ -47,9 +47,14 @@ Type "q"  Sleep 1s
 Type "clear" Enter
 Sleep 800ms
 
-# --- themes ------------------------------------------------------------
-Type "opsforge theme"  Sleep 500ms  Enter
-Sleep 7s
+# --- stack profiles ----------------------------------------------------
+# 7 ready-made stacks; `opsforge install --profile <name>` installs one in one go
+Type "opsforge profiles"  Sleep 500ms  Enter
+# long screen: hold, then scroll through the stacks
+Sleep 6s
+Down Down Down Down  Sleep 3s
+Down Down Down Down  Sleep 3s
+Down Down Down Down  Sleep 3s
 
 Type "clear" Enter
 Sleep 800ms
