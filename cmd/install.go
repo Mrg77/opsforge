@@ -54,7 +54,9 @@ func runPicker(cat *catalog.Catalog) error {
 			Tools:       tools,
 		})
 	}
-	model := tui.New(cat.Categories, rescan(), rescan).WithProfileSaver(saver)
+	model := tui.New(cat.Categories, rescan(), rescan).
+		WithProfileSaver(saver).
+		WithSecurityTargets(CollectOSVTargets(cat))
 	final, err := tea.NewProgram(model).Run()
 	if err != nil {
 		return err

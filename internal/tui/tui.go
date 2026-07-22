@@ -4,14 +4,18 @@
 package tui
 
 import (
+	"context"
 	"fmt"
+	"sort"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
@@ -81,6 +85,14 @@ type Model struct {
 	saveProfile ProfileSaver
 	notice      string // transient status line (e.g. "saved profile 'x'")
 
+	// Tabs: 0=Tools (full picker), 1=Updates (outdated only),
+	// 2=Security (async CVE scan of installed tools).
+	tab         int
+	secTargets  []audit.ToolTarget
+	secFindings []audit.Finding
+	secLoading  bool
+	secLoaded   bool
+
 	// height is the terminal height from the last WindowSizeMsg, used
 	// to window the list — the full catalog no longer fits on screen.
 	height int
@@ -128,6 +140,13 @@ func (m Model) WithProfileSaver(f ProfileSaver) Model {
 	return m
 }
 
+// WithSecurityTargets enables the Security tab (key 3), scanning the
+// given targets against OSV when the tab is first opened.
+func (m Model) WithSecurityTargets(targets []audit.ToolTarget) Model {
+	m.secTargets = targets
+	return m
+}
+
 // selectedToolNames returns the catalog names of currently selected tools.
 func (m Model) selectedToolNames() []string {
 	var names []string
@@ -155,8 +174,8 @@ func (m Model) DidWork() bool { return m.didWork }
 // Init implements tea.Model.
 func (m Model) Init() tea.Cmd { return nil }
 
-// visible returns row indexes to display given the current filter;
-// headers appear only when at least one of their tools matches.
+// visible returns row indexes to display given the current filter and
+// tab; headers appear only when at least one of their tools matches.
 func (m Model) visible() []int {
 	query := strings.ToLower(strings.TrimSpace(m.filter.Value()))
 	var out []int
@@ -165,6 +184,9 @@ func (m Model) visible() []int {
 		if r.isHeader() {
 			pendingHeader = i
 			continue
+		}
+		if m.tab == 1 && !r.status.Outdated {
+			continue // Updates tab shows only outdated tools
 		}
 		if query != "" &&
 			!strings.Contains(strings.ToLower(r.tool.Name), query) &&
@@ -225,10 +247,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.queue = nil
 		m.phase = phaseSelect
 		return m, nil
+	case secScanDoneMsg:
+		m.secFindings = msg.findings
+		m.secLoading = false
+		m.secLoaded = true
+		return m, nil
 	case tea.KeyMsg:
 		return m.updateKeys(msg)
 	}
 	return m, nil
+}
+
+// secScanDoneMsg carries the security scan results back to the model.
+type secScanDoneMsg struct{ findings []audit.Finding }
+
+// startSecurityScan fires the OSV scan for the security tab.
+func (m Model) startSecurityScan() tea.Cmd {
+	targets := m.secTargets
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+		defer cancel()
+		findings := audit.ScanTools(ctx, targets)
+		sort.Slice(findings, func(a, b int) bool {
+			if findings[a].TopSeverity() != findings[b].TopSeverity() {
+				return findings[a].TopSeverity() > findings[b].TopSeverity()
+			}
+			return findings[a].Tool < findings[b].Tool
+		})
+		return secScanDoneMsg{findings: findings}
+	}
 }
 
 // rescanDoneMsg carries a fresh detection map back to the model.
@@ -323,6 +370,20 @@ func (m Model) updateKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "q", "ctrl+c":
 		return m, tea.Quit
+	case "1":
+		m.tab = 0
+		m.clampCursor()
+	case "2":
+		m.tab = 1
+		m.clampCursor()
+	case "3":
+		if len(m.secTargets) > 0 {
+			m.tab = 2
+			if !m.secLoaded && !m.secLoading {
+				m.secLoading = true
+				return m, tea.Batch(m.spin.Tick, m.startSecurityScan())
+			}
+		}
 	case "up", "k":
 		if m.cursor > 0 {
 			m.cursor--
@@ -412,13 +473,89 @@ func (m Model) View() string {
 		return styleTitle.Render("opsforge") + "\n\n" +
 			m.spin.View() + " re-scanning your tools…\n"
 	default:
+		if m.tab == 2 {
+			return m.viewSecurity()
+		}
 		return m.viewSelect()
 	}
 }
 
+// tabBar renders the k9s-style view switcher.
+func (m Model) tabBar() string {
+	names := []string{"1:Tools", "2:Updates", "3:Security"}
+	if len(m.secTargets) == 0 {
+		names = names[:2]
+	}
+	var parts []string
+	for i, n := range names {
+		if i == m.tab {
+			parts = append(parts, styleTitle.Render("["+n+"]"))
+		} else {
+			parts = append(parts, styleHelp.Render(" "+n+" "))
+		}
+	}
+	return strings.Join(parts, styleHelp.Render("·"))
+}
+
+// viewSecurity renders the CVE findings for installed tools.
+func (m Model) viewSecurity() string {
+	var b strings.Builder
+	b.WriteString(styleTitle.Render("opsforge — security") + "  " + m.tabBar() + "\n\n")
+
+	if m.secLoading {
+		b.WriteString(m.spin.View() + " scanning " +
+			fmt.Sprintf("%d installed tool(s) against OSV.dev…\n", len(m.secTargets)))
+		return b.String()
+	}
+
+	var lines []string
+	vulnerable := 0
+	for _, f := range m.secFindings {
+		if len(f.Vulns) == 0 {
+			lines = append(lines, styleOK.Render("✓ ")+fmt.Sprintf("%-14s", f.Tool)+
+				styleDim.Render(f.Version+" — no known vulnerabilities"))
+			continue
+		}
+		vulnerable++
+		lines = append(lines, styleErr.Render("⚠ ")+fmt.Sprintf("%-14s", f.Tool)+
+			styleDim.Render(f.Version))
+		for _, v := range f.Vulns {
+			sev := styleUpdate
+			if v.Severity >= audit.SevCritical {
+				sev = styleErr
+			}
+			fix := ""
+			if v.FixedIn != "" {
+				fix = styleDim.Render("  → fixed in " + v.FixedIn)
+			}
+			text := v.ID + " " + v.Summary
+			if len(text) > 80 {
+				text = text[:79] + "…"
+			}
+			lines = append(lines, "    "+sev.Render(fmt.Sprintf("[%s]", v.Severity))+" "+text+fix)
+		}
+	}
+	for _, l := range window(lines, 0, m.listHeight()) {
+		b.WriteString(l + "\n")
+	}
+
+	b.WriteString("\n")
+	if vulnerable == 0 {
+		b.WriteString(styleOK.Render("All audited tools are free of known vulnerabilities.") + "\n")
+	} else {
+		b.WriteString(styleUpdate.Render(fmt.Sprintf("%d vulnerable tool(s) — upgrade them from the Updates tab.", vulnerable)) + "\n")
+	}
+	b.WriteString(styleHelp.Render("1 tools · 2 updates · q quit"))
+	return b.String()
+}
+
 func (m Model) viewSelect() string {
 	var b strings.Builder
-	b.WriteString(styleTitle.Render("opsforge — pick your tools") + "\n")
+	title := "opsforge — pick your tools"
+	if m.tab == 1 {
+		title = "opsforge — updates"
+	}
+	b.WriteString(styleTitle.Render(title) + "  " + m.tabBar() + "\n")
 	if m.saving {
 		b.WriteString(m.nameInput.View() + styleHelp.Render("  (enter to save · esc to cancel)") + "\n")
 	} else if m.filtering || m.filter.Value() != "" {
