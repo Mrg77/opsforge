@@ -61,6 +61,18 @@ func InstallFromGitHub(t catalog.Tool) Result {
 		return Result{Err: fmt.Errorf("downloading %s: %w", url, err)}
 	}
 
+	// Supply-chain check: verify the asset against a published SHA-256
+	// before we ever mark it executable. A mismatch aborts the install; a
+	// release with no published checksum installs with a warning.
+	var warning string
+	status, err := verifyChecksum(gh, gh.Repo, tag, asset, archivePath)
+	if err != nil {
+		return Result{Err: err}
+	}
+	if status == ChecksumUnavailable {
+		warning = "no published checksum for this release — integrity not verified"
+	}
+
 	binName := t.Bin
 	src, err := extractBinary(archivePath, tmp, binName, gh.BinInArchive)
 	if err != nil {
@@ -78,7 +90,7 @@ func InstallFromGitHub(t catalog.Tool) Result {
 	if err := os.Chmod(dest, 0o755); err != nil {
 		return Result{Err: err}
 	}
-	return Result{}
+	return Result{Warning: warning}
 }
 
 // resolveAsset fills the asset template for the running platform.

@@ -64,6 +64,13 @@ type GitHubRelease struct {
 	// OSMap overrides the default GOOS→asset-os mapping (e.g. "Darwin"
 	// instead of "darwin").
 	OSMap map[string]string `yaml:"os_map"`
+	// ChecksumTemplate is the release asset that holds SHA-256 checksums,
+	// with the same {os}/{arch}/{version}/{tag} placeholders as
+	// AssetTemplate. Empty means opsforge tries the common conventions
+	// ("checksums.txt", "<asset>.sha256"). Verification is best-effort: a
+	// published checksum that mismatches fails the install; no published
+	// checksum is a warning, not a failure.
+	ChecksumTemplate string `yaml:"checksum"`
 }
 
 // Category groups tools by domain for display.

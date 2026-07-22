@@ -121,3 +121,32 @@ func TestQueryAtParsesResponse(t *testing.T) {
 		t.Errorf("QueryAt returned %+v", vulns)
 	}
 }
+
+func TestCVSSBase(t *testing.T) {
+	cases := []struct {
+		score string
+		want  Severity
+	}{
+		// A classic CRITICAL vector (base 9.8): network, low complexity,
+		// no privileges/UI, all impacts High.
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H", SevCritical},
+		// HIGH vector (base 7.5): only confidentiality impact.
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N", SevHigh},
+		// MEDIUM vector (base ~5.3): limited integrity impact.
+		{"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N", SevMedium},
+		// A bare numeric score still works.
+		{"9.1", SevCritical},
+		{"5.0", SevMedium},
+		// Garbage falls through to UNKNOWN.
+		{"not-a-score", SevUnknown},
+	}
+	for _, c := range cases {
+		v := osvVuln{Severity: []struct {
+			Type  string `json:"type"`
+			Score string `json:"score"`
+		}{{Type: "CVSS_V3", Score: c.score}}}
+		if got := severityOf(v); got != c.want {
+			t.Errorf("severityOf(%q) = %v, want %v", c.score, got, c.want)
+		}
+	}
+}

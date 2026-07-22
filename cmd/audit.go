@@ -100,6 +100,7 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 		})
 
 		vulnerable := 0
+		highOrWorse := 0
 		for _, f := range findings {
 			if len(f.Vulns) == 0 {
 				fmt.Printf("%s %-14s %s\n", auditOK.Render("✓"), f.Tool,
@@ -107,6 +108,9 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 				continue
 			}
 			vulnerable++
+			if f.TopSeverity() >= audit.SevHigh {
+				highOrWorse++
+			}
 			fmt.Printf("%s %-14s %s\n", sevStyle(f.TopSeverity()).Render("⚠"), f.Tool,
 				auditDim.Render(f.Version))
 			for _, v := range f.Vulns {
@@ -128,7 +132,11 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 			return nil
 		}
 		fmt.Printf("%s in %d tool(s). Run `opsforge upgrade` or update the affected tools.\n",
-			sevHigh.Render(fmt.Sprintf("Found vulnerabilities")), vulnerable)
+			sevHigh.Render("Found vulnerabilities"), vulnerable)
+		// Non-zero exit on HIGH/CRITICAL so `opsforge audit` can gate CI.
+		if highOrWorse > 0 {
+			return fmt.Errorf("%d tool(s) with HIGH or CRITICAL vulnerabilities", highOrWorse)
+		}
 		return nil
 	},
 }

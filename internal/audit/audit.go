@@ -13,8 +13,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -370,15 +372,78 @@ func qualitative(s string) Severity {
 	}
 }
 
-// cvssBase pulls the base score out of a CVSS vector string. OSV stores
-// the full vector (e.g. "CVSS:3.1/AV:N/.../C:H") but not always the
-// numeric score, so we only handle the numeric-score case and return -1
-// otherwise (callers then fall through to UNKNOWN).
-func cvssBase(vector string) float64 {
-	// Some OSV entries put a bare number here; try that first.
-	var f float64
-	if _, err := fmt.Sscanf(vector, "%g", &f); err == nil && f > 0 {
+// cvssBase returns the CVSS base score for an OSV severity score string.
+// OSV stores the full vector (e.g. "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"),
+// occasionally a bare number. We compute the base score from a v3.x vector
+// per the CVSS v3.1 spec; a bare number is used as-is. Returns -1 when the
+// input is neither, so callers fall through to UNKNOWN.
+func cvssBase(score string) float64 {
+	score = strings.TrimSpace(score)
+	// Bare numeric score (some OSV entries provide this directly).
+	if f, err := strconv.ParseFloat(score, 64); err == nil && f >= 0 {
 		return f
 	}
+	if strings.HasPrefix(strings.ToUpper(score), "CVSS:3") {
+		return cvss3Base(score)
+	}
 	return -1
+}
+
+// cvss3 metric weights per the CVSS v3.1 specification (§7.4).
+var (
+	cvss3AV = map[string]float64{"N": 0.85, "A": 0.62, "L": 0.55, "P": 0.2}
+	cvss3AC = map[string]float64{"L": 0.77, "H": 0.44}
+	cvss3UI = map[string]float64{"N": 0.85, "R": 0.62}
+	// Privileges Required depends on Scope (changed vs unchanged).
+	cvss3PRunchanged = map[string]float64{"N": 0.85, "L": 0.62, "H": 0.27}
+	cvss3PRchanged   = map[string]float64{"N": 0.85, "L": 0.68, "H": 0.5}
+	// Confidentiality / Integrity / Availability impact.
+	cvss3CIA = map[string]float64{"N": 0.0, "L": 0.22, "H": 0.56}
+)
+
+// cvss3Base computes the CVSS v3.1 base score from a vector string.
+// It implements the spec formula (roundup to one decimal) and returns -1
+// if a required base metric is missing.
+func cvss3Base(vector string) float64 {
+	m := map[string]string{}
+	for _, part := range strings.Split(vector, "/") {
+		if k, val, ok := strings.Cut(part, ":"); ok {
+			m[strings.ToUpper(k)] = strings.ToUpper(val)
+		}
+	}
+	scopeChanged := m["S"] == "C"
+	prTable := cvss3PRunchanged
+	if scopeChanged {
+		prTable = cvss3PRchanged
+	}
+	av, ok1 := cvss3AV[m["AV"]]
+	ac, ok2 := cvss3AC[m["AC"]]
+	pr, ok3 := prTable[m["PR"]]
+	ui, ok4 := cvss3UI[m["UI"]]
+	c, ok5 := cvss3CIA[m["C"]]
+	integ, ok6 := cvss3CIA[m["I"]]
+	a, ok7 := cvss3CIA[m["A"]]
+	if !(ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7) {
+		return -1
+	}
+
+	iscBase := 1 - (1-c)*(1-integ)*(1-a)
+	var impact float64
+	if scopeChanged {
+		impact = 7.52*(iscBase-0.029) - 3.25*math.Pow(iscBase-0.02, 15)
+	} else {
+		impact = 6.42 * iscBase
+	}
+	if impact <= 0 {
+		return 0
+	}
+	exploitability := 8.22 * av * ac * pr * ui
+	var base float64
+	if scopeChanged {
+		base = math.Min(1.08*(impact+exploitability), 10)
+	} else {
+		base = math.Min(impact+exploitability, 10)
+	}
+	// CVSS "roundup" to one decimal place.
+	return math.Ceil(base*10) / 10
 }

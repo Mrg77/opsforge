@@ -11,6 +11,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/tui"
+	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
 )
 
@@ -93,22 +94,34 @@ func installNonInteractive(cat *catalog.Catalog, names []string) error {
 		queue = append(queue, t)
 	}
 
-	installed := 0
+	installed, failed := 0, 0
 	for _, t := range queue {
 		if detect.Tool(t).Installed {
 			fmt.Printf("✓ %-16s already installed\n", t.Name)
 			continue
 		}
 		fmt.Printf("… installing %s (via %s)\n", t.Name, installer.BackendFor(t))
-		if res := installer.Install(t); res.Err != nil {
+		res := installer.Install(t)
+		if res.Err != nil {
 			fmt.Printf("✗ %-16s %v\n%s\n", t.Name, res.Err, res.OutputTail)
+			failed++
 			continue
 		}
 		fmt.Printf("✓ %-16s installed\n", t.Name)
+		if res.Warning != "" {
+			fmt.Printf("  %s %s\n", ui.WarnMark(), ui.Dim.Render(res.Warning))
+		}
 		installed++
 	}
 	if installed > 0 {
-		return postInstall(cat)
+		if err := postInstall(cat); err != nil {
+			return err
+		}
+	}
+	// Propagate a non-zero exit when any install failed, so scripts/CI can
+	// detect it (individual errors were printed above).
+	if failed > 0 {
+		return fmt.Errorf("%d of %d tool(s) failed to install", failed, failed+installed)
 	}
 	return nil
 }

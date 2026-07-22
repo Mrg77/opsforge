@@ -33,6 +33,9 @@ type Result struct {
 	NotBrewManaged bool
 	// Backend records which backend handled the operation.
 	Backend Backend
+	// Warning holds a non-fatal note about a successful operation, e.g.
+	// "installed but no published checksum to verify against".
+	Warning string
 }
 
 // brewAvailable reports whether Homebrew is on PATH.
