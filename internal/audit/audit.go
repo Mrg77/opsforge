@@ -127,6 +127,38 @@ func Query(ctx context.Context, ecosystem, name, version string) ([]Vuln, error)
 	return QueryAt(ctx, osvEndpoint, ecosystem, name, version)
 }
 
+// ToolTarget identifies one installed tool to check against OSV.
+type ToolTarget struct {
+	Name      string // display name
+	Ecosystem string
+	Package   string
+	Version   string // normalized semver
+}
+
+// ScanTools queries OSV concurrently for every target and returns one
+// Finding per tool (empty Vulns when clean; query errors yield an empty
+// result rather than failing the whole scan). Reused by the audit
+// command and the TUI security view.
+func ScanTools(ctx context.Context, targets []ToolTarget) []Finding {
+	findings := make([]Finding, len(targets))
+	done := make(chan int, len(targets))
+	for i, tg := range targets {
+		go func(i int, tg ToolTarget) {
+			vulns, err := Query(ctx, tg.Ecosystem, tg.Package, tg.Version)
+			f := Finding{Tool: tg.Name, Version: tg.Version, Auditable: true}
+			if err == nil {
+				f.Vulns = vulns
+			}
+			findings[i] = f
+			done <- i
+		}(i, tg)
+	}
+	for range targets {
+		<-done
+	}
+	return findings
+}
+
 // QueryAt is Query against an explicit endpoint (used in tests).
 func QueryAt(ctx context.Context, endpoint, ecosystem, name, version string) ([]Vuln, error) {
 	body, _ := json.Marshal(osvRequest{

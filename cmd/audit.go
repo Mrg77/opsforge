@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
@@ -14,6 +13,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/secrets"
 )
 
 var (
@@ -25,66 +25,63 @@ var (
 	auditDim    = lipgloss.NewStyle().Foreground(lipgloss.Color("241"))
 )
 
+var auditSecrets bool
+
+// CollectOSVTargets gathers installed tools with an OSV mapping and a
+// parsable version — shared by the audit command and the TUI.
+func CollectOSVTargets(cat *catalog.Catalog) []audit.ToolTarget {
+	var targets []audit.ToolTarget
+	for _, t := range cat.Tools() {
+		if t.OSV == nil {
+			continue
+		}
+		s := detect.Tool(t)
+		if !s.Installed {
+			continue
+		}
+		ver := audit.NormalizeVersion(s.Version)
+		if ver == "" {
+			continue
+		}
+		targets = append(targets, audit.ToolTarget{
+			Name: t.Name, Ecosystem: t.OSV.Ecosystem, Package: t.OSV.Name, Version: ver,
+		})
+	}
+	return targets
+}
+
 var auditCmd = &cobra.Command{
 	Use:   "audit",
-	Short: "Scan installed tools for known CVEs (via OSV.dev)",
+	Short: "Scan installed tools for CVEs — and your workstation for leaked secrets",
 	Long: `Cross-references the versions of your installed tools against the OSV.dev
 vulnerability database and reports which ones have known CVEs and should be
-upgraded. Only tools with an OSV mapping in the catalog are checked.`,
+upgraded. Only tools with an OSV mapping in the catalog are checked.
+
+With --secrets, also scans the places credentials habitually leak — shell
+history, shell rc files, and local .env files — and reports masked findings.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {
 			return err
 		}
 
-		// Collect installed tools that have an OSV mapping.
-		type target struct {
-			tool    catalog.Tool
-			version string
-		}
-		var targets []target
-		auditable := 0
-		for _, t := range cat.Tools() {
-			if t.OSV == nil {
-				continue
+		if auditSecrets {
+			if err := runSecretsScan(); err != nil {
+				return err
 			}
-			auditable++
-			s := detect.Tool(t)
-			if !s.Installed {
-				continue
-			}
-			ver := audit.NormalizeVersion(s.Version)
-			if ver == "" {
-				continue
-			}
-			targets = append(targets, target{tool: t, version: ver})
+			fmt.Println()
 		}
 
+		targets := CollectOSVTargets(cat)
 		if len(targets) == 0 {
-			fmt.Printf("No auditable tools installed (%d tools in the catalog carry an OSV mapping).\n", auditable)
+			fmt.Println("No auditable tools installed (no installed tool carries an OSV mapping).")
 			return nil
 		}
 
 		fmt.Printf("Auditing %d installed tool(s) against OSV.dev…\n\n", len(targets))
-
-		// Query OSV concurrently.
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 		defer cancel()
-		findings := make([]audit.Finding, len(targets))
-		var wg sync.WaitGroup
-		for i, tg := range targets {
-			wg.Add(1)
-			go func(i int, tg target) {
-				defer wg.Done()
-				vulns, err := audit.Query(ctx, tg.tool.OSV.Ecosystem, tg.tool.OSV.Name, tg.version)
-				f := audit.Finding{Tool: tg.tool.Name, Version: tg.version, Auditable: true}
-				if err == nil {
-					f.Vulns = vulns
-				}
-				findings[i] = f
-			}(i, tg)
-		}
-		wg.Wait()
+		findings := audit.ScanTools(ctx, targets)
 
 		// Sort: most severe first, then by tool name.
 		sort.Slice(findings, func(a, b int) bool {
@@ -168,6 +165,57 @@ func hyperlink(url, text string) string {
 	return "\x1b]8;;" + url + "\x1b\\" + text + "\x1b]8;;\x1b\\"
 }
 
+// runSecretsScan scans the workstation for leaked credentials and prints
+// masked findings grouped by file.
+func runSecretsScan() error {
+	fmt.Println("Scanning your workstation for leaked secrets…")
+	fmt.Println(auditDim.Render("  (shell history, shell rc files, local .env files — values are masked)"))
+	fmt.Println()
+
+	findings := secrets.ScanWorkstation()
+	if len(findings) == 0 {
+		fmt.Println(auditOK.Render("✓ No leaked credentials found."))
+		return nil
+	}
+
+	// Group by source file for a readable report.
+	bySource := map[string][]secrets.Finding{}
+	var order []string
+	for _, f := range findings {
+		if _, seen := bySource[f.Source]; !seen {
+			order = append(order, f.Source)
+		}
+		bySource[f.Source] = append(bySource[f.Source], f)
+	}
+
+	critical := 0
+	for _, src := range order {
+		fmt.Printf("%s\n", sevHigh.Render(src))
+		for _, f := range bySource[src] {
+			style := sevMedium
+			if f.Rule.Severity == secrets.SevCritical {
+				style = sevCritical
+				critical++
+			}
+			fmt.Printf("  %s line %-6d %s  %s\n",
+				style.Render(fmt.Sprintf("[%s]", f.Rule.Severity)),
+				f.Line, f.Rule.Desc, auditDim.Render(f.Excerpt))
+		}
+	}
+
+	fmt.Println()
+	fmt.Printf("%s in %d location(s).\n",
+		sevHigh.Render(fmt.Sprintf("Found %d potential leak(s)", len(findings))), len(order))
+	fmt.Println(auditDim.Render(`  Clean up: rotate any real credentials, then remove the lines
+  (history: edit ~/.zsh_history · prefer 'read -s' or a secrets manager next time)`))
+	if critical > 0 {
+		return fmt.Errorf("%d critical secret leak(s) found", critical)
+	}
+	return nil
+}
+
 func init() {
+	auditCmd.Flags().BoolVar(&auditSecrets, "secrets", false,
+		"also scan shell history, rc files and local .env files for leaked credentials")
 	rootCmd.AddCommand(auditCmd)
 }
