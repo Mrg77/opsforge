@@ -32,12 +32,39 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autocomplete/zsh-autocompl
   zstyle ':autocomplete:tab:*' widget-style menu-select
   # Don't insert a match automatically — only when you pick one.
   zstyle ':autocomplete:*' insert-unambiguous yes
+
+  # --- history-first menu ---------------------------------------------
+  # The whole point: when you type `kubectl`, your recent *actual*
+  # `kubectl …` command lines surface at the TOP of the live menu, above
+  # the subcommand/flag completions — so you re-run what you did before
+  # instead of retyping it. zsh-autocomplete already blends history into
+  # the menu; we bias it toward real history and give it room.
+  #   - reserve the first lines of the menu for history matches
+  zstyle ':autocomplete:*' default-context history-incremental-search-backward
+  zstyle ':autocomplete:history-search:*' list-lines 6
+  #   - match anywhere in the line isn't what we want here: we want the
+  #     line to START with what you typed (prefix), like fish.
+  zstyle ':autocomplete:*' history-search-syntax prefix
+  #   - keep the current session's commands weighted as most recent
+  setopt SHARE_HISTORY INC_APPEND_HISTORY HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS
+
   source "$_of_brew_share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
+
+  # Up-arrow does a prefix history search (type `kubectl`, press ↑ to walk
+  # only your kubectl history) — the behavior most people expect.
+  zstyle ':autocomplete:up:*'   fzf-completion no
+  zstyle ':autocomplete:down:*' fzf-completion no
 fi
 
 # --- zsh-autosuggestions: gray inline suggestion as you type ---
 if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+  # Suggest from your HISTORY (a whole past command line) rather than from
+  # completion — so typing `kubectl` proposes a real previous command, not
+  # a stray next token. Prefix-match keeps it relevant.
+  ZSH_AUTOSUGGEST_STRATEGY=(history)
   ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=8'
+  # Don't fire on very long buffers (a pasted block shouldn't flicker).
+  ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=80
   source "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 fi
 
