@@ -28,20 +28,25 @@ autoload -Uz add-zsh-hook
 zmodload zsh/datetime 2>/dev/null   # provides EPOCHREALTIME for timing
 
 # --- timing: measure how long each command took -------------------------
-_opsforge_timer_start() { _opsforge_timer=${EPOCHREALTIME:-$SECONDS} }
+# preexec records the start; precmd computes the duration ONCE and stores
+# a formatted string. Crucially, preexec only fires when a real command
+# runs — so pressing Enter on an empty line leaves no timer, and precmd
+# then clears the duration instead of re-showing a stale one.
+_opsforge_timer_start() { _opsforge_timer_begin=${EPOCHREALTIME:-$SECONDS} }
 add-zsh-hook preexec _opsforge_timer_start
 
-_opsforge_cmd_duration() {
-  [[ -z "$_opsforge_timer" ]] && return
+# _opsforge_compute_duration sets $_opsforge_duration (may be empty).
+_opsforge_compute_duration() {
+  _opsforge_duration=""
+  [[ -z "$_opsforge_timer_begin" ]] && return       # empty line: nothing ran
   local now=${EPOCHREALTIME:-$SECONDS}
-  local elapsed=$(( now - _opsforge_timer ))
-  unset _opsforge_timer
-  # Only show it when it actually took a moment (>2s).
-  (( elapsed < 2 )) && return
+  local elapsed=$(( now - _opsforge_timer_begin ))
+  unset _opsforge_timer_begin                        # consume it, so it can't be reused
+  (( elapsed < 2 )) && return                        # only show noticeable durations
   if (( elapsed >= 60 )); then
-    printf '%dm%ds' $(( elapsed / 60 )) $(( elapsed % 60 ))
+    _opsforge_duration=$(printf '%dm%02ds' $(( elapsed / 60 )) $(( elapsed % 60 )))
   else
-    printf '%.1fs' "$elapsed"
+    _opsforge_duration=$(printf '%.1fs' "$elapsed")
   fi
 }
 
@@ -76,27 +81,26 @@ _opsforge_git_segment() {
 # --- assemble the left prompt -------------------------------------------
 _opsforge_precmd_prompt() {
   local last=$?
-  local dur
-  dur=$(_opsforge_cmd_duration)
+  _opsforge_compute_duration   # sets $_opsforge_duration
 
   # directory: repo-relative path inside a git repo, else ~-shortened cwd
-  local dir
-  local root
+  local dir root
   root=$(git rev-parse --show-toplevel 2>/dev/null)
   if [[ -n "$root" ]]; then
-    local reponame=${root:t}
-    local rel=${PWD#$root}
-    dir="${reponame}${rel}"
+    dir="${root:t}${PWD#$root}"
   else
     dir="%~"
   fi
 
   local durseg=""
-  [[ -n "$dur" ]] && durseg=" %F{242}${dur}%f"
+  [[ -n "$_opsforge_duration" ]] && durseg=" %F{242}${_opsforge_duration}%f"
 
-  # ❯ turns red on failure.
+  # ❯ turns red when the last command truly failed. Exit code 130 (Ctrl-C)
+  # and 148 (Ctrl-Z) are user interruptions, not failures, so keep it cyan.
   local mark="%F{cyan}❯%f"
-  (( last != 0 )) && mark="%F{red}❯%f"
+  if (( last != 0 && last != 130 && last != 148 )); then
+    mark="%F{red}❯%f"
+  fi
 
   PROMPT="%F{blue}${dir}%f\$(_opsforge_git_segment)${durseg}
 ${mark} "
