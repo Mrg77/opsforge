@@ -359,12 +359,22 @@ rules:
     action: confirm
     message: "This changes a PRODUCTION helm release."
 
-  - name: "confirm terraform destroy/apply on prod"
+  - name: "confirm terraform destroy/apply on prod (by context)"
     match:
-      command: "terraform (destroy|apply)"
+      command: "(terraform|tofu|terragrunt) (destroy|apply)"
       context: "prod|production"
     action: confirm
     message: "This changes PRODUCTION infrastructure."
+
+  # Context detection reads the terraform WORKSPACE — but most teams point
+  # at prod with -var-file=prod.tfvars or an environments/prod directory,
+  # not a workspace. This rule matches the command line itself, so those
+  # cases are caught too. Tune the "prod" markers to your conventions.
+  - name: "confirm terraform destroy/apply targeting prod (by command)"
+    match:
+      command: "(terraform|tofu|terragrunt) .*(destroy|apply).*(prod\\.tfvars|environments?/prod|-var-?file[= ]\\S*prod)"
+    action: confirm
+    message: "This terraform command targets PRODUCTION."
 
   # Example of a hard block (uncomment to forbid outright):
   # - name: "never delete namespaces on prod"

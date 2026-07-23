@@ -220,10 +220,23 @@ func DefaultPolicy() *GuardPolicy {
 				Message: "This changes a PRODUCTION helm release.",
 			},
 			{
-				Name:    "confirm terraform destroy/apply on prod",
-				Match:   GuardMatch{Command: `terraform (destroy|apply)`, Context: `prod|production`},
+				Name:    "confirm terraform destroy/apply on prod (by context)",
+				Match:   GuardMatch{Command: `(terraform|tofu|terragrunt) (destroy|apply)`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This changes PRODUCTION infrastructure.",
+				Message: "This changes PRODUCTION infrastructure (prod context detected).",
+			},
+			{
+				// Context detection (the tf workspace) misses the common
+				// real-world cases: -var-file=prod.tfvars, an environments/prod
+				// directory, or `workspace select prod`. So also look at the
+				// command line itself, which the guard already sees in full.
+				// Go's RE2 has no lookahead, so we spell out both orders (verb
+				// then marker, marker then verb) to stay order-independent —
+				// covering chained `tofu workspace select prod && tofu destroy`.
+				Name:    "confirm terraform destroy/apply targeting prod (by command)",
+				Match:   GuardMatch{Command: `(terraform|tofu|terragrunt).*((destroy|apply).*(-var-?file[= ]\S*prod|environments?/prod|prod\.tfvars|workspace\s+select\s+prod)|(-var-?file[= ]\S*prod|environments?/prod|prod\.tfvars|workspace\s+select\s+prod).*(destroy|apply))`},
+				Action:  ActionConfirm,
+				Message: "This terraform command targets PRODUCTION (prod var-file / directory / workspace).",
 			},
 		},
 	}

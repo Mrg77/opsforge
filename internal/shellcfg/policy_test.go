@@ -301,3 +301,33 @@ func TestPrefilterTerms(t *testing.T) {
 		t.Error("custom rule keyword 'import' missing from prefilter — rule would be silently skipped")
 	}
 }
+
+func TestDefaultPolicyCatchesProdTerraformByCommand(t *testing.T) {
+	p := DefaultPolicy()
+	// Cases that the workspace-context detection would MISS but the
+	// command-line rule should catch (empty context, prod is in the args).
+	catch := []string{
+		"terraform destroy -var-file=prod.tfvars",
+		"terraform apply environments/prod/main.tf",
+		"tofu workspace select prod && tofu destroy",
+		"terragrunt apply -var-file prod.tfvars",
+	}
+	for _, cmd := range catch {
+		d := p.Evaluate(cmd, "") // no context at all
+		if d.Action == ActionAllow {
+			t.Errorf("expected a guard on %q, got allow", cmd)
+		}
+	}
+	// Non-prod commands must NOT trip a guard (no false positives).
+	allow := []string{
+		"terraform destroy -var-file=staging.tfvars",
+		"terraform plan -var-file=prod.tfvars", // plan is read-only
+		"terraform apply -var-file=dev.tfvars",
+		"ls environments/prod",
+	}
+	for _, cmd := range allow {
+		if d := p.Evaluate(cmd, ""); d.Action != ActionAllow {
+			t.Errorf("expected allow on %q, got %s", cmd, d.Action)
+		}
+	}
+}
