@@ -29,7 +29,7 @@ opsforge is **three tools in one binary**:
 
 | | | |
 |:--:|---|---|
-| 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
+| 📦 | **Tool installer** | An interactive picker over **249 curated CLIs across every IT discipline**. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
 | 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
 | 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; `opsforge apply <url>` rebuilds it anywhere, and `apply --check` verifies a machine against it in CI. Your workstation becomes a reproducible, enforceable baseline. |
 
@@ -157,7 +157,7 @@ opsforge profiles                    # list all with install status
 ```
 
 Built-in: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`. In the picker, select your tools and press `s` to save a personal
+`security`, `sysadmin`, `netsec`, `secrets`. In the picker, select your tools and press `s` to save a personal
 profile to `~/.config/opsforge/profiles.yaml` — then
 `opsforge install --profile my-stack` reproduces it anywhere.
 
@@ -427,11 +427,21 @@ credential, uploading the JSON reports as artifacts.
 
 ## The catalog
 
-**106 tools across 14 categories** — Kubernetes, Infrastructure as Code, Cloud
+**249 tools across 15 categories** — Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
-HTTP, Databases, Security & Compliance, Secrets & Identity, Serverless & PaaS,
-Runtime & Versions, Utilities. It's a single embedded
-[YAML file](internal/catalog/catalog.yaml) — adding a tool is a five-line PR.
+HTTP, **System & SysAdmin**, Databases, Security & Compliance, Secrets & Identity,
+Serverless & PaaS, Runtime & Versions, Utilities. The catalog now spans **every IT
+job** — not just Kubernetes and cloud, but development, DevOps, systems, networking,
+security and databases — so a dev, a DevOps engineer, a sysadmin, a network engineer
+or a DevSecOps all find their toolbox here:
+
+- **Networking** — `tcpdump`, `iperf3`, `nmap`, `wireguard`…
+- **System & SysAdmin** — `htop`, `tmux`, `zellij`, `rclone`…
+- **Security & pentest** — `nuclei`, `ffuf`, `semgrep`, `trivy`, `opa`…
+- **Databases** — `mongosh`, `litecli`, `atlas`…
+
+It's a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a tool
+is a five-line PR.
 
 **Two install backends, picked per tool at runtime:**
 
@@ -450,6 +460,42 @@ executable, opsforge verifies its **SHA-256 against a published checksum** —
 catalog's `checksum:` field. A mismatch **refuses the install**; a release that
 publishes no checksum is a warning, not a failure (best-effort, so the ~85% of
 projects that ship none still install).
+
+### Add your own tools
+
+The catalog isn't a closed list. Point opsforge at an **overlay** and your own
+tools — internal or private CLIs — show up in the picker, profiles and every
+command, **no PR required**. Two ways to load one:
+
+- Drop one or more files in `~/.config/opsforge/catalog.d/*.yaml` (merged in
+  alphabetical order).
+- Or set `OPSFORGE_CATALOG=/path/to/my-catalog.yaml`.
+
+The format is exactly the catalog's — `categories:` with `tools:` (`name`, `bin`,
+`brew`, `description`), and optional `profiles:`:
+
+```yaml
+# ~/.config/opsforge/catalog.d/internal.yaml
+categories:
+  - name: Internal
+    tools:
+      - name: acme-cli
+        bin: acme
+        brew: acmecorp/tap/acme-cli
+        description: ACME Corp internal deploy CLI
+```
+
+Merge semantics are predictable:
+
+- A tool with a **new name** is **added** to the catalog.
+- A tool with an **existing name** **overrides** the built-in one — pin an
+  internal formula, swap a source, tweak a description.
+- A profile with an existing name is likewise **replaced**.
+- **Unknown YAML fields are rejected**, so a typo fails loudly instead of being
+  silently ignored.
+
+This makes opsforge a real fit for a team: ship an overlay alongside your repo and
+everyone's internal tooling installs the same way as the public catalog.
 
 ---
 
@@ -509,7 +555,7 @@ The parts worth pointing a reviewer to:
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
   never triggers auth or hangs on a wrapper CLI holding the output pipe.
-- **The catalog can't lie.** A CI job validates all 106 brew references against
+- **The catalog can't lie.** A CI job validates all 249 brew references against
   the Homebrew API and every GitHub asset template against the tool's real latest
   release (darwin/linux × amd64/arm64) — a renamed formula is caught before a
   user hits it mid-install.
@@ -553,7 +599,6 @@ upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 
 - [ ] bash & fish support for the shell layer
 - [ ] Native Windows (winget/scoop + PowerShell completions)
-- [ ] User config file for custom tools and profiles
 - [ ] More `github:` templates for full brew-less coverage
 
 ## License

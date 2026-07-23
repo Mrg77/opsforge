@@ -30,7 +30,7 @@ opsforge, c'est **trois outils dans un seul binaire** :
 
 | | | |
 |:--:|---|---|
-| 📦 | **Installeur d'outils** | Un sélecteur interactif parmi **106 CLI DevOps triés sur le volet**. Il détecte ce que vous avez et ce qui est obsolète, puis installe le reste via Homebrew *ou* directement depuis les binaires de release GitHub — fonctionne sur une machine Linux nue sans gestionnaire de paquets. |
+| 📦 | **Installeur d'outils** | Un sélecteur interactif parmi **249 CLI triés sur le volet, couvrant tous les métiers IT**. Il détecte ce que vous avez et ce qui est obsolète, puis installe le reste via Homebrew *ou* directement depuis les binaires de release GitHub — fonctionne sur une machine Linux nue sans gestionnaire de paquets. |
 | 🐚 | **Shell DevOps** | Une seule commande transforme votre propre zsh en une expérience façon Warp/Fish : complétion en direct, aide inline `?`, prompt conscient de la prod, et des [**guards policy-as-code**](#guards-policy-as-code) sur les commandes destructrices. Aucun remplacement de shell, aucun verrouillage. |
 | 📸 | **Poste de travail as-code** | `opsforge snapshot` exporte toute votre config — outils, profils, shell, thème *et* politique de guards — dans un seul YAML ; `opsforge apply <url>` la reconstruit n'importe où, et `apply --check` vérifie une machine par rapport à elle en CI. Votre poste de travail devient une base reproductible et applicable. |
 
@@ -162,7 +162,7 @@ opsforge profiles                    # liste tout avec le statut d'installation
 ```
 
 Intégrés : `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`. Dans le sélecteur, sélectionnez vos outils et appuyez sur `s` pour
+`security`, `sysadmin`, `netsec`, `secrets`. Dans le sélecteur, sélectionnez vos outils et appuyez sur `s` pour
 sauver un profil personnel dans `~/.config/opsforge/profiles.yaml` — ensuite
 `opsforge install --profile my-stack` le reproduit n'importe où.
 
@@ -454,12 +454,22 @@ identifiant exposé, en téléversant les rapports JSON comme artefacts.
 
 ## Le catalogue
 
-**106 outils sur 14 catégories** — Kubernetes, Infrastructure as Code, CLI Cloud,
-Conteneurs, Git & CI/CD, Observabilité & Monitoring, Logs, Réseau & HTTP, Bases de
-données, Sécurité & Conformité, Secrets & Identité, Serverless & PaaS, Runtime &
-Versions, Utilitaires. C'est un unique
-[fichier YAML](internal/catalog/catalog.yaml) embarqué — ajouter un outil est une
-PR de cinq lignes.
+**249 outils sur 15 catégories** — Kubernetes, Infrastructure as Code, CLI Cloud,
+Conteneurs, Git & CI/CD, Observabilité & Monitoring, Logs, Réseau & HTTP,
+**Système & SysAdmin**, Bases de données, Sécurité & Conformité, Secrets & Identité,
+Serverless & PaaS, Runtime & Versions, Utilitaires. Le catalogue couvre désormais
+**tous les métiers IT** — pas seulement Kubernetes et le cloud, mais aussi le
+développement, le DevOps, le système, le réseau, la sécurité et les bases de
+données — pour qu'un dev, un ingénieur DevOps, un ingénieur système, un ingénieur
+réseau ou un DevSecOps y trouvent tous leur boîte à outils :
+
+- **Réseau** — `tcpdump`, `iperf3`, `nmap`, `wireguard`…
+- **Système & SysAdmin** — `htop`, `tmux`, `zellij`, `rclone`…
+- **Sécurité & pentest** — `nuclei`, `ffuf`, `semgrep`, `trivy`, `opa`…
+- **Bases de données** — `mongosh`, `litecli`, `atlas`…
+
+C'est un unique [fichier YAML](internal/catalog/catalog.yaml) embarqué — ajouter un
+outil est une PR de cinq lignes.
 
 **Deux backends d'installation, choisis par outil à l'exécution :**
 
@@ -479,6 +489,43 @@ outil via le champ `checksum:` du catalogue. Une non-correspondance **refuse
 l'installation** ; une release qui ne publie aucun checksum est un avertissement,
 pas un échec (au mieux, pour que les ~85 % de projets qui n'en fournissent aucun
 s'installent quand même).
+
+### Ajouter vos propres outils
+
+Le catalogue n'est pas une liste fermée. Pointez opsforge vers un **overlay** et
+vos propres outils — CLI internes ou privés — apparaissent dans le sélecteur, les
+profils et chaque commande, **sans aucune PR**. Deux façons d'en charger un :
+
+- Déposez un ou plusieurs fichiers dans `~/.config/opsforge/catalog.d/*.yaml`
+  (mergés par ordre alphabétique).
+- Ou définissez `OPSFORGE_CATALOG=/chemin/vers/mon-catalogue.yaml`.
+
+Le format est exactement celui du catalogue — des `categories:` avec des `tools:`
+(`name`, `bin`, `brew`, `description`), et optionnellement des `profiles:` :
+
+```yaml
+# ~/.config/opsforge/catalog.d/internal.yaml
+categories:
+  - name: Internal
+    tools:
+      - name: acme-cli
+        bin: acme
+        brew: acmecorp/tap/acme-cli
+        description: CLI de déploiement interne d'ACME Corp
+```
+
+La sémantique de merge est prévisible :
+
+- Un outil au nom **nouveau** est **ajouté** au catalogue.
+- Un outil au nom **existant** **remplace** celui du catalogue — épinglez une
+  formule interne, changez de source, ajustez une description.
+- Un profil au nom existant est de même **remplacé**.
+- **Les champs YAML inconnus sont rejetés**, pour qu'une typo échoue bruyamment au
+  lieu d'être silencieusement ignorée.
+
+Cela fait d'opsforge un vrai atout pour une équipe : livrez un overlay à côté de
+votre dépôt et l'outillage interne de chacun s'installe de la même façon que le
+catalogue public.
 
 ---
 
@@ -546,7 +593,7 @@ Les parties vers lesquelles pointer un relecteur :
   navigateur. Chaque sonde tourne avec un `KUBECONFIG` neutralisé et un
   `WaitDelay`, pour que la détection ne déclenche jamais d'auth ni ne se bloque sur
   un CLI wrapper retenant le pipe de sortie.
-- **Le catalogue ne peut pas mentir.** Un job CI valide les 106 références brew
+- **Le catalogue ne peut pas mentir.** Un job CI valide les 249 références brew
   contre l'API Homebrew et chaque template d'asset GitHub contre la vraie dernière
   release de l'outil (darwin/linux × amd64/arm64) — une formule renommée est
   attrapée avant qu'un utilisateur ne la rencontre en plein milieu d'une
@@ -593,7 +640,6 @@ GoReleaser sur tag.
 
 - [ ] Support bash & fish pour la couche shell
 - [ ] Windows natif (winget/scoop + complétions PowerShell)
-- [ ] Fichier de config utilisateur pour outils et profils personnalisés
 - [ ] Plus de templates `github:` pour une couverture sans brew complète
 
 ## Licence
