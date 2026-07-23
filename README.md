@@ -8,6 +8,8 @@ Pick your CLIs from an interactive terminal UI, install them in one go, and turn
 your zsh into a context-aware DevOps environment — live completion, a prod-aware
 prompt, and **policy-as-code guards** that stop you from nuking the wrong cluster.
 
+**English** · [Français](README.fr.md)
+
 [![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
@@ -15,7 +17,7 @@ prompt, and **policy-as-code guards** that stop you from nuking the wrong cluste
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [History](#history) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
+**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -27,14 +29,14 @@ opsforge is **three tools in one binary**:
 
 | | | |
 |:--:|---|---|
-| 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have, what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
-| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: a live completion menu, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
+| 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
+| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
 | 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; `opsforge apply <url>` rebuilds it anywhere, and `apply --check` verifies a machine against it in CI. Your workstation becomes a reproducible, enforceable baseline. |
 
-> **Why:** setting up (or rebuilding) a DevOps workstation means installing 20+
-> CLIs, then wiring completions, aliases and a useful prompt for each — by hand,
-> again, on every new machine. opsforge makes it a two-minute session and keeps
-> your shell in sync as your toolbox grows.
+> **Why:** rebuilding a DevOps workstation means installing 20+ CLIs, then wiring
+> completions, aliases and a useful prompt for each — by hand, on every machine.
+> opsforge makes it a two-minute session and keeps your shell in sync as your
+> toolbox grows.
 
 ---
 
@@ -45,15 +47,12 @@ curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
 Downloads the right binary for your OS/arch into `~/.local/bin` (override with
-`OPSFORGE_INSTALL_DIR`, pin with `OPSFORGE_VERSION=v1.2.3`).
+`OPSFORGE_INSTALL_DIR`, pin with `OPSFORGE_VERSION=v1.2.3`). From source:
+`go install github.com/Mrg77/opsforge@latest`.
 
-```sh
-go install github.com/Mrg77/opsforge@latest   # from source
-```
-
-Then keep it current with `opsforge self update` — it downloads the latest
-release, **verifies its published SHA-256 before swapping the binary in place**,
-and no-ops when you're already up to date (`--check` for cron/CI).
+Keep it current with `opsforge self update` — it downloads the latest release,
+**verifies its published SHA-256 before swapping the binary in place**, and
+no-ops when you're already up to date (`--check` for cron/CI).
 
 > **Windows:** use WSL — the installer backend is Homebrew and the shell layer
 > targets zsh. Native winget/scoop + PowerShell support is on the roadmap.
@@ -68,9 +67,8 @@ opsforge status       # one-glance cockpit of your workstation
 opsforge doctor       # full health check — incl. CVEs & leaked secrets
 opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
 opsforge guard test "terraform destroy" --context prod   # simulate a guard rule
-opsforge apply --check team-baseline.yaml   # verify this machine matches the baseline (CI)
+opsforge apply --check team-baseline.yaml                # verify this machine matches the baseline (CI)
 opsforge self update  # self-update, checksum-verified before the swap
-opsforge audit --json # machine-readable output for CI (non-zero exit on HIGH/CRITICAL)
 ```
 
 <table>
@@ -108,6 +106,47 @@ Launch the bare binary to browse by category and install what you check.
 - **Markers:** `[✓]` green installed · `[✓]` orange update available · `[▸]` cyan
   selected · `[ ]` grey not installed
 
+---
+
+## Common workflows
+
+Three paths that show how the pieces fit together.
+
+### Onboard a new machine
+
+Rebuild a full workstation from one file instead of a day of manual setup.
+
+```sh
+opsforge snapshot -o my-setup.yaml         # on your current machine: tools + shell + theme + guards → one YAML
+opsforge apply https://…/my-setup.yaml     # on the new one: review the plan, then rebuild everything
+opsforge shell install && exec zsh         # light up the DevOps shell
+```
+
+### Gate your CI on CVEs & secrets
+
+Turn the same binary you use interactively into a one-line security gate.
+
+```sh
+opsforge audit --json | tee cve-report.json   # non-zero exit on any HIGH/CRITICAL CVE — fails the job on its own
+opsforge audit --secrets --json               # also fails on a leaked credential
+```
+
+Drop-in workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
+
+### Enforce prod guards for a team
+
+Version your prod-safety policy and keep it honest in the pipeline.
+
+```sh
+opsforge guard init                                            # write a starter guards.yaml, then commit it
+opsforge guard lint                                            # validate it — non-zero exit on a bad rule
+opsforge guard test "terraform destroy" --context prod --json  # assert in CI that prod destroys are denied
+```
+
+---
+
+## Beyond the basics
+
 ### Stack profiles
 
 Install a whole stack in one command — or save your own:
@@ -132,19 +171,17 @@ opsforge apply <file-or-url>          # rebuild it on any machine
 opsforge apply --check <file-or-url>  # verify a machine against it, without changing a thing
 ```
 
-A snapshot now captures the **whole** managed workstation — installed tools,
-your custom profiles, the shell-environment state, the active **theme**, your
-**guard policy** (the raw `guards.yaml`), and the detected **version manager**.
-`apply` shows the full plan and asks before changing anything (`--yes` for
-scripts), restoring the theme and guard rules alongside the tools. Onboarding a
-new engineer becomes one command.
+A snapshot captures the **whole** managed workstation — installed tools, your
+custom profiles, the shell-environment state, the active **theme**, your **guard
+policy** (the raw `guards.yaml`), and the detected **version manager**. `apply`
+shows the full plan and asks before changing anything (`--yes` for scripts),
+restoring the theme and guard rules alongside the tools.
 
-**A verifiable team baseline.** `apply --check` reads the snapshot and compares
-this machine to it **without modifying anything**, exiting **non-zero on drift** —
-a missing tool, or a theme/guards/shell/version-manager that differs. With
-`--json` it emits a structured report — `{compliant, missing_tools, drift}` —
-so a CI job can assert that a developer's laptop or a base image still matches
-the team baseline:
+**A verifiable team baseline.** `apply --check` compares this machine to the
+snapshot **without modifying anything**, exiting **non-zero on drift** — a
+missing tool, or a theme/guards/shell/version-manager that differs. With `--json`
+it emits a structured report — `{compliant, missing_tools, drift}` — so a CI job
+can assert that a laptop or a base image still matches the team baseline:
 
 ```sh
 opsforge apply --check team-baseline.yaml            # fails the job on any drift
@@ -172,8 +209,8 @@ severity, with the fix version:
 ✓ helm           4.2.3 — no known vulnerabilities
 ```
 
-Matching is client-side against OSV's affected ranges, so a CVE fixed before
-your version (or only in a future major) isn't reported. `--secrets` scans shell
+Matching is client-side against OSV's affected ranges, so a CVE fixed before your
+version (or only in a future major) isn't reported. `--secrets` scans shell
 history, rc files and local `.env`s for AWS/GitHub/GitLab/Slack tokens, private
 keys, `--from-literal`, `docker login -p`… with values always masked.
 
@@ -244,19 +281,16 @@ reach your shell.
 <tr><td><code>opsforge shell sync</code></td><td>Refresh the shell modules <em>and</em> cached completions (run after upgrading opsforge)</td></tr>
 </table>
 
----
-
-## History
+### History
 
 Your shell history is full of the exact commands you need again — buried under
-everything else. `opsforge history` pulls out just one family of DevOps tools,
-so you can find last week's `kubectl port-forward` without scrolling.
+everything else. `opsforge history` pulls out just one family of DevOps tools, so
+you can find last week's `kubectl port-forward` without scrolling.
 
 ```sh
 opsforge history              # overview: every family, with how many recent commands each has
 opsforge history kube         # recent kubectl / helm / k9s / argocd… commands
 opsforge history tf           # terraform / tofu / terragrunt
-opsforge history terraform    # a single tool, by name
 opsforge history git -n 50    # more results (0 = no cap)
 opsforge history kube --json  # machine-readable
 ```
@@ -431,7 +465,7 @@ opsforge theme set dracula  # persist it — every command follows, no reload
 
 Themes: `forge` (default), `nord`, `dracula`, `gruvbox`, `light`, `mono`, `auto`.
 `auto` matches your terminal background; `mono` is color-free for logs/CI. The
-theme now drives **every command *and* the interactive picker** — one palette, no
+theme drives **every command *and* the interactive picker** — one palette, no
 stray default colors anywhere. Precedence: `$OPSFORGE_THEME` › saved (`theme
 set`) › auto.
 
