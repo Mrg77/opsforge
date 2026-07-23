@@ -88,6 +88,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge self [version|update]</code></td><td>Affiche la version ou se met à jour — checksum vérifié avant le remplacement (<code>--check</code> pour CI/cron)</td></tr>
 <tr><td><code>opsforge history [famille|outil]</code></td><td>Commandes shell récentes, groupées par famille d'outils (<code>kube</code>, <code>git</code>, <code>tf</code>… — voir <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Outils installés · catalogue complet · seulement les mises à jour (<code>--json</code> pour scripter)</td></tr>
+<tr><td><code>opsforge list &lt;terme&gt;</code></td><td>Rechercher dans tout le catalogue par nom, description ou catégorie (ex. <code>list dns</code>)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Profils de stack avec statut d'installation</td></tr>
 <tr><td><code>opsforge theme [set &lt;nom&gt;]</code></td><td>Lister/prévisualiser/persister les thèmes de couleurs</td></tr>
 <tr><td><code>opsforge doctor</code></td><td>Bilan de santé complet — système, shell, boîte à outils, <strong>CVE &amp; secrets exposés</strong> (<code>--json</code>)</td></tr>
