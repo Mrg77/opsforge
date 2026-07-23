@@ -138,6 +138,16 @@ func latestTag(repo string) (string, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
+		// The unauthenticated GitHub API allows only 60 requests/hour;
+		// installing several GitHub-backed tools can exhaust it mid-run.
+		// Turn the opaque 403 into an actionable message.
+		if resp.StatusCode == http.StatusForbidden &&
+			resp.Header.Get("X-RateLimit-Remaining") == "0" &&
+			os.Getenv("GITHUB_TOKEN") == "" {
+			return "", fmt.Errorf(
+				"github api rate limit reached for %s — set GITHUB_TOKEN "+
+					"(a token with no scopes is enough) to raise the limit", repo)
+		}
 		return "", fmt.Errorf("github api %s: %s", repo, resp.Status)
 	}
 	var rel ghRelease

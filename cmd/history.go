@@ -96,13 +96,14 @@ func historyOverview(path string) error {
 		Label string `json:"label"`
 		Count int    `json:"count"`
 	}
+	// One pass over the history file for all families (not one read each).
+	counts, err := history.CountByFamily(path, history.Families)
+	if err != nil {
+		return err
+	}
 	var rows []row
 	for _, f := range history.Families {
-		entries, err := history.Query(path, f.Bins, 0)
-		if err != nil {
-			return err
-		}
-		rows = append(rows, row{f.Key, f.Label, len(entries)})
+		rows = append(rows, row{f.Key, f.Label, counts[f.Key]})
 	}
 
 	if output.JSON {

@@ -84,3 +84,32 @@ func TestQueryLimit(t *testing.T) {
 		t.Fatalf("limit not applied: %d", len(got))
 	}
 }
+
+func TestCountByFamily(t *testing.T) {
+	p := writeHist(t, `kubectl get pods
+git status
+kubectl get pods
+helm list
+terraform plan
+git commit
+`)
+	fams := []Family{
+		{Key: "kube", Bins: []string{"kubectl", "helm"}},
+		{Key: "git", Bins: []string{"git"}},
+		{Key: "tf", Bins: []string{"terraform"}},
+	}
+	counts, err := CountByFamily(p, fams)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// kube: distinct {kubectl get pods, helm list} = 2 (dedup the repeat)
+	if counts["kube"] != 2 {
+		t.Errorf("kube = %d, want 2", counts["kube"])
+	}
+	if counts["git"] != 2 { // git status, git commit
+		t.Errorf("git = %d, want 2", counts["git"])
+	}
+	if counts["tf"] != 1 {
+		t.Errorf("tf = %d, want 1", counts["tf"])
+	}
+}

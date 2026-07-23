@@ -134,3 +134,48 @@ func Query(path string, bins []string, limit int) ([]Entry, error) {
 	}
 	return entries, nil
 }
+
+// CountByFamily reads the history file ONCE and returns the number of
+// distinct commands per family key. The overview used to call Query per
+// family, re-reading (and re-parsing) a possibly-large history file once
+// per family; this does a single pass with a bin→family index.
+func CountByFamily(path string, fams []Family) (map[string]int, error) {
+	binToFam := map[string]string{}
+	for _, f := range fams {
+		for _, b := range f.Bins {
+			binToFam[b] = f.Key
+		}
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	// distinct[famKey] holds the set of distinct command lines seen.
+	distinct := map[string]map[string]struct{}{}
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := strings.TrimSpace(zshExtended.ReplaceAllString(sc.Text(), ""))
+		if line == "" {
+			continue
+		}
+		fam, ok := binToFam[firstWord(line)]
+		if !ok {
+			continue
+		}
+		if distinct[fam] == nil {
+			distinct[fam] = map[string]struct{}{}
+		}
+		distinct[fam][line] = struct{}{}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
+	}
+	counts := make(map[string]int, len(fams))
+	for _, f := range fams {
+		counts[f.Key] = len(distinct[f.Key])
+	}
+	return counts, nil
+}
