@@ -43,8 +43,10 @@ checksum:
 #     checksums.txt
 signs:
   - cmd: cosign
-    # ${artifact} is checksums.txt; ${signature}/${certificate} expand to the
-    # standard checksums.txt.sig / checksums.txt.pem alongside it.
+    # ${artifact} is checksums.txt. `certificate:` makes GoReleaser track
+    # the .pem as a release artifact too (otherwise only the .sig is
+    # uploaded and `cosign verify-blob --certificate` can't be run).
+    certificate: "${artifact}.pem"
     args:
       - sign-blob
       - "--yes"
