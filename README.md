@@ -87,7 +87,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
-<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-enforceable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
+<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
@@ -144,9 +144,11 @@ opsforge audit --secrets --json               # also fails on a leaked credentia
 
 Drop-in workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
 
-### Enforce prod guards for a team
+### Share & validate a prod-guard policy
 
-Version your prod-safety policy and keep it honest in the pipeline.
+Version your team's prod-safety rules in one file and keep them honest in the
+pipeline. (opsforge can't force the guards onto anyone's shell — but it lets
+you commit the policy and prove it does what you think.)
 
 ```sh
 opsforge guard init                                            # write a starter guards.yaml, then commit it
@@ -384,7 +386,7 @@ opsforge guard lint                                    # validate guards.yaml �
 opsforge guard test "kubectl delete ns" --context prod --json  # {command, context, matched_rule, action, message}
 ```
 
-**Policy you can version and enforce in CI.** Because the rules live in one file,
+**Policy you can version and validate in CI.** Because the rules live in one file,
 a team can commit `guards.yaml` to a repo and keep it honest in the pipeline:
 
 - `opsforge guard lint` validates the active policy and **exits non-zero** when
@@ -395,8 +397,9 @@ a team can commit `guards.yaml` to a repo and keep it honest in the pipeline:
   **assert** that, say, `terraform destroy` is `deny`ed on prod — the same
   `Evaluate` call the shell uses, so the test can't diverge from real behavior.
 
-This is the moat, extended: the guards aren't just enforced on your machine,
-they're **testable and versionable** like the rest of your infrastructure.
+This is the moat, extended: the guards apply on your own shell, and the policy
+that drives them is **testable and versionable** like the rest of your
+infrastructure — not a per-machine snowflake.
 
 - **Context is read passively.** The context string is built from your kubeconfig
   `current-context`, `AWS_PROFILE`/`AWS_VAULT`, and the terraform workspace —

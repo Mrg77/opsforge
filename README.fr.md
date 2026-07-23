@@ -89,7 +89,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Installe tout un preset de stack en une commande</td></tr>
 <tr><td><code>opsforge upgrade [-u] [outil…]</code></td><td>Met à jour tout, seulement l'obsolète (<code>-u</code>), ou des outils nommés</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>Scan CVE des outils installés · scan de secrets exposés optionnel · <code>--json</code> + code de sortie non nul verrouille la CI</td></tr>
-<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent applicables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
+<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> reporte la dérive pour la CI · gate CVE optionnel (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
@@ -149,9 +149,12 @@ opsforge audit --secrets --json               # échoue aussi sur un identifiant
 
 Workflow prêt à l'emploi : [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
 
-### Imposer les guards prod à une équipe
+### Partager & valider une politique de guards prod
 
-Versionnez votre politique de sûreté prod et gardez-la honnête dans le pipeline.
+Versionnez les règles de sûreté prod de votre équipe dans un seul fichier et
+gardez-les honnêtes dans le pipeline. (opsforge ne peut pas *imposer* les guards
+sur le shell de qui que ce soit — mais il vous laisse committer la politique et
+prouver qu'elle fait ce que vous croyez.)
 
 ```sh
 opsforge guard init                                            # écrit un guards.yaml de départ, puis committez-le
@@ -405,7 +408,7 @@ opsforge guard lint                                    # valide guards.yaml — 
 opsforge guard test "kubectl delete ns" --context prod --json  # {command, context, matched_rule, action, message}
 ```
 
-**Une politique que vous pouvez versionner et imposer en CI.** Comme les règles
+**Une politique que vous pouvez versionner et valider en CI.** Comme les règles
 vivent dans un seul fichier, une équipe peut committer `guards.yaml` dans un dépôt
 et la garder honnête dans le pipeline :
 
@@ -419,9 +422,9 @@ et la garder honnête dans le pipeline :
   appel `Evaluate` que celui du shell, donc le test ne peut pas diverger du
   comportement réel.
 
-C'est le fossé défensif, prolongé : les guards ne sont pas seulement imposés sur
-votre machine, ils sont **testables et versionnables** comme le reste de votre
-infrastructure.
+C'est le fossé défensif, prolongé : les guards s'appliquent sur votre propre
+shell, et la politique qui les pilote est **testable et versionnable** comme le
+reste de votre infrastructure — pas un flocon de neige propre à chaque machine.
 
 - **Le contexte est lu passivement.** La chaîne de contexte est construite à
   partir du `current-context` de votre kubeconfig, de `AWS_PROFILE`/`AWS_VAULT`, et
