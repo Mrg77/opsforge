@@ -8,12 +8,20 @@ Pick your CLIs from an interactive terminal UI, install them in one go, and turn
 your zsh into a context-aware DevOps environment — live completion, a prod-aware
 prompt, and **policy-as-code guards** that stop you from nuking the wrong cluster.
 
+opsforge is the **supply-chain + policy layer for your workstation *and* your
+projects**: it installs your toolbox, guards how you use it, and hands you a
+CVE-correlated SBOM of the whole thing.
+
 **English** · [Français](README.fr.md)
 
 [![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<br>
+[![Tools](https://img.shields.io/badge/tools-287-blue)](#the-catalog)
+[![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--supply-chain)
+[![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
@@ -321,6 +329,12 @@ parsed **passively** — opsforge reads the file, never executes anything.
 
 ## Policy-as-code guards
 
+<div align="center">
+
+![opsforge guard test — a prod terraform destroy denied by policy](demo/screenshots/guard.png)
+
+</div>
+
 This is the part no other tool does. Homebrew Bundle, mise, chezmoi and aqua
 install your CLIs — none of them **guard how you use them**. opsforge turns the
 prod-safety layer of the shell into a small policy engine: a declarative set of
@@ -397,6 +411,12 @@ Disable everything for one session with `OPSFORGE_GUARDS=0`.
 
 ## Project mode
 
+<div align="center">
+
+![opsforge sync --check — a drift report for a project's opsforge.yaml](demo/screenshots/sync.png)
+
+</div>
+
 A workstation snapshot pins a whole *machine*. A **project** often needs less —
 just the toolchain *this repo* depends on. Commit an `opsforge.yaml` at its root
 and anyone reproduces it with one command — the reproducibility angle mise and
@@ -440,6 +460,12 @@ opsforge sync --check --json | jq '.compliant'   # fails the job on drift or a b
 ---
 
 ## SBOM & supply-chain
+
+<div align="center">
+
+![opsforge sbom --audit — a CycloneDX SBOM with an embedded CVE, piped through jq](demo/screenshots/sbom.png)
+
+</div>
 
 opsforge is the only tool manager that emits a **CVE-correlated SBOM of your
 workstation** — a supply-chain artifact consumable by grype, `trivy sbom`, or a
@@ -729,8 +755,10 @@ upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 
 ## Roadmap
 
-- [ ] bash & fish support for the shell layer
+- [ ] bash & fish support for the shell layer (currently zsh-only)
 - [ ] Native Windows (winget/scoop + PowerShell completions)
+- [ ] Provenance verification — cosign/sigstore signature checks on release assets
+- [ ] Proactive CVE notification when a new advisory hits an installed tool
 - [ ] More `github:` templates for full brew-less coverage
 
 ## License

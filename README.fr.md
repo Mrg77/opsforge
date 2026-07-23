@@ -9,12 +9,20 @@ seul coup, et transformez votre zsh en un environnement DevOps sensible au
 contexte — complétion en direct, prompt conscient de la prod, et des **guards
 policy-as-code** qui vous empêchent de démolir le mauvais cluster.
 
+opsforge est la **couche supply-chain + policy de votre poste de travail *et* de
+vos projets** : il installe votre boîte à outils, garde-fou la façon dont vous
+l'utilisez, et vous remet un SBOM corrélé aux CVE de l'ensemble.
+
 [English](README.md) · **Français**
 
 [![CI](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrg77/opsforge/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrg77/opsforge?sort=semver)](https://github.com/Mrg77/opsforge/releases/latest)
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+<br>
+[![Tools](https://img.shields.io/badge/tools-287-blue)](#le-catalogue)
+[![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--chaîne-dapprovisionnement)
+[![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
@@ -339,6 +347,12 @@ tout) et `--json` les émet pour les scripts. L'historique est analysé
 
 ## Guards policy-as-code
 
+<div align="center">
+
+![opsforge guard test — un terraform destroy prod refusé par la politique](demo/screenshots/guard.png)
+
+</div>
+
 C'est la partie qu'aucun autre outil ne fait. Homebrew Bundle, mise, chezmoi et
 aqua installent vos CLI — aucun d'eux ne **garde-fou la façon dont vous les
 utilisez**. opsforge transforme la couche de sûreté prod du shell en un petit
@@ -423,6 +437,12 @@ Désactivez tout pour une session avec `OPSFORGE_GUARDS=0`.
 
 ## Mode projet
 
+<div align="center">
+
+![opsforge sync --check — un rapport de dérive pour l'opsforge.yaml d'un projet](demo/screenshots/sync.png)
+
+</div>
+
 Un snapshot de poste de travail épingle toute une *machine*. Un **projet** a
 souvent besoin de moins — juste la boîte à outils dont *ce dépôt* dépend.
 Committez un `opsforge.yaml` à sa racine et n'importe qui le reproduit en une
@@ -468,6 +488,12 @@ opsforge sync --check --json | jq '.compliant'   # fait échouer le job en cas d
 ---
 
 ## SBOM & chaîne d'approvisionnement
+
+<div align="center">
+
+![opsforge sbom --audit — un SBOM CycloneDX avec une CVE embarquée, passé dans jq](demo/screenshots/sbom.png)
+
+</div>
 
 opsforge est le seul gestionnaire d'outils qui émet un **SBOM corrélé aux CVE de
 votre poste de travail** — un artefact supply-chain consommable par grype,
@@ -774,8 +800,10 @@ GoReleaser sur tag.
 
 ## Feuille de route
 
-- [ ] Support bash & fish pour la couche shell
+- [ ] Support bash & fish pour la couche shell (actuellement zsh uniquement)
 - [ ] Windows natif (winget/scoop + complétions PowerShell)
+- [ ] Vérification de provenance — contrôle des signatures cosign/sigstore sur les assets de release
+- [ ] Notification CVE proactive quand un nouvel advisory touche un outil installé
 - [ ] Plus de templates `github:` pour une couverture sans brew complète
 
 ## Licence

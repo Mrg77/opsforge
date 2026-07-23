@@ -85,9 +85,17 @@ Sleep 5s
 Type "clear" Enter
 Sleep 800ms
 
-# --- history: your recent commands, filtered by DevOps tool family -----
+# --- sbom: a CVE-correlated CycloneDX SBOM of your workstation ---------
+# the supply-chain differentiator — pipe it to jq to show it is real JSON
+Type "opsforge sbom --audit | jq '{components: (.components|length), vulns: (.vulnerabilities|length)}'"  Sleep 500ms  Enter
+Sleep 7s
+
+Type "clear" Enter
+Sleep 800ms
+
+# --- history: recent commands, filtered by DevOps tool family ----------
 Type "opsforge history kube"  Sleep 500ms  Enter
-Sleep 6s
+Sleep 5s
 
 Type "clear" Enter
 Sleep 800ms
