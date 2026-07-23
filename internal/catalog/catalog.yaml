@@ -23,6 +23,12 @@ profiles:
   - name: secrets
     description: Secrets and identity management
     tools: [sops, age, vault, step, mkcert, gitleaks]
+  - name: sysadmin
+    description: System administration and troubleshooting essentials
+    tools: [htop, glances, dust, duf, ncdu, procs, tmux, rsync, rclone, tcpdump, mtr]
+  - name: netsec
+    description: Network reconnaissance and security testing
+    tools: [nmap, masscan, nuclei, ffuf, gobuster, subfinder, httpx, dnsx, sslscan, semgrep]
 
 categories:
   - name: Kubernetes
@@ -142,6 +148,54 @@ categories:
         brew: k3d
         description: Run k3s (lightweight Kubernetes) in Docker
         completion_zsh: ["k3d", "completion", "zsh"]
+      - name: kyverno
+        bin: kyverno
+        brew: kyverno
+        description: Kubernetes policy management CLI
+      - name: vcluster
+        bin: vcluster
+        brew: vcluster
+        description: Create virtual Kubernetes clusters
+      - name: chart-testing
+        bin: ct
+        brew: chart-testing
+        description: Lint and test Helm charts
+      - name: helm-docs
+        bin: helm-docs
+        brew: helm-docs
+        description: Generate documentation for Helm charts
+      - name: kubie
+        bin: kubie
+        brew: kubie
+        description: Context and namespace switching with subshells
+      - name: kubecolor
+        bin: kubecolor
+        brew: kubecolor
+        description: Colorize kubectl output
+      - name: kdash
+        bin: kdash
+        brew: kdash
+        description: Fast terminal dashboard for Kubernetes
+      - name: kubetail
+        bin: kubetail
+        brew: kubetail
+        description: Tail logs from multiple pods at once
+      - name: kubectl-tree
+        bin: kubectl-tree
+        brew: kubectl-tree
+        description: Show ownership hierarchy of Kubernetes objects
+      - name: kor
+        bin: kor
+        brew: kor
+        description: Find unused resources in Kubernetes clusters
+      - name: kubeshark
+        bin: kubeshark
+        brew: kubeshark
+        description: API traffic viewer for Kubernetes
+      - name: ktop
+        bin: ktop
+        brew: ktop
+        description: top-like tool for Kubernetes clusters
 
   - name: Infrastructure as Code
     tools:
@@ -220,6 +274,50 @@ categories:
         brew: scw
         description: Scaleway CLI (French cloud provider)
         completion_zsh: ["scw", "autocomplete", "script", "shell=zsh"]
+      - name: s5cmd
+        bin: s5cmd
+        brew: s5cmd
+        description: Fast, parallel S3 and local filesystem command runner
+      - name: steampipe
+        bin: steampipe
+        brew: steampipe
+        description: Query cloud APIs and services with SQL
+      - name: aws-vault
+        bin: aws-vault
+        brew: aws-vault
+        description: Securely store and access AWS credentials
+      - name: saml2aws
+        bin: saml2aws
+        brew: saml2aws
+        description: Get AWS credentials via SAML SSO providers
+      - name: granted
+        bin: granted
+        brew: granted
+        description: Manage and switch between multiple cloud roles
+      - name: cloud-nuke
+        bin: cloud-nuke
+        brew: cloud-nuke
+        description: Delete all resources in an AWS account
+      - name: aws-nuke
+        bin: aws-nuke
+        brew: aws-nuke
+        description: Remove all resources from an AWS account
+      - name: terraformer
+        bin: terraformer
+        brew: terraformer
+        description: Generate Terraform from existing cloud infrastructure
+      - name: driftctl
+        bin: driftctl
+        brew: driftctl
+        description: Detect infrastructure drift against Terraform state
+      - name: aws-sam-cli
+        bin: sam
+        brew: aws-sam-cli
+        description: Build and test AWS serverless applications (SAM)
+      - name: cfn-lint
+        bin: cfn-lint
+        brew: cfn-lint
+        description: Validate AWS CloudFormation templates
 
   - name: Containers
     tools:
@@ -267,6 +365,30 @@ categories:
         bin: hadolint
         brew: hadolint
         description: Dockerfile linter
+      - name: buildkit
+        bin: buildctl
+        brew: buildkit
+        description: Concurrent, cache-efficient container image builder
+      - name: ko
+        bin: ko
+        brew: ko
+        description: Build and deploy Go container images without a Dockerfile
+      - name: earthly
+        bin: earthly
+        brew: earthly
+        description: Repeatable container-based builds
+      - name: apko
+        bin: apko
+        brew: apko
+        description: Build OCI images from apk packages declaratively
+      - name: melange
+        bin: melange
+        brew: melange
+        description: Build apk packages from declarative YAML
+      - name: umoci
+        bin: umoci
+        brew: umoci
+        description: Manipulate OCI container images
 
   - name: Git & CI/CD
     tools:
@@ -297,6 +419,18 @@ categories:
           repo: jesseduffield/lazygit
           asset: "lazygit_{version}_{os}_{arch}.tar.gz"
           arch_map: {amd64: x86_64, arm64: arm64}
+      - name: git-delta
+        bin: delta
+        brew: git-delta
+        description: Syntax-highlighting pager for git diffs
+      - name: gitui
+        bin: gitui
+        brew: gitui
+        description: Blazing fast terminal UI for git
+      - name: git-cliff
+        bin: git-cliff
+        brew: git-cliff
+        description: Generate changelogs from conventional commits
 
   - name: Observability & Monitoring
     tools:
@@ -364,6 +498,177 @@ categories:
         bin: nmap
         brew: nmap
         description: Network discovery and port scanning
+      - name: tcpdump
+        bin: tcpdump
+        brew: tcpdump
+        description: Command-line packet analyzer
+      - name: termshark
+        bin: termshark
+        brew: termshark
+        description: Terminal UI for tshark (Wireshark in the console)
+      - name: iperf3
+        bin: iperf3
+        brew: iperf3
+        description: Active network bandwidth measurement tool
+      - name: bandwhich
+        bin: bandwhich
+        brew: bandwhich
+        description: Terminal bandwidth utilization by process and connection
+      - name: gping
+        bin: gping
+        brew: gping
+        description: ping with a real-time graph
+      - name: trippy
+        bin: trip
+        brew: trippy
+        description: Network diagnostic combining traceroute and ping
+      - name: fping
+        bin: fping
+        brew: fping
+        description: Ping many hosts in parallel
+      - name: iftop
+        bin: iftop
+        brew: iftop
+        description: Display bandwidth usage on an interface
+      - name: nload
+        bin: nload
+        brew: nload
+        description: Real-time console network traffic monitor
+      - name: vnstat
+        bin: vnstat
+        brew: vnstat
+        description: Network traffic monitor keeping per-interface statistics
+      - name: whois
+        bin: whois
+        brew: whois
+        description: Look up domain and IP registration records
+      - name: speedtest-cli
+        bin: speedtest
+        brew: speedtest-cli
+        description: Test internet bandwidth from the command line
+      - name: socat
+        bin: socat
+        brew: socat
+        description: Multipurpose relay for bidirectional data transfer
+      - name: sshuttle
+        bin: sshuttle
+        brew: sshuttle
+        description: Transparent proxy / poor-man's VPN over SSH
+      - name: cloudflared
+        bin: cloudflared
+        brew: cloudflared
+        description: Cloudflare Tunnel client
+      - name: wireguard-tools
+        bin: wg
+        brew: wireguard-tools
+        description: WireGuard VPN configuration utilities
+      - name: masscan
+        bin: masscan
+        brew: masscan
+        description: Mass IP port scanner
+      - name: httpstat
+        bin: httpstat
+        brew: httpstat
+        description: Visualize curl statistics with a timeline breakdown
+      - name: oha
+        bin: oha
+        brew: oha
+        description: HTTP load generator with a live TUI
+      - name: xh
+        bin: xh
+        brew: xh
+        description: Fast HTTPie-like HTTP client written in Rust
+
+  - name: System & SysAdmin
+    tools:
+      - name: htop
+        bin: htop
+        brew: htop
+        description: Interactive process viewer
+      - name: glances
+        bin: glances
+        brew: glances
+        description: Cross-platform system monitoring tool
+      - name: bottom
+        bin: btm
+        brew: bottom
+        description: Graphical process and system monitor
+      - name: procs
+        bin: procs
+        brew: procs
+        description: Modern replacement for ps
+      - name: hyperfine
+        bin: hyperfine
+        brew: hyperfine
+        description: Command-line benchmarking tool
+      - name: dust
+        bin: dust
+        brew: dust
+        description: More intuitive version of du
+      - name: duf
+        bin: duf
+        brew: duf
+        description: Disk usage / free utility with a better UI
+      - name: ncdu
+        bin: ncdu
+        brew: ncdu
+        description: NCurses disk usage analyzer
+      - name: gdu
+        bin: gdu
+        brew: gdu
+        description: Fast disk usage analyzer with a console UI
+      - name: tree
+        bin: tree
+        brew: tree
+        description: Display directories as a tree
+      - name: pv
+        bin: pv
+        brew: pv
+        description: Monitor the progress of data through a pipe
+      - name: tmux
+        bin: tmux
+        brew: tmux
+        description: Terminal multiplexer
+      - name: zellij
+        bin: zellij
+        brew: zellij
+        description: Terminal workspace and multiplexer
+      - name: rsync
+        bin: rsync
+        brew: rsync
+        description: Fast incremental file transfer
+      - name: rclone
+        bin: rclone
+        brew: rclone
+        description: Sync files to and from cloud storage
+      - name: croc
+        bin: croc
+        brew: croc
+        description: Securely transfer files between computers
+      - name: mosh
+        bin: mosh
+        brew: mosh
+        description: Mobile shell with roaming and intermittent connectivity
+      - name: sd
+        bin: sd
+        brew: sd
+        description: Intuitive find-and-replace CLI (sed alternative)
+      - name: choose-rust
+        bin: choose
+        brew: choose-rust
+        description: Human-friendly alternative to cut and awk
+      - name: watchexec
+        bin: watchexec
+        brew: watchexec
+        description: Run commands when files change
+      - name: entr
+        bin: entr
+        brew: entr
+        description: Run arbitrary commands when files change
+      - name: miller
+        bin: mlr
+        brew: miller
+        description: Like awk/sed/cut/join for CSV, TSV and JSON
 
   - name: Databases
     tools:
@@ -379,6 +684,74 @@ categories:
         bin: usql
         brew: xo/xo/usql
         description: Universal SQL client (one CLI, every database)
+      - name: litecli
+        bin: litecli
+        brew: litecli
+        description: SQLite client with autocompletion and syntax highlighting
+      - name: mongosh
+        bin: mongosh
+        brew: mongosh
+        description: MongoDB shell
+      - name: redli
+        bin: redli
+        brew: redli
+        description: Humane alternative to the redis-cli (TLS support)
+      - name: iredis
+        bin: iredis
+        brew: iredis
+        description: Redis client with autocompletion and syntax highlighting
+      - name: pgweb
+        bin: pgweb
+        brew: pgweb
+        description: Web-based PostgreSQL database browser
+      - name: harlequin
+        bin: harlequin
+        brew: harlequin
+        description: Terminal SQL IDE
+      - name: sqlite-utils
+        bin: sqlite-utils
+        brew: sqlite-utils
+        description: CLI and library for manipulating SQLite databases
+      - name: dbmate
+        bin: dbmate
+        brew: dbmate
+        description: Lightweight database migration tool
+      - name: golang-migrate
+        bin: migrate
+        brew: golang-migrate
+        description: Database migrations CLI (many databases)
+      - name: goose
+        bin: goose
+        brew: goose
+        description: Database migration tool (Go, embeddable)
+      - name: atlas
+        bin: atlas
+        brew: atlas
+        description: Manage database schemas as code
+      - name: pspg
+        bin: pspg
+        brew: pspg
+        description: Table pager for PostgreSQL and other SQL clients
+      - name: sqlfluff
+        bin: sqlfluff
+        brew: sqlfluff
+        description: SQL linter and formatter
+      - name: octosql
+        bin: octosql
+        brew: octosql
+        description: Query files and databases with SQL joins
+      - name: dsq
+        bin: dsq
+        brew: dsq
+        description: Run SQL queries against JSON, CSV, Parquet and more
+      - name: visidata
+        bin: vd
+        brew: visidata
+        description: Terminal spreadsheet for exploring tabular data
+      - name: csvkit
+        bin: csvlook
+        brew: csvkit
+        description: Suite of command-line tools for working with CSV
 
   - name: Security & Compliance
     tools:
@@ -434,6 +807,142 @@ categories:
         bin: kubent
         brew: kubent
         description: Detect deprecated Kubernetes APIs (kube-no-trouble)
+      - name: nuclei
+        bin: nuclei
+        brew: nuclei
+        description: Template-based vulnerability scanner
+      - name: ffuf
+        bin: ffuf
+        brew: ffuf
+        description: Fast web fuzzer
+      - name: gobuster
+        bin: gobuster
+        brew: gobuster
+        description: Directory, DNS and vhost brute-forcer
+      - name: subfinder
+        bin: subfinder
+        brew: subfinder
+        description: Passive subdomain discovery tool
+      - name: httpx
+        bin: httpx
+        brew: httpx
+        description: Fast and multi-purpose HTTP probing toolkit
+      - name: amass
+        bin: amass
+        brew: amass
+        description: In-depth attack surface mapping and asset discovery
+      - name: naabu
+        bin: naabu
+        brew: naabu
+        description: Fast port scanner
+      - name: dnsx
+        bin: dnsx
+        brew: dnsx
+        description: Fast and multi-purpose DNS toolkit
+      - name: katana
+        bin: katana
+        brew: katana
+        description: Next-generation crawling and spidering framework
+      - name: feroxbuster
+        bin: feroxbuster
+        brew: feroxbuster
+        description: Fast content discovery / forced browsing tool
+      - name: gau
+        bin: gau
+        brew: gau
+        description: Fetch known URLs from Wayback, OTX and Common Crawl
+      - name: sqlmap
+        bin: sqlmap
+        brew: sqlmap
+        description: Automatic SQL injection and takeover tool
+      - name: nikto
+        bin: nikto
+        brew: nikto
+        description: Web server vulnerability scanner
+      - name: hashcat
+        bin: hashcat
+        brew: hashcat
+        description: Advanced password recovery / hash cracking
+      - name: john
+        bin: john
+        brew: john
+        description: John the Ripper password cracker
+      - name: dnstwist
+        bin: dnstwist
+        brew: dnstwist
+        description: Detect typosquatting and phishing domains
+      - name: theharvester
+        bin: theHarvester
+        brew: theharvester
+        description: OSINT gathering of emails, subdomains and hosts
+      - name: semgrep
+        bin: semgrep
+        brew: semgrep
+        description: Fast static analysis for finding bugs and security issues
+      - name: trufflehog
+        bin: trufflehog
+        brew: trufflehog
+        description: Find leaked credentials across repos and files
+      - name: osv-scanner
+        bin: osv-scanner
+        brew: osv-scanner
+        description: Vulnerability scanner using the OSV database
+      - name: dependency-check
+        bin: dependency-check
+        brew: dependency-check
+        description: OWASP software composition analysis tool
+      - name: testssl
+        bin: testssl.sh
+        brew: testssl
+        description: Test TLS/SSL configuration of a server
+      - name: sslscan
+        bin: sslscan
+        brew: sslscan
+        description: Query SSL/TLS services and enumerate ciphers
+      - name: git-crypt
+        bin: git-crypt
+        brew: git-crypt
+        description: Transparent file encryption in git
+      - name: opa
+        bin: opa
+        brew: opa
+        description: Open Policy Agent policy engine
+      - name: conftest
+        bin: conftest
+        brew: conftest
+        description: Test configuration files against Rego policies
+      - name: checkov
+        bin: checkov
+        brew: checkov
+        description: Static analysis for IaC (Terraform, Kubernetes, etc.)
+      - name: tfsec
+        bin: tfsec
+        brew: tfsec
+        description: Security scanner for Terraform code
+      - name: terrascan
+        bin: terrascan
+        brew: terrascan
+        description: Detect compliance and security violations in IaC
+      - name: kics
+        bin: kics
+        brew: kics
+        description: Find security vulnerabilities in IaC (Keep IaC Secure)
+      - name: kubescape
+        bin: kubescape
+        brew: kubescape
+        description: Kubernetes security posture scanner
+      - name: kube-bench
+        bin: kube-bench
+        brew: kube-bench
+        description: Check Kubernetes against the CIS benchmark
+      - name: kube-linter
+        bin: kube-linter
+        brew: kube-linter
+        description: Lint Kubernetes manifests for security and correctness
+      - name: kube-score
+        bin: kube-score
+        brew: kube-score
+        description: Static code analysis of Kubernetes object definitions
 
   - name: Secrets & Identity
     tools:
@@ -608,3 +1117,75 @@ categories:
         bin: duckdb
         brew: duckdb
         description: In-process analytical SQL database
+      - name: fx
+        bin: fx
+        brew: fx
+        description: Terminal JSON viewer and processor
+      - name: dasel
+        bin: dasel
+        brew: dasel
+        description: Query and modify JSON, YAML, TOML, XML and CSV
+      - name: gojq
+        bin: gojq
+        brew: gojq
+        description: Pure Go implementation of jq
+      - name: yj
+        bin: yj
+        brew: yj
+        description: Convert between YAML, TOML, JSON and HCL
+      - name: jc
+        bin: jc
+        brew: jc
+        description: Convert command output and files to JSON
+      - name: hexyl
+        bin: hexyl
+        brew: hexyl
+        description: Command-line hex viewer
+      - name: htmlq
+        bin: htmlq
+        brew: htmlq
+        description: Extract content from HTML with CSS selectors
+      - name: shfmt
+        bin: shfmt
+        brew: shfmt
+        description: Shell script formatter
+      - name: yamlfmt
+        bin: yamlfmt
+        brew: yamlfmt
+        description: Formatter for YAML files
+      - name: yamllint
+        bin: yamllint
+        brew: yamllint
+        description: Linter for YAML files
+      - name: taplo
+        bin: taplo
+        brew: taplo
+        description: TOML toolkit (formatter, linter, language server)
+      - name: evans
+        bin: evans
+        brew: evans
+        description: Expressive universal gRPC client
+      - name: grpcui
+        bin: grpcui
+        brew: grpcui
+        description: Interactive web UI for gRPC services
+      - name: restish
+        bin: restish
+        brew: restish
+        description: CLI for interacting with REST APIs
+      - name: posting
+        bin: posting
+        brew: posting
+        description: Terminal UI HTTP/API client
+      - name: spectral-cli
+        bin: spectral
+        brew: spectral-cli
+        description: Lint and validate OpenAPI and AsyncAPI specs
+      - name: fblog
+        bin: fblog
+        brew: fblog
+        description: Small command-line JSON log viewer
+      - name: jd
+        bin: jd
+        brew: jd
+        description: JSON diff and patch tool
