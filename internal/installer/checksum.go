@@ -30,6 +30,16 @@ const (
 	// ChecksumMismatch — a checksum WAS published and did NOT match. The
 	// asset must never be installed. Always paired with a non-nil error.
 	ChecksumMismatch
+	// ChecksumSigned — the strongest state: the published checksum was found
+	// AND matched, AND the checksums file itself carries a cosign keyless
+	// signature that verified against the expected OIDC identity. This is a
+	// strict refinement of ChecksumVerified — the asset is not just intact but
+	// provably built by the trusted release workflow. Only reached when cosign
+	// is installed locally, a signature (+certificate) was published, and it
+	// verified; otherwise verification degrades to ChecksumVerified (see
+	// verifyProvenance). A signature that IS present but FAILS to verify is a
+	// hard failure surfaced as ChecksumMismatch, never as ChecksumSigned.
+	ChecksumSigned
 )
 
 // verifyChecksum verifies the SHA-256 of the downloaded asset against a
@@ -177,6 +187,25 @@ func fetchText(url string) (string, bool) {
 		return "", false
 	}
 	return string(b), true
+}
+
+// fetchBytes GETs a URL and returns its raw body, or ok=false on any non-200
+// (a missing signature/certificate is expected, not an error). Mirrors
+// fetchText but preserves bytes, which cosign artifacts (.sig/.pem) need.
+func fetchBytes(url string) ([]byte, bool) {
+	resp, err := httpClient.Get(url)
+	if err != nil {
+		return nil, false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, false
+	}
+	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20)) // 1 MiB cap
+	if err != nil {
+		return nil, false
+	}
+	return b, true
 }
 
 func repoName(gh *catalog.GitHubRelease) string {

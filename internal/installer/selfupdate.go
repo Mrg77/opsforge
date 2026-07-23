@@ -108,50 +108,79 @@ func CheckForSelfUpdate(current string) (SelfUpdateCheck, error) {
 	return NewerAvailable(current, latest), nil
 }
 
+// SelfUpdateDownload is the staged result of DownloadSelfUpdate: the path to
+// the verified-but-not-yet-installed binary, the temp dir the caller must
+// clean up, a non-fatal warning, and whether the checksums file's cosign
+// keyless signature verified (opsforge signs its own releases).
+type SelfUpdateDownload struct {
+	BinPath string
+	TmpDir  string
+	Warning string
+	// Signed is true when the published checksums.txt carried a cosign keyless
+	// signature that verified against opsforge's release-workflow identity —
+	// i.e. verifyChecksumProvenance returned ChecksumSigned. False means the
+	// checksum still matched (best-effort: cosign absent or no signature
+	// published), never that a signature failed (that path returns an error).
+	Signed bool
+}
+
 // DownloadSelfUpdate downloads, checksum-verifies and extracts the opsforge
 // binary for `tag` and the running platform into a temporary directory,
-// returning the path to the verified binary and a warning (non-fatal) when
-// the release published no checksum.
+// returning the staged binary path and provenance details.
 //
 // It performs NO in-place replacement — that is ApplySelfUpdate's job — so a
 // caller can stage the download and only swap the running binary once the
-// checksum has passed. A checksum MISMATCH (tampered asset) returns an error
-// and the staged file is discarded by the caller via os.RemoveAll(tmpDir).
-func DownloadSelfUpdate(tag string) (binPath, tmpDir, warning string, err error) {
+// checksum (and, when available, the signature) has passed. A checksum
+// MISMATCH or a published-but-invalid signature (tampered asset) returns an
+// error and the staged file is discarded by the caller via os.RemoveAll.
+//
+// Because opsforge signs its own checksums.txt (cosign keyless, see
+// .goreleaser.yaml), the self-update path verifies that signature when cosign
+// is installed locally, upgrading integrity to full provenance.
+func DownloadSelfUpdate(tag string) (SelfUpdateDownload, error) {
 	gh := selfRelease()
 	asset := resolveAssetFor(gh, tag, runtime.GOOS, runtime.GOARCH)
 	url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", gh.Repo, tag, asset)
 
-	tmpDir, err = os.MkdirTemp("", "opsforge-selfupdate-*")
+	tmpDir, err := os.MkdirTemp("", "opsforge-selfupdate-*")
 	if err != nil {
-		return "", "", "", err
+		return SelfUpdateDownload{}, err
 	}
 
 	archivePath := filepath.Join(tmpDir, asset)
-	if err = download(url, archivePath); err != nil {
+	if err := download(url, archivePath); err != nil {
 		os.RemoveAll(tmpDir)
-		return "", "", "", fmt.Errorf("downloading %s: %w", url, err)
+		return SelfUpdateDownload{}, fmt.Errorf("downloading %s: %w", url, err)
 	}
 
 	// Supply-chain gate: verify the SHA-256 against the published
-	// checksums.txt BEFORE the binary is ever extracted or run. A mismatch
-	// (or an I/O failure that leaves integrity unknown) aborts; a release
-	// with no checksum installs with a warning.
-	status, verr := verifyChecksum(gh, gh.Repo, tag, asset, archivePath)
+	// checksums.txt BEFORE the binary is ever extracted or run, and — since we
+	// sign our own releases — verify the cosign keyless signature over that
+	// checksums file too. A mismatch, a bad signature, or an I/O failure that
+	// leaves integrity unknown aborts; a release with no checksum installs with
+	// a warning; a matched checksum with no verifiable signature stays a
+	// (silent) success.
+	res := SelfUpdateDownload{TmpDir: tmpDir}
+	status, verr := verifyChecksumProvenance(
+		gh, gh.Repo, tag, asset, archivePath,
+		"checksums.txt", selfCertIdentityRegexp, oidcIssuerGitHubActions)
 	switch {
 	case status == ChecksumMismatch, verr != nil:
 		os.RemoveAll(tmpDir)
-		return "", "", "", verr
+		return SelfUpdateDownload{}, verr
 	case status == ChecksumUnavailable:
-		warning = "no published checksum for this release — integrity not verified"
+		res.Warning = "no published checksum for this release — integrity not verified"
+	case status == ChecksumSigned:
+		res.Signed = true
 	}
 
 	src, err := extractBinary(archivePath, tmpDir, "opsforge", "")
 	if err != nil {
 		os.RemoveAll(tmpDir)
-		return "", "", "", fmt.Errorf("extracting opsforge: %w", err)
+		return SelfUpdateDownload{}, fmt.Errorf("extracting opsforge: %w", err)
 	}
-	return src, tmpDir, warning, nil
+	res.BinPath = src
+	return res, nil
 }
 
 // ApplySelfUpdate atomically replaces the executable at dest with the

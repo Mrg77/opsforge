@@ -113,19 +113,23 @@ func runSelfUpdate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("locating the running binary: %w", err)
 	}
 
-	src, tmpDir, warning, err := installer.DownloadSelfUpdate(check.Latest)
+	dl, err := installer.DownloadSelfUpdate(check.Latest)
 	if err != nil {
-		// A checksum mismatch surfaces here as a hard error — the tampered
-		// asset is never installed.
+		// A checksum mismatch or an invalid signature surfaces here as a hard
+		// error — the tampered asset is never installed.
 		return err
 	}
-	defer os.RemoveAll(tmpDir)
+	defer os.RemoveAll(dl.TmpDir)
 
-	if warning != "" {
-		fmt.Printf("  %s %s\n", ui.WarnMark(), ui.Warn.Render(warning))
+	if dl.Warning != "" {
+		fmt.Printf("  %s %s\n", ui.WarnMark(), ui.Warn.Render(dl.Warning))
+	}
+	if dl.Signed {
+		fmt.Printf("  %s %s\n", ui.OKMark(),
+			ui.Dim.Render("signature verified (cosign, keyless)"))
 	}
 
-	if err := installer.ApplySelfUpdate(src, self); err != nil {
+	if err := installer.ApplySelfUpdate(dl.BinPath, self); err != nil {
 		return fmt.Errorf("replacing %s: %w", self, err)
 	}
 

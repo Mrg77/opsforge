@@ -5,7 +5,9 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: write # create the GitHub release and upload assets
+  id-token: write # OIDC token for cosign keyless signing (Fulcio) + attestations
+  attestations: write # actions/attest-build-provenance records the SLSA attestation
 
 jobs:
   goreleaser:
@@ -17,10 +19,25 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
+      # cosign performs the keyless signature of checksums.txt (see .goreleaser
+      # yaml `signs`). It needs no key material: the `id-token: write` permission
+      # above lets it exchange the runner's OIDC token for a short-lived Fulcio
+      # certificate. cosign v2 no longer requires COSIGN_EXPERIMENTAL for this.
+      - uses: sigstore/cosign-installer@v3
       - uses: goreleaser/goreleaser-action@v7
+        id: goreleaser
         with:
           distribution: goreleaser
           version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Native GitHub SLSA provenance attestation over the built archives, in
+      # addition to the cosign signature. This is best-effort hardening: if it
+      # ever fails it must not fail an otherwise-good release, and the cosign
+      # signature already provides verifiable provenance on its own.
+      - name: Attest build provenance
+        continue-on-error: true
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: "dist/*.tar.gz"

@@ -20,6 +20,40 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# Keyless supply-chain signing (Sigstore/cosign).
+#
+# We sign only checksums.txt: it already carries the SHA-256 of every archive,
+# so a verified signature over it transitively vouches for all release assets.
+# The signature is KEYLESS — cosign fetches a short-lived certificate from
+# Fulcio bound to the workflow's GitHub OIDC identity, so there is no long-lived
+# private key to store or leak. cosign v2 no longer needs COSIGN_EXPERIMENTAL
+# for keyless sign-blob; the OIDC token is provided by the runner (see the
+# `id-token: write` permission and cosign-installer step in release.yml).
+#
+# Outputs published next to checksums.txt on the GitHub release:
+#   checksums.txt.sig   — the detached signature
+#   checksums.txt.pem   — the Fulcio certificate (carries the signing identity)
+#
+# Verify (see README "Provenance / signature verification"):
+#   cosign verify-blob \
+#     --certificate checksums.txt.pem \
+#     --signature   checksums.txt.sig \
+#     --certificate-identity-regexp '^https://github.com/Mrg77/opsforge/\.github/workflows/release\.yml@.*' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     checksums.txt
+signs:
+  - cmd: cosign
+    # ${artifact} is checksums.txt; ${signature}/${certificate} expand to the
+    # standard checksums.txt.sig / checksums.txt.pem alongside it.
+    args:
+      - sign-blob
+      - "--yes"
+      - "--output-signature=${signature}"
+      - "--output-certificate=${certificate}"
+      - "${artifact}"
+    artifacts: checksum
+    output: true
+
 changelog:
   sort: asc
   filters:
