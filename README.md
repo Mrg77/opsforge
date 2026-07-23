@@ -97,6 +97,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against your snapshot without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
 <tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
+<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Ask your AI CLI to explain a command or your last failure (the shell <code>??</code> shortcut)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge list &lt;term&gt;</code></td><td>Search the whole catalog by name, description or category (e.g. <code>list dns</code>)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
@@ -270,11 +271,13 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
 - **`?` help** — press `?` on an empty line for a themed cheat-sheet; type
   `kubectl get ?` for that command's help, rendered under a framed header with
   `bat`-colored man syntax; type `??` to have an AI explain your last failure.
-- **Context prompt** — kube `cluster:namespace` (**red on a prod-looking
-  context**), cloud account, terraform workspace — each shown only when relevant.
-  Plus a clean left prompt: repo-relative dir, git branch with
-  dirty/ahead/behind markers, last-command duration, and a `❯` that reddens on
-  failure. Reads only local git — never a cloud or cluster.
+- **Context prompt** — the right prompt shows the kube `cluster:namespace` and
+  turns **red the moment the context looks like prod** — a passive *visual* alarm
+  you see **before you even start typing**, alongside the cloud account and
+  terraform workspace (each shown only when relevant). Plus a clean left prompt:
+  repo-relative dir, git branch with dirty/ahead/behind markers, last-command
+  duration, and a `❯` that reddens on failure. Everything is read locally — never
+  a cloud or cluster contacted.
 - **Policy-as-code guards** — before a destructive command (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) on a production context, opsforge can
   confirm, warn, or block — driven by [declarative rules](#policy-as-code-guards),
@@ -292,6 +295,12 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   network. Run [`opsforge notify`](#the-notify-digest) for the full breakdown;
   silence the heads-up with `OPSFORGE_NOTIFY=0`.
 - **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
+
+**Three layers, three jobs:** the **prompt** is a *passive* alarm — it reddens so
+you **see** you're on prod; the [**guards**](#policy-as-code-guards) are an
+*active* barrier — they **stop** a destructive command; the
+[**notify** heads-up](#the-notify-digest) is *proactive* watch — it **tells** you
+when a CVE, update or leak lands on your machine.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
 reach your shell.
@@ -353,6 +362,27 @@ prod-safety layer of the shell into a small policy engine: a declarative set of
 rules that decides whether a destructive command should run, warn, confirm, or be
 refused — based on the context you're actually in.
 
+### The one rule to understand
+
+A guard fires only when **two things line up at once**: a **destructive command**
+*and* a **production marker**. Miss either one and the command runs untouched —
+so read-only commands never nag you, and destructive commands on staging or dev
+stay out of your way. It's a safety net for the distracted gesture, not a wall in
+front of every command.
+
+| Command | Context | Decision | Why |
+|:--|:--|:--:|:--|
+| `kubectl delete pod api` | `prod-eks` | ⚠️ confirm | destructive + prod |
+| `kubectl get pods` | `prod-eks` | ✓ allow | prod, but read-only |
+| `kubectl delete pod api` | `staging` | ✓ allow | destructive, but not prod |
+| `terraform destroy -var-file=prod.tfvars` | *(none)* | ⚠️ confirm | prod is in the command itself |
+| `terraform destroy -var-file=dev.tfvars` | *(none)* | ✓ allow | dev, not prod |
+| `terraform plan -var-file=prod.tfvars` | *(none)* | ✓ allow | plan is read-only |
+| `helm uninstall app` | `prod` | ⚠️ confirm | destructive + prod |
+| `ls` · `git status` · `cat` | `prod` | ✓ allow | nothing destructive |
+
+Simulate any of these yourself with `opsforge guard test "<cmd>" --context <ctx>`.
+
 Rules live in a single file, `~/.config/opsforge/guards.yaml`. Each rule matches a
 **command** regex and a **context** regex, and picks an action:
 
@@ -406,13 +436,51 @@ This is the moat, extended: the guards apply on your own shell, and the policy
 that drives them is **testable and versionable** like the rest of your setup —
 not a per-machine snowflake.
 
-- **Context is read passively.** The context string is built from your kubeconfig
-  `current-context`, `AWS_PROFILE`/`AWS_VAULT`, and the terraform workspace —
-  opsforge **never runs `kubectl` or `gcloud`** to figure out where you are, so
-  evaluating a rule can't trigger an OIDC browser login or hang on a wrapper CLI.
-- **Zero-config by default.** With no `guards.yaml`, a built-in policy reproduces
-  the old prod-confirm behavior exactly — upgrading changes nothing until you opt
-  into custom rules.
+### How opsforge knows you're on prod
+
+The "context" a rule matches against comes from **two places**, and opsforge is
+deliberately honest about the trade-offs of each:
+
+- **Read passively from your environment** — never running a single command.
+  opsforge scrapes the kubeconfig `current-context`, `AWS_PROFILE`/`AWS_VAULT`
+  (or `CLOUDSDK_ACTIVE_CONFIG_NAME`), and the terraform workspace
+  (`.terraform/environment`). It **never runs `kubectl` or `gcloud`** to figure
+  out where you are, so evaluating a rule can't trigger an OIDC browser login or
+  hang on a wrapper CLI.
+- **Read from the command itself** — because in 2026 teams target prod far more
+  often with `-var-file=prod.tfvars` or an `environments/prod/` directory than
+  with a terraform *workspace*. The default policy therefore also matches those
+  markers **in the command line** for `terraform`/`tofu`/`terragrunt`, so
+  `terraform destroy -var-file=prod.tfvars` confirms even with no workspace set.
+  `terraform plan …` stays allowed — it's read-only.
+
+> **Be clear-eyed about what this is.** Guards are a **safety net against the
+> distracted gesture** — they catch you when you switch env without noticing,
+> not a determined mistake. They are **not** a security boundary. Real prod
+> protection stays where it belongs: `prevent_destroy`, separate cloud accounts,
+> and CI approvals. opsforge **complements** that layer, it doesn't replace it.
+
+### What you see when a guard fires
+
+On a `confirm`, the command is held at the prompt until you type `yes`:
+
+```text
+⚠  opsforge guard
+   This changes PRODUCTION Kubernetes resources.
+   kubectl delete pod api -n payments
+   (to skip guards this session: OPSFORGE_GUARDS=0)
+Type 'yes' to run this: ▏
+```
+
+A `deny` prints a red **✗ Blocked by opsforge guard** and clears the line; a
+`warn` prints its message and runs anyway.
+
+### Everything is configurable in one file
+
+- **Zero-config by default.** With no `guards.yaml`, the built-in policy above
+  reproduces the old prod-confirm behavior exactly — upgrading changes nothing
+  until you opt into custom rules. Start customizing with `opsforge guard init`,
+  which drops a fully commented `guards.yaml` you can edit.
 - **Fast on the hot path.** The shell pre-filters cheaply and only calls the
   engine (`opsforge guard check`, used internally) on commands that look
   destructive, so your prompt stays instant.

@@ -100,6 +100,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à votre snapshot sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Affiche la version ou se met à jour — checksum vérifié avant le remplacement (<code>--check</code> pour CI/cron)</td></tr>
 <tr><td><code>opsforge history [famille|outil]</code></td><td>Commandes shell récentes, groupées par famille d'outils (<code>kube</code>, <code>git</code>, <code>tf</code>… — voir <a href="#history">History</a>)</td></tr>
+<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Demande à votre CLI IA d'expliquer une commande ou votre dernière erreur (le raccourci <code>??</code> du shell)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Outils installés · catalogue complet · seulement les mises à jour (<code>--json</code> pour scripter)</td></tr>
 <tr><td><code>opsforge list &lt;terme&gt;</code></td><td>Rechercher dans tout le catalogue par nom, description ou catégorie (ex. <code>list dns</code>)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Profils de stack avec statut d'installation</td></tr>
@@ -284,12 +285,14 @@ sous `~/.config/opsforge/shell/`, `shell uninstall` restaure tout) :
   tapez `kubectl get ?` pour l'aide de cette commande, rendue sous un en-tête
   encadré avec la syntaxe man colorée par `bat` ; tapez `??` pour qu'une IA
   explique votre dernière erreur.
-- **Prompt de contexte** — kube `cluster:namespace` (**rouge sur un contexte qui
-  ressemble à de la prod**), compte cloud, workspace terraform — chacun affiché
-  seulement quand pertinent. Plus un prompt gauche épuré : répertoire relatif au
-  dépôt, branche git avec marqueurs dirty/ahead/behind, durée de la dernière
-  commande, et un `❯` qui rougit en cas d'échec. Ne lit que le git local — jamais
-  un cloud ou un cluster.
+- **Prompt de contexte** — le prompt de droite affiche le kube `cluster:namespace`
+  et devient **rouge dès que le contexte ressemble à de la prod** — une alarme
+  *visuelle* passive que vous voyez **avant même de commencer à taper**, aux côtés
+  du compte cloud et du workspace terraform (chacun affiché seulement quand
+  pertinent). Plus un prompt gauche épuré : répertoire relatif au dépôt, branche
+  git avec marqueurs dirty/ahead/behind, durée de la dernière commande, et un `❯`
+  qui rougit en cas d'échec. Tout est lu localement — jamais un cloud ou un
+  cluster contacté.
 - **Guards policy-as-code** — avant une commande destructrice (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) sur un contexte de production, opsforge
   peut confirmer, avertir ou bloquer — piloté par des [règles
@@ -309,6 +312,13 @@ sous `~/.config/opsforge/shell/`, `shell uninstall` restaure tout) :
   [`opsforge notify`](#le-digest-notify) pour le détail complet ; coupez le
   heads-up avec `OPSFORGE_NOTIFY=0`.
 - **Intégrations** — `fzf`, `zoxide`, `atuin` câblés quand présents.
+
+**Trois couches, trois rôles :** le **prompt** est une alarme *passive* — il
+rougit pour que vous **voyiez** que vous êtes en prod ; les
+[**guards**](#guards-policy-as-code) sont une barrière *active* — ils
+**arrêtent** une commande destructrice ; le
+[heads-up **notify**](#le-digest-notify) est une veille *proactive* — il vous
+**informe** quand une CVE, une mise à jour ou une fuite tombe sur votre machine.
 
 Chaque module est validé avec `zsh -n` en CI, donc un script cassé ne peut jamais
 atteindre votre shell.
@@ -374,6 +384,28 @@ moteur de politique : un ensemble déclaratif de règles qui décide si une comm
 destructrice doit s'exécuter, avertir, confirmer ou être refusée — en fonction du
 contexte dans lequel vous êtes vraiment.
 
+### La seule règle à comprendre
+
+Un guard ne se déclenche que quand **deux choses sont réunies en même temps** :
+une **commande destructrice** *et* un **marqueur de production**. S'il en manque
+une → la commande passe intacte — les commandes en lecture seule ne vous
+embêtent donc jamais, et les commandes destructrices sur staging ou dev ne vous
+gênent pas. C'est un filet de sécurité contre le geste distrait, pas un mur
+devant chaque commande.
+
+| Commande | Contexte | Décision | Pourquoi |
+|:--|:--|:--:|:--|
+| `kubectl delete pod api` | `prod-eks` | ⚠️ confirm | destructrice + prod |
+| `kubectl get pods` | `prod-eks` | ✓ allow | prod, mais lecture seule |
+| `kubectl delete pod api` | `staging` | ✓ allow | destructrice, mais pas prod |
+| `terraform destroy -var-file=prod.tfvars` | *(aucun)* | ⚠️ confirm | la prod est dans la commande elle-même |
+| `terraform destroy -var-file=dev.tfvars` | *(aucun)* | ✓ allow | dev, pas prod |
+| `terraform plan -var-file=prod.tfvars` | *(aucun)* | ✓ allow | plan est en lecture seule |
+| `helm uninstall app` | `prod` | ⚠️ confirm | destructrice + prod |
+| `ls` · `git status` · `cat` | `prod` | ✓ allow | rien de destructeur |
+
+Simulez n'importe lequel de ces cas avec `opsforge guard test "<cmd>" --context <ctx>`.
+
 Les règles vivent dans un seul fichier, `~/.config/opsforge/guards.yaml`. Chaque
 règle matche une regex de **commande** et une regex de **contexte**, et choisit
 une action :
@@ -430,14 +462,55 @@ C'est le fossé défensif, prolongé : les guards s'appliquent sur votre propre
 shell, et la politique qui les pilote est **testable et versionnable** comme le
 reste de votre config — pas un flocon de neige propre à chaque machine.
 
-- **Le contexte est lu passivement.** La chaîne de contexte est construite à
-  partir du `current-context` de votre kubeconfig, de `AWS_PROFILE`/`AWS_VAULT`, et
-  du workspace terraform — opsforge **ne lance jamais `kubectl` ni `gcloud`** pour
+### Comment opsforge sait que vous êtes en prod
+
+Le « contexte » qu'une règle matche vient de **deux sources**, et opsforge est
+délibérément honnête sur les compromis de chacune :
+
+- **Lu passivement depuis votre environnement** — sans lancer une seule commande.
+  opsforge récupère le `current-context` de la kubeconfig, `AWS_PROFILE`/`AWS_VAULT`
+  (ou `CLOUDSDK_ACTIVE_CONFIG_NAME`), et le workspace terraform
+  (`.terraform/environment`). Il **ne lance jamais `kubectl` ni `gcloud`** pour
   savoir où vous êtes, donc évaluer une règle ne peut pas déclencher un login OIDC
   dans le navigateur ni se bloquer sur un CLI wrapper.
-- **Zéro config par défaut.** Sans `guards.yaml`, une politique intégrée reproduit
-  exactement l'ancien comportement de confirmation en prod — mettre à jour ne
-  change rien tant que vous n'optez pas pour des règles personnalisées.
+- **Lu depuis la commande elle-même** — parce qu'en 2026, les équipes ciblent la
+  prod bien plus souvent avec `-var-file=prod.tfvars` ou un dossier
+  `environments/prod/` qu'avec un *workspace* terraform. La politique par défaut
+  matche donc aussi ces marqueurs **dans la ligne de commande** pour
+  `terraform`/`tofu`/`terragrunt`, si bien que
+  `terraform destroy -var-file=prod.tfvars` confirme même sans workspace défini.
+  `terraform plan …` reste autorisé — c'est en lecture seule.
+
+> **Ayez les idées claires sur ce que c'est.** Les guards sont un **filet de
+> sécurité contre le geste distrait** — ils vous rattrapent quand vous changez
+> d'env sans le remarquer, pas une erreur délibérée. Ce **n'est pas** une barrière
+> de sécurité. La vraie protection prod reste là où elle doit être :
+> `prevent_destroy`, des comptes cloud séparés, et des approbations CI. opsforge
+> **complète** cette couche, il ne la remplace pas.
+
+### Ce que vous voyez quand un guard se déclenche
+
+Sur un `confirm`, la commande est retenue au prompt jusqu'à ce que vous tapiez
+`yes` :
+
+```text
+⚠  opsforge guard
+   This changes PRODUCTION Kubernetes resources.
+   kubectl delete pod api -n payments
+   (to skip guards this session: OPSFORGE_GUARDS=0)
+Type 'yes' to run this: ▏
+```
+
+Un `deny` affiche un **✗ Blocked by opsforge guard** rouge et efface la ligne ;
+un `warn` affiche son message et s'exécute quand même.
+
+### Tout est configurable dans un seul fichier
+
+- **Zéro config par défaut.** Sans `guards.yaml`, la politique intégrée ci-dessus
+  reproduit exactement l'ancien comportement de confirmation en prod — mettre à
+  jour ne change rien tant que vous n'optez pas pour des règles personnalisées.
+  Commencez à personnaliser avec `opsforge guard init`, qui dépose un `guards.yaml`
+  entièrement commenté que vous pouvez éditer.
 - **Rapide sur le chemin critique.** Le shell pré-filtre à moindre coût et n'appelle
   le moteur (`opsforge guard check`, utilisé en interne) que sur les commandes qui
   ont l'air destructrices, pour que votre prompt reste instantané.
