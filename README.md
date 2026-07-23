@@ -17,7 +17,7 @@ prompt, and **policy-as-code guards** that stop you from nuking the wrong cluste
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
+**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM](#sbom--supply-chain) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -29,9 +29,9 @@ opsforge is **three tools in one binary**:
 
 | | | |
 |:--:|---|---|
-| 📦 | **Tool installer** | An interactive picker over **249 curated CLIs across every IT discipline**. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
+| 📦 | **Tool installer** | An interactive picker over **287 curated CLIs across every IT discipline** — including a new **AI & LLM** category. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
 | 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
-| 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; `opsforge apply <url>` rebuilds it anywhere, and `apply --check` verifies a machine against it in CI. Your workstation becomes a reproducible, enforceable baseline. |
+| 📸 | **Workstation- & project-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; a committed [`opsforge.yaml`](#project-mode) declares a repo's toolchain and `opsforge sync` reproduces it (with a CVE gate). `apply --check` / `sync --check` verify a machine in CI, and [`opsforge sbom`](#sbom--supply-chain) emits a CVE-correlated SBOM of it. |
 
 > **Why:** rebuilding a DevOps workstation means installing 20+ CLIs, then wiring
 > completions, aliases and a useful prompt for each — by hand, on every machine.
@@ -81,6 +81,8 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-enforceable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
+<tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
+<tr><td><code>opsforge sbom [--audit]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
 <tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against the baseline without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
@@ -94,7 +96,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 
 > **Machine-readable everywhere.** A global `--json` flag makes `list`, `status`,
 > `doctor` and `audit` emit structured JSON instead of the TUI — see
-> [CI / machine-readable output](#ci--machine-readable-output).
+> [CI & integrations](#ci--integrations).
 
 ### The picker
 
@@ -158,7 +160,7 @@ opsforge profiles                    # list all with install status
 ```
 
 Built-in: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`, `sysadmin`, `netsec`, `secrets`. In the picker, select your tools and press `s` to save a personal
+`security`, `sysadmin`, `netsec`, `secrets`, `ai`. In the picker, select your tools and press `s` to save a personal
 profile to `~/.config/opsforge/profiles.yaml` — then
 `opsforge install --profile my-stack` reproduces it anywhere.
 
@@ -393,7 +395,77 @@ Disable everything for one session with `OPSFORGE_GUARDS=0`.
 
 ---
 
-## CI / machine-readable output
+## Project mode
+
+A workstation snapshot pins a whole *machine*. A **project** often needs less —
+just the toolchain *this repo* depends on. Commit an `opsforge.yaml` at its root
+and anyone reproduces it with one command — the reproducibility angle mise and
+devbox own, plus a CVE gate they don't have.
+
+```yaml
+# opsforge.yaml — commit at the repo root
+version: 1
+tools:
+  - kubectl
+  - helm
+  - terraform
+profiles:
+  - core          # pull in whole stack profiles too
+fail_on: high     # optional: sync fails if a required tool has a HIGH/CRITICAL CVE
+```
+
+```sh
+opsforge sync           # install whatever the manifest declares that's missing
+opsforge sync --check   # report drift, exit non-zero if a required tool is missing (CI/pre-commit)
+opsforge sync --init    # write a starter opsforge.yaml here
+```
+
+`sync` walks up from the working directory to the nearest `opsforge.yaml`, so it
+works from any subdirectory. It resolves `tools` + `profiles` into one
+de-duplicated list, installs only what's missing (via Homebrew or a GitHub
+release, per tool), and skips anything not in the catalog with a warning.
+
+**The differentiator: a CVE gate in the same file.** Set `fail_on: high` (or
+`critical`) and `sync` audits *just the tools this project requires* against
+[OSV.dev](https://osv.dev) and **fails** when one carries a CVE at that level —
+so a single committed file gives you both a **reproducible environment** *and* a
+**supply-chain gate**, which mise/devbox don't combine. With `--json`, `sync
+--check` emits `{compliant, missing, present, unknown, cve_blocked, fail_on}` for
+a pipeline to assert on:
+
+```sh
+opsforge sync --check --json | jq '.compliant'   # fails the job on drift or a blocked CVE
+```
+
+---
+
+## SBOM & supply-chain
+
+opsforge is the only tool manager that emits a **CVE-correlated SBOM of your
+workstation** — a supply-chain artifact consumable by grype, `trivy sbom`, or a
+compliance pipeline.
+
+```sh
+opsforge sbom                # CycloneDX 1.6 JSON of your installed tools → stdout
+opsforge sbom --audit > bom.json   # + embedded CVE findings, captured to a file
+```
+
+- **`opsforge sbom`** builds a **CycloneDX 1.6** document where each installed
+  tool is a component with its detected **version** and — when the catalog maps
+  it to a package ecosystem — a **PURL**.
+- **`opsforge sbom --audit`** cross-references OSV.dev and embeds the known CVEs
+  as CycloneDX **vulnerabilities**, each linked to its component with a severity
+  and the recommended fix version. The SBOM ships CVE-corrected out of the box.
+
+The document goes to stdout (a short summary to stderr), so
+`opsforge sbom > bom.json` gives you a clean file plus feedback. This is a 2026
+supply-chain differentiator: no other CLI installer hands you a signed inventory
+of your toolbox *with* its vulnerabilities, ready to feed a scanner or a
+compliance gate.
+
+---
+
+## CI & integrations
 
 opsforge isn't just a pretty TUI — a global `--json` flag makes `list`, `status`,
 `doctor` and `audit` emit structured JSON, so the same binary you use interactively
@@ -424,22 +496,68 @@ credential, uploading the JSON reports as artifacts.
   run: opsforge audit --json | tee cve-report.json
 ```
 
+### Official GitHub Action
+
+Skip the install boilerplate — the composite action does it, then runs whichever
+gates you switch on (`audit`, `secrets`, `guard-lint`, `sbom`, `baseline`):
+
+```yaml
+- uses: Mrg77/opsforge@v1
+  with:
+    audit: 'true'          # fail on any HIGH/CRITICAL CVE
+    secrets: 'true'        # also fail on a leaked credential
+    guard-lint: 'true'     # validate guards.yaml (policy-as-code)
+    sbom: 'true'           # emit a CycloneDX SBOM, uploaded as an artifact
+    baseline: team-baseline.yaml   # assert this machine matches the snapshot
+```
+
+Full example: [`examples/github-action-usage.yml`](examples/github-action-usage.yml).
+
+### Docker image
+
+A distroless image (~20–30 MB, no package manager) ships the static binary — run
+any command against a build image that has your CLIs:
+
+```sh
+docker run --rm ghcr.io/mrg77/opsforge audit --json
+```
+
+### pre-commit hooks
+
+Gate commits with the same policy engine, straight from
+[`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml):
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/Mrg77/opsforge
+    rev: v1.0.0
+    hooks:
+      - id: opsforge-guard-lint   # validate guards.yaml — fails on a bad rule
+      - id: opsforge-secrets      # block a commit leaking a credential
+```
+
 ---
 
 ## The catalog
 
-**249 tools across 15 categories** — Kubernetes, Infrastructure as Code, Cloud
+**287 tools across 16 categories** — Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, **System & SysAdmin**, Databases, Security & Compliance, Secrets & Identity,
-Serverless & PaaS, Runtime & Versions, Utilities. The catalog now spans **every IT
-job** — not just Kubernetes and cloud, but development, DevOps, systems, networking,
-security and databases — so a dev, a DevOps engineer, a sysadmin, a network engineer
-or a DevSecOps all find their toolbox here:
+Serverless & PaaS, Runtime & Versions, Utilities, and a new **AI & LLM** category.
+The catalog now spans **every IT job** — not just Kubernetes and cloud, but
+development, DevOps, systems, networking, security, databases and AI — so a dev, a
+DevOps engineer, a sysadmin, a network engineer, a DevSecOps or an AI engineer all
+find their toolbox here:
 
 - **Networking** — `tcpdump`, `iperf3`, `nmap`, `wireguard`…
 - **System & SysAdmin** — `htop`, `tmux`, `zellij`, `rclone`…
 - **Security & pentest** — `nuclei`, `ffuf`, `semgrep`, `trivy`, `opa`…
 - **Databases** — `mongosh`, `litecli`, `atlas`…
+- **Observability, GitOps & pipelines** — `prometheus`, `otel-cli`, `grafana`,
+  `argo`, `tekton`/`tkn`, `dagger`…
+- **AI & LLM** — `ollama`, `llm`, `aichat`, `mods`, `aider`, `fabric`,
+  `gemini-cli`, `promptfoo`, `codex`…
 
 It's a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a tool
 is a five-line PR.
@@ -552,11 +670,22 @@ The parts worth pointing a reviewer to:
   flag renders `list`/`status`/`doctor`/`audit` as structured JSON; `audit` exits
   non-zero on HIGH/CRITICAL CVEs (and critical secret leaks with `--secrets`), so
   it drops into CI as a security gate with no wrapper script.
+- **A CVE-correlated SBOM of your workstation.** `opsforge sbom` builds a
+  CycloneDX 1.6 document from the *detected* tools — each a component with its
+  version and, when mapped, a PURL — and `--audit` embeds the OSV.dev CVEs as
+  linked CycloneDX vulnerabilities. No other tool manager emits a signed
+  inventory of your toolbox *with* its vulnerabilities, feedable to grype/trivy
+  or a compliance gate.
+- **Reproducible env + a CVE gate in one file.** A committed `opsforge.yaml`
+  (`version`, `tools`, `profiles`, `fail_on`) makes `opsforge sync` reproduce a
+  repo's toolchain — and `fail_on: high|critical` audits *only the required
+  tools* and fails the sync on a matching CVE. That's the reproducibility mise
+  and devbox own, plus a supply-chain gate they don't combine.
 - **Auth-safe detection.** Probing `kubectl --version` where kubectl is a
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
   never triggers auth or hangs on a wrapper CLI holding the output pipe.
-- **The catalog can't lie.** A CI job validates all 249 brew references against
+- **The catalog can't lie.** A CI job validates all 287 brew references against
   the Homebrew API and every GitHub asset template against the tool's real latest
   release (darwin/linux × amd64/arm64) — a renamed formula is caught before a
   user hits it mid-install.
@@ -568,8 +697,10 @@ The parts worth pointing a reviewer to:
 ### Architecture
 
 ```
-cmd/                Cobra commands (install, status, audit, guard, snapshot, apply, self, doctor, shell, theme…)
+cmd/                Cobra commands (install, status, audit, guard, sync, sbom, snapshot, apply, self, doctor, shell, theme…)
 internal/catalog/   Embedded YAML catalog + brew/github validation
+internal/project/   opsforge.yaml manifest: resolve tools/profiles, drift plan, CVE gate (sync)
+internal/sbom/      CycloneDX 1.6 builder (components + PURLs + embedded CVE vulnerabilities)
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify; self-update)
 internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
