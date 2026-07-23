@@ -16,6 +16,9 @@ import (
 )
 
 // ChecksumStatus reports how a downloaded asset was integrity-checked.
+// Each value means exactly one thing — in particular a MISMATCH is never
+// conflated with "no checksum published", so a caller can never treat a
+// tampered asset as merely unverified.
 type ChecksumStatus int
 
 const (
@@ -24,16 +27,21 @@ const (
 	// ChecksumUnavailable — no checksum was published for this release, so
 	// integrity could not be verified (a warning, not a failure).
 	ChecksumUnavailable
+	// ChecksumMismatch — a checksum WAS published and did NOT match. The
+	// asset must never be installed. Always paired with a non-nil error.
+	ChecksumMismatch
 )
 
-// verifyChecksum tries to verify the SHA-256 of the downloaded asset
-// against a checksum published alongside the GitHub release.
+// verifyChecksum verifies the SHA-256 of the downloaded asset against a
+// checksum published alongside the GitHub release.
 //
-// It returns:
-//   - (ChecksumVerified, nil)    when a checksum was found and matched,
-//   - (ChecksumUnavailable, nil) when no checksum was published,
-//   - (_, error)                 when a checksum WAS found but did NOT match
-//     (a hard failure — the asset must not be installed).
+// Contract (status and error move together, no ambiguity):
+//   - (ChecksumVerified, nil)     — a checksum was found and matched.
+//   - (ChecksumUnavailable, nil)  — no checksum was published (benign).
+//   - (ChecksumMismatch, err)     — a checksum was found and did NOT match;
+//     the caller MUST abort the install.
+//   - (ChecksumUnavailable, err)  — the asset couldn't be hashed (I/O);
+//     the caller MUST abort (err != nil), integrity is unknown.
 //
 // This mirrors the 2026 supply-chain baseline: never run a downloaded
 // binary whose published checksum disagrees, while not blocking the ~85%
@@ -41,12 +49,24 @@ const (
 func verifyChecksum(gh *catalog.GitHubRelease, repo, tag, asset, archivePath string) (ChecksumStatus, error) {
 	sum, err := sha256File(archivePath)
 	if err != nil {
-		return ChecksumUnavailable, err
+		return ChecksumUnavailable, fmt.Errorf("hashing %s: %w", asset, err)
 	}
+	// fetch resolves a candidate checksum-file name to its body (or ok=false
+	// when absent). Split out so the decision logic is testable without a
+	// network — see verifyChecksumSum.
+	fetch := func(name string) (string, bool) {
+		return fetchText(fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repo, tag, name))
+	}
+	return verifyChecksumSum(gh, tag, asset, sum, fetch)
+}
 
+// verifyChecksumSum is the pure decision core of verifyChecksum: given the
+// asset's computed hash and a function that returns the body of a named
+// checksum file, it decides verified / unavailable / mismatch. No I/O of
+// its own, so it is unit-testable.
+func verifyChecksumSum(gh *catalog.GitHubRelease, tag, asset, sum string, fetch func(name string) (string, bool)) (ChecksumStatus, error) {
 	for _, name := range checksumCandidates(gh, tag, asset) {
-		url := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", repo, tag, name)
-		body, ok := fetchText(url)
+		body, ok := fetch(name)
 		if !ok {
 			continue
 		}
@@ -57,7 +77,7 @@ func verifyChecksum(gh *catalog.GitHubRelease, repo, tag, asset, archivePath str
 		if strings.EqualFold(want, sum) {
 			return ChecksumVerified, nil
 		}
-		return ChecksumUnavailable, fmt.Errorf(
+		return ChecksumMismatch, fmt.Errorf(
 			"checksum mismatch for %s: published %s, got %s (refusing to install)",
 			asset, want, sum)
 	}

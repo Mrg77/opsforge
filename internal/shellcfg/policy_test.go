@@ -269,3 +269,35 @@ func TestCurrentContextIncludesCloudProfile(t *testing.T) {
 		t.Errorf("want aws:prod-admin, got %q", ctx)
 	}
 }
+
+func TestPrefilterTerms(t *testing.T) {
+	p := &GuardPolicy{
+		Version: 1,
+		Rules: []GuardRule{
+			{Name: "a", Match: GuardMatch{Command: "kubectl (delete|drain)"}},
+			{Name: "b", Match: GuardMatch{Command: "terraform import"}},
+			{Name: "c", Match: GuardMatch{Command: "kubectl apply"}}, // dup kubectl
+		},
+	}
+	got := p.PrefilterTerms()
+	want := map[string]bool{"kubectl": true, "delete": true, "drain": true, "terraform": true, "import": true, "apply": true}
+	if len(got) != len(want) {
+		t.Fatalf("got %v (%d terms), want %d distinct", got, len(got), len(want))
+	}
+	for _, term := range got {
+		if !want[term] {
+			t.Errorf("unexpected term %q", term)
+		}
+	}
+	// A custom rule's verb must be present — this is the regression that
+	// let `terraform import` bypass the shell prefilter.
+	found := false
+	for _, term := range got {
+		if term == "import" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("custom rule keyword 'import' missing from prefilter — rule would be silently skipped")
+	}
+}

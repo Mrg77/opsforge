@@ -13,21 +13,26 @@
 # Set OPSFORGE_GUARDS=0 to disable for a session.
 
 # PERF: the widget runs on every command. To stay cheap we first do a
-# zero-subprocess prefilter — only commands mentioning a potentially
-# destructive verb reach the Go binary. Tune the list with
-# OPSFORGE_GUARD_PREFILTER (a zsh extended-glob alternation).
-: ${OPSFORGE_GUARD_PREFILTER:='(kubectl|helm|terraform|kubens|kubectx|k) *'}
+# zero-subprocess prefilter — only commands whose words could match a rule
+# reach the Go binary. The pattern is derived ONCE, at shell load, from the
+# ACTIVE policy (built-in or your guards.yaml) via `opsforge guard
+# prefilter`, so a custom rule (e.g. on `terraform import`) is never
+# silently skipped by a stale hard-coded verb list. Override with
+# OPSFORGE_GUARD_PREFILTER (a zsh extended-glob alternation like
+# '(kubectl|terraform|helm)').
+if [[ -z "$OPSFORGE_GUARD_PREFILTER" ]] && (( $+commands[opsforge] )); then
+  OPSFORGE_GUARD_PREFILTER="$(opsforge guard prefilter 2>/dev/null)"
+fi
+# Fallback if the binary was unavailable or the policy was empty.
+: ${OPSFORGE_GUARD_PREFILTER:='(kubectl|helm|terraform|kubens|kubectx|argocd|flux|k)'}
 
-# _opsforge_looks_dangerous is a cheap, in-shell gate: true only when the
-# buffer might match a rule, so most commands skip the Go call entirely.
+# _opsforge_looks_dangerous is a cheap, in-shell gate: true only when a word
+# of the buffer appears in the policy-derived prefilter, so most commands
+# skip the Go call entirely.
 _opsforge_looks_dangerous() {
   setopt localoptions extendedglob
-  local buf="$1"
-  case "$buf" in
-    *delete*|*destroy*|*drain*|*cordon*|*apply*|*replace*|*uninstall*|*rollback*)
-      return 0 ;;
-  esac
-  return 1
+  local buf="${1:l}"   # lowercase, matching the lowercase prefilter terms
+  [[ "$buf" == (*[^a-z0-9])#${~OPSFORGE_GUARD_PREFILTER}(|[^a-z0-9]*) ]]
 }
 
 _opsforge_accept_line() {

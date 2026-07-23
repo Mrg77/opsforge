@@ -1,6 +1,10 @@
 package installer
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/Mrg77/opsforge/internal/catalog"
+)
 
 func TestChecksumFor(t *testing.T) {
 	const h1 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -56,4 +60,45 @@ func TestIsHexSHA256(t *testing.T) {
 			t.Errorf("bad hex accepted: %q", bad)
 		}
 	}
+}
+
+func TestVerifyChecksumSum(t *testing.T) {
+	const good = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	const bad = "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+	gh := &catalog.GitHubRelease{Repo: "acme/tool"}
+	asset := "tool_linux_amd64.tar.gz"
+
+	t.Run("verified when published checksum matches", func(t *testing.T) {
+		fetch := func(name string) (string, bool) {
+			if name == "checksums.txt" {
+				return good + "  " + asset + "\n", true
+			}
+			return "", false
+		}
+		st, err := verifyChecksumSum(gh, "v1", asset, good, fetch)
+		if st != ChecksumVerified || err != nil {
+			t.Fatalf("got (%v,%v), want (Verified,nil)", st, err)
+		}
+	})
+
+	t.Run("mismatch aborts with error", func(t *testing.T) {
+		fetch := func(name string) (string, bool) {
+			if name == "checksums.txt" {
+				return bad + "  " + asset + "\n", true // published != our sum
+			}
+			return "", false
+		}
+		st, err := verifyChecksumSum(gh, "v1", asset, good, fetch)
+		if st != ChecksumMismatch || err == nil {
+			t.Fatalf("got (%v,%v), want (Mismatch, error)", st, err)
+		}
+	})
+
+	t.Run("unavailable when nothing published", func(t *testing.T) {
+		fetch := func(string) (string, bool) { return "", false }
+		st, err := verifyChecksumSum(gh, "v1", asset, good, fetch)
+		if st != ChecksumUnavailable || err != nil {
+			t.Fatalf("got (%v,%v), want (Unavailable,nil)", st, err)
+		}
+	})
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -175,6 +176,31 @@ var guardInitCmd = &cobra.Command{
 	},
 }
 
+// guardPrefilterCmd emits a zsh extended-glob alternation of the keywords
+// that appear in the active policy's command patterns. The shell guard
+// module sources this so its cheap in-shell prefilter tracks the REAL
+// rules — a custom rule on, say, `terraform import` is then no longer
+// silently skipped by a hard-coded verb list. Hidden: it's plumbing.
+var guardPrefilterCmd = &cobra.Command{
+	Use:    "prefilter",
+	Short:  "Print the shell prefilter pattern derived from the active policy",
+	Hidden: true,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		policy, _, err := shellcfg.LoadPolicy()
+		if err != nil {
+			return err
+		}
+		terms := policy.PrefilterTerms()
+		if len(terms) == 0 {
+			// No rules → match nothing (empty alternation would match all).
+			fmt.Println("")
+			return nil
+		}
+		fmt.Printf("(%s)\n", strings.Join(terms, "|"))
+		return nil
+	},
+}
+
 func actionGlyph(a shellcfg.Action) string {
 	switch a {
 	case shellcfg.ActionDeny:
@@ -265,6 +291,6 @@ func init() {
 		"context to simulate against (defaults to the current context)")
 	guardInitCmd.Flags().BoolVar(&guardInitForce, "force", false,
 		"overwrite an existing guards.yaml")
-	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardInitCmd)
+	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardInitCmd, guardPrefilterCmd)
 	rootCmd.AddCommand(guardCmd)
 }

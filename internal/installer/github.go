@@ -62,14 +62,15 @@ func InstallFromGitHub(t catalog.Tool) Result {
 	}
 
 	// Supply-chain check: verify the asset against a published SHA-256
-	// before we ever mark it executable. A mismatch aborts the install; a
-	// release with no published checksum installs with a warning.
+	// before we ever mark it executable. A mismatch (or a hashing failure,
+	// which leaves integrity unknown) aborts the install; a release with no
+	// published checksum installs with a warning.
 	var warning string
 	status, err := verifyChecksum(gh, gh.Repo, tag, asset, archivePath)
-	if err != nil {
+	switch {
+	case status == ChecksumMismatch, err != nil:
 		return Result{Err: err}
-	}
-	if status == ChecksumUnavailable {
+	case status == ChecksumUnavailable:
 		warning = "no published checksum for this release — integrity not verified"
 	}
 

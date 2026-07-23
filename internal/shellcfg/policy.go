@@ -123,6 +123,33 @@ func (r *GuardRule) matches(command, context string) bool {
 	return true
 }
 
+// prefilterTermRe pulls alphanumeric words (2+ chars) out of a command
+// pattern, so "kubectl (delete|drain)" yields kubectl, delete, drain.
+var prefilterTermRe = regexp.MustCompile(`[a-zA-Z][a-zA-Z0-9_-]{1,}`)
+
+// PrefilterTerms returns the distinct lowercase keywords that appear in
+// the policy's command patterns. The shell prefilter uses these to decide,
+// with zero subprocesses, whether a typed command could possibly match a
+// rule — so it is derived from the ACTUAL rules (built-in or the user's
+// guards.yaml) instead of a hard-coded verb list. That closes the gap
+// where a custom rule (e.g. `terraform import`) was silently skipped
+// because the static prefilter never let it reach the engine.
+func (p *GuardPolicy) PrefilterTerms() []string {
+	seen := map[string]bool{}
+	var terms []string
+	for i := range p.Rules {
+		for _, w := range prefilterTermRe.FindAllString(p.Rules[i].Match.Command, -1) {
+			w = strings.ToLower(w)
+			if seen[w] {
+				continue
+			}
+			seen[w] = true
+			terms = append(terms, w)
+		}
+	}
+	return terms
+}
+
 // Validate compiles every rule and reports the first problem. A policy
 // that fails validation is never used (the engine falls back to default),
 // so a typo in the user's YAML can't silently disable all guards.
