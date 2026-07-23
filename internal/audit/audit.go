@@ -144,8 +144,13 @@ type ToolTarget struct {
 func ScanTools(ctx context.Context, targets []ToolTarget) []Finding {
 	findings := make([]Finding, len(targets))
 	done := make(chan int, len(targets))
+	// Bound concurrent OSV requests so a large toolbox doesn't fire a
+	// hundred HTTP calls at once (rate-limit risk, socket exhaustion).
+	sem := make(chan struct{}, 12)
 	for i, tg := range targets {
 		go func(i int, tg ToolTarget) {
+			sem <- struct{}{}
+			defer func() { <-sem }()
 			vulns, err := Query(ctx, tg.Ecosystem, tg.Package, tg.Version)
 			f := Finding{Tool: tg.Name, Version: tg.Version, Auditable: true}
 			if err == nil {
@@ -155,8 +160,16 @@ func ScanTools(ctx context.Context, targets []ToolTarget) []Finding {
 			done <- i
 		}(i, tg)
 	}
-	for range targets {
-		<-done
+	// Collect, but bail out if the context is cancelled/expires — otherwise
+	// a single stuck request (DNS hang beyond the client timeout) would
+	// block the whole scan past its deadline. Late goroutines still write
+	// into their own findings slot and drain via the buffered channel.
+	for n := 0; n < len(targets); n++ {
+		select {
+		case <-done:
+		case <-ctx.Done():
+			return findings
+		}
 	}
 	return findings
 }

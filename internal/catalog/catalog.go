@@ -92,12 +92,23 @@ type Catalog struct {
 	Categories []Category `yaml:"categories"`
 }
 
-// Load parses the embedded catalog and validates its invariants.
+// Load parses the embedded catalog, merges any user overlay, and
+// validates the result. See MergeOverlays for how user tools are layered
+// on top of the built-in catalog.
 func Load() (*Catalog, error) {
 	var c Catalog
 	if err := yaml.Unmarshal(raw, &c); err != nil {
 		return nil, fmt.Errorf("parsing embedded catalog: %w", err)
 	}
+	if err := c.MergeOverlays(overlayPaths()); err != nil {
+		return nil, err
+	}
+	return c.validated()
+}
+
+// validated checks the catalog's invariants and returns it, so both the
+// embedded-only and merged catalogs go through the same rules.
+func (c *Catalog) validated() (*Catalog, error) {
 	seen := map[string]bool{}
 	for _, cat := range c.Categories {
 		if cat.Name == "" {
@@ -136,7 +147,7 @@ func Load() (*Catalog, error) {
 			}
 		}
 	}
-	return &c, nil
+	return c, nil
 }
 
 // Tools flattens the catalog into a single list.

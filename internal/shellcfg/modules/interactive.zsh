@@ -14,23 +14,46 @@
 
 [[ "$OPSFORGE_INTERACTIVE" == "0" ]] && return
 
-_of_brew_share=""
-if command -v brew >/dev/null 2>&1; then
-  _of_brew_share="$(brew --prefix 2>/dev/null)/share"
-fi
+# Locate a zsh plugin's entry file across the common install layouts, so
+# the interactive layer works on Linux (apt/pacman/manual) too, not just
+# Homebrew. Usage: _of_plugin zsh-autosuggestions zsh-autosuggestions.zsh
+# echoes the first readable path found, or nothing.
+_of_plugin() {
+  local name="$1" file="$2" d
+  local -a dirs
+  if command -v brew >/dev/null 2>&1; then
+    dirs+=("$(brew --prefix 2>/dev/null)/share/$name")
+  fi
+  dirs+=(
+    "/usr/share/$name"                              # Debian/Ubuntu apt
+    "/usr/share/zsh/plugins/$name"                  # Arch
+    "/usr/local/share/$name"                        # manual /usr/local
+    "/usr/share/zsh-$name"                          # some distros
+    "$HOME/.zsh/$name"                              # manual clone
+    "${ZDOTDIR:-$HOME}/.zsh/$name"
+  )
+  for d in $dirs; do
+    if [[ -r "$d/$file" ]]; then print -r -- "$d/$file"; return 0; fi
+  done
+  return 1
+}
+
+# Resolve each plugin's path once (empty when absent — the block is skipped).
+_of_autocomplete="$(_of_plugin zsh-autocomplete zsh-autocomplete.plugin.zsh)"
+_of_autosuggest="$(_of_plugin zsh-autosuggestions zsh-autosuggestions.zsh)"
+_of_highlight="$(_of_plugin zsh-syntax-highlighting zsh-syntax-highlighting.zsh)"
 
 # History behavior shared by both modes: de-dupe so one command doesn't
 # dominate, and make the current session's commands searchable right away.
 setopt HIST_IGNORE_ALL_DUPS HIST_FIND_NO_DUPS INC_APPEND_HISTORY SHARE_HISTORY
 
-if [[ "$OPSFORGE_AUTOMENU" == "1" && -n "$_of_brew_share" \
-      && -r "$_of_brew_share/zsh-autocomplete/zsh-autocomplete.plugin.zsh" ]]; then
+if [[ "$OPSFORGE_AUTOMENU" == "1" && -n "$_of_autocomplete" ]]; then
   # --- opt-in: always-on live menu (zsh-autocomplete) -------------------
   zstyle ':autocomplete:*' min-input 1
   zstyle ':autocomplete:*' list-lines 8
   zstyle ':autocomplete:tab:*' widget-style menu-select
   zstyle ':autocomplete:*' insert-unambiguous yes
-  source "$_of_brew_share/zsh-autocomplete/zsh-autocomplete.plugin.zsh"
+  source "$_of_autocomplete"
 else
   # --- default: quiet, on-demand completion + prefix history search -----
   # Native zsh completion (TAB), initialized once. `-u` avoids the insecure
@@ -56,7 +79,7 @@ else
 fi
 
 # --- zsh-autosuggestions: gray inline suggestion from history ---
-if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
+if [[ -n "$_of_autosuggest" ]]; then
   # Suggest a whole PAST command line (history strategy), not a stray next
   # token — so the gray hint is a real command you can accept with →.
   ZSH_AUTOSUGGEST_STRATEGY=(history)
@@ -64,7 +87,7 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosu
   # Don't fire on very long buffers (a pasted block shouldn't flicker).
   ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE=80
 
-  source "$_of_brew_share/zsh-autosuggestions/zsh-autosuggestions.zsh"
+  source "$_of_autosuggest"
 
   # --- Tab = accept the gray suggestion one word at a time ------------
   # Why not just bind Tab to `forward-word`? The plugin only wraps a
@@ -110,8 +133,9 @@ if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-autosuggestions/zsh-autosu
 fi
 
 # --- zsh-syntax-highlighting: color the command line (load LAST) ---
-if [[ -n "$_of_brew_share" && -r "$_of_brew_share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
-  source "$_of_brew_share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+if [[ -n "$_of_highlight" ]]; then
+  source "$_of_highlight"
 fi
 
-unset _of_brew_share
+unset _of_autocomplete _of_autosuggest _of_highlight
+unfunction _of_plugin

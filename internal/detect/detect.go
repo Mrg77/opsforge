@@ -6,6 +6,7 @@ import (
 	"context"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -43,17 +44,37 @@ func Tool(t catalog.Tool) Status {
 	return Status{Installed: true, Version: version(t)}
 }
 
+// detectConcurrency bounds how many version probes run at once. Each probe
+// execs a CLI (some heavyweight, e.g. gcloud/az), so an unbounded fan-out
+// over a large catalog would spawn a hundred-plus processes at once and
+// thrash a constrained CI runner. We cap at a small multiple of the CPU
+// count — enough to hide the per-probe latency, not enough to fork-bomb.
+func detectConcurrency() int {
+	n := runtime.NumCPU() * 2
+	if n < 4 {
+		n = 4
+	}
+	if n > 16 {
+		n = 16
+	}
+	return n
+}
+
 // All runs detection concurrently over a flat tool list, keyed by tool
 // name. Version commands of heavyweight CLIs (gcloud, az...) take up to
-// a few seconds each, so running them sequentially is not an option.
+// a few seconds each, so running them sequentially is not an option — but
+// the fan-out is bounded (see detectConcurrency) so it never fork-bombs.
 func All(tools []catalog.Tool) map[string]Status {
 	out := make(map[string]Status, len(tools))
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	sem := make(chan struct{}, detectConcurrency())
 	for _, t := range tools {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			sem <- struct{}{}        // acquire a slot
+			defer func() { <-sem }() // release it
 			s := Tool(t)
 			mu.Lock()
 			out[t.Name] = s
