@@ -294,6 +294,13 @@ sous `~/.config/opsforge/shell/`, `shell uninstall` restaure tout) :
   est élargi pour montrer les **200** dernières lignes (`history 1` pour tout), et
   `hg <terme>` grep tout votre historique — tandis que
   [`opsforge history`](#history) le groupe par famille d'outils DevOps.
+- **Heads-up CVE proactif** — une fois par session, opsforge vous prévient dans
+  votre propre shell si une CVE connue vient de toucher un de vos outils
+  installés, puis rafraîchit son cache local en arrière-plan — en lisant depuis
+  `~/.cache/opsforge/` (TTL 6h) pour que le prompt ne bloque jamais sur le
+  réseau. C'est le seul gestionnaire d'outils qui vous prévient *dans votre
+  shell* dès qu'un advisory tombe sur votre boîte à outils. Coupez-le avec
+  `OPSFORGE_CVE_NOTICE=0`.
 - **Intégrations** — `fzf`, `zoxide`, `atuin` câblés quand présents.
 
 Chaque module est validé avec `zsh -n` en CI, donc un script cassé ne peut jamais
@@ -517,6 +524,28 @@ différenciateur supply-chain 2026 : aucun autre installeur CLI ne vous remet un
 inventaire signé de votre boîte à outils *avec* ses vulnérabilités, prêt à
 alimenter un scanner ou un gate de conformité.
 
+C'est toute la chaîne supply-chain dans un seul binaire : un **checksum** prouve
+que chaque téléchargement est intact, une **signature cosign** prouve que la
+release est authentique (voir [le catalogue](#le-catalogue)), et le **SBOM**
+prouve ce que vous avez obtenu au final — CVE comprises.
+
+### Notification CVE proactive
+
+opsforge n'attend pas que vous lanciez `audit` — il vous prévient dès qu'un
+advisory tombe sur un outil que vous avez déjà installé.
+
+- **Dans votre shell.** Une fois par session, le [shell DevOps](#lenvironnement-shell-devops)
+  affiche un heads-up si une CVE connue touche un outil installé, puis rafraîchit
+  son cache en arrière-plan (`OPSFORGE_CVE_NOTICE=0` pour le couper).
+- **Dans `opsforge status`.** Une ligne **Security** fait remonter le même
+  constat en un coup d'œil — ex. *« 1 tool(s) with HIGH/CRITICAL CVEs »*.
+- **Ne bloque jamais.** Les deux lisent un cache local sous `~/.cache/opsforge/`
+  (TTL 6h), rafraîchi en arrière-plan — donc un heads-up ou une vérif de status
+  n'attend jamais sur le réseau.
+
+C'est le seul gestionnaire d'outils qui vous prévient proactivement — dans votre
+shell *et* votre cockpit de status — qu'une CVE vient de toucher un de vos outils.
+
 ---
 
 ## CI & intégrations
@@ -638,6 +667,26 @@ l'installation** ; une release qui ne publie aucun checksum est un avertissement
 pas un échec (au mieux, pour que les ~85 % de projets qui n'en fournissent aucun
 s'installent quand même).
 
+**Chaîne d'approvisionnement : provenance signée.** Les releases d'opsforge
+elles-mêmes sont **signées keyless avec [cosign](https://github.com/sigstore/cosign)
+(Sigstore)** — aucune clé longue durée, le certificat est lié à l'identité OIDC
+GitHub du workflow de release — plus une **attestation de build-provenance SLSA**
+GitHub native. La release publie `checksums.txt.sig` + `checksums.txt.pem` à côté
+de `checksums.txt`. À la **self-update**, si `cosign` est installé localement,
+opsforge vérifie cette signature contre l'identité attendue et affiche
+*« signature verified (cosign, keyless) »* — un checksum valide dont la signature
+ne vérifie **pas** est refusé comme une non-correspondance. Vérifiez-la
+vous-même :
+
+```sh
+cosign verify-blob \
+  --certificate checksums.txt.pem \
+  --signature   checksums.txt.sig \
+  --certificate-identity-regexp '^https://github.com/Mrg77/opsforge/\.github/workflows/release\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+```
+
 ### Ajouter vos propres outils
 
 Le catalogue n'est pas une liste fermée. Pointez opsforge vers un **overlay** et
@@ -718,13 +767,23 @@ Les parties vers lesquelles pointer un relecteur :
   (`checksums.txt`, `<asset>.sha256`, ou un template `checksum:` du catalogue)
   *avant* d'être rendus exécutables — une non-correspondance refuse l'installation ;
   une release sans checksum se dégrade en avertissement.
-- **Une mise à jour qui vérifie sa propre intégrité.** `opsforge self update`
-  récupère la dernière release, vérifie son SHA-256 publié, et seulement ensuite
-  remplace le binaire en cours d'exécution — atomiquement. La même garantie de
-  chaîne d'approvisionnement que l'installeur donne à vos outils, opsforge se
-  l'applique à lui-même : un asset falsifié n'est jamais rendu exécutable.
-  `--check` signale la disponibilité avec un code de sortie pour cron/CI, et un
-  build de dev (aucun tag de release à comparer) est un no-op sûr.
+- **Une mise à jour qui vérifie sa propre intégrité — et sa provenance.**
+  `opsforge self update` récupère la dernière release, vérifie son SHA-256 publié,
+  et seulement ensuite remplace le binaire en cours d'exécution — atomiquement. La
+  même garantie de chaîne d'approvisionnement que l'installeur donne à vos outils,
+  opsforge se l'applique à lui-même : un asset falsifié n'est jamais rendu
+  exécutable. Comme nos releases sont **signées cosign keyless**, la self-update
+  **vérifie aussi cette signature** (quand cosign est installé) contre l'identité
+  OIDC du workflow de release — une signature publiée mais invalide est refusée
+  comme une non-correspondance. `--check` signale la disponibilité avec un code de
+  sortie pour cron/CI, et un build de dev (aucun tag de release à comparer) est un
+  no-op sûr.
+- **Releases signées keyless avec provenance SLSA.** Les releases sont signées
+  avec **cosign keyless (Sigstore/Fulcio)** à partir de l'identité OIDC de GitHub
+  Actions — aucune clé à stocker — et portent une **attestation de
+  build-provenance SLSA** GitHub native. `checksums.txt.sig` + `checksums.txt.pem`
+  accompagnent chaque release ; n'importe qui peut les `cosign verify-blob` contre
+  l'identité du workflow.
 - **Une seule source de vérité pour les familles d'outils.** Les « familles »
   DevOps (`kube`, `tf`, `cloud`…) sur lesquelles `history` filtre et dont le
   pré-filtre des guards dérive vivent désormais dans un seul package
@@ -742,6 +801,13 @@ Les parties vers lesquelles pointer un relecteur :
   d'OSV.dev comme vulnerabilities CycloneDX liées. Aucun autre gestionnaire d'outils
   n'émet un inventaire signé de votre boîte à outils *avec* ses vulnérabilités,
   alimentable par grype/trivy ou un gate de conformité.
+- **Notification CVE proactive, sans jamais bloquer.** opsforge maintient un cache
+  CVE local (`~/.cache/opsforge/`, TTL 6h) pour que `opsforge status` (une ligne
+  *Security*) comme le shell (un heads-up une fois par session via `cvenotify.zsh`,
+  cache rafraîchi en arrière-plan) puissent vous signaler qu'un nouvel advisory a
+  touché un outil installé *sans* appel réseau synchrone — un chemin
+  d'avertissement qui ne peut jamais bloquer votre prompt. Aucun autre gestionnaire
+  d'outils ne fait remonter une CVE fraîche dans votre shell et votre status.
 - **Env reproductible + gate CVE dans un seul fichier.** Un `opsforge.yaml`
   committé (`version`, `tools`, `profiles`, `fail_on`) fait reproduire à
   `opsforge sync` la boîte à outils d'un dépôt — et `fail_on: high|critical` audite
@@ -780,7 +846,7 @@ internal/secrets/   Scanner d'identifiants exposés
 internal/output/    Émetteur JSON exploitable par machine pour le flag --json
 internal/snapshot/  Capture / apply / rapport d'écart --check du poste de travail
 internal/tui/       Sélecteur Bubble Tea avec onglets (stylé par le thème)
-internal/shellcfg/  Modules d'environnement zsh + cache de complétions + moteur de politique des guards (policy.go)
+internal/shellcfg/  Modules d'environnement zsh (dont cvenotify.zsh) + cache de complétions + moteur de politique des guards (policy.go)
 internal/ui/        Identité visuelle partagée + thèmes
 ```
 
@@ -802,8 +868,6 @@ GoReleaser sur tag.
 
 - [ ] Support bash & fish pour la couche shell (actuellement zsh uniquement)
 - [ ] Windows natif (winget/scoop + complétions PowerShell)
-- [ ] Vérification de provenance — contrôle des signatures cosign/sigstore sur les assets de release
-- [ ] Notification CVE proactive quand un nouvel advisory touche un outil installé
 - [ ] Plus de templates `github:` pour une couverture sans brew complète
 
 ## Licence

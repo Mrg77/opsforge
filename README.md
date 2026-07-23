@@ -279,6 +279,12 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   to show the last **200** lines (`history 1` for everything), and `hg <term>`
   greps your whole history — while [`opsforge history`](#history) groups it by
   DevOps tool family.
+- **Proactive CVE heads-up** — once per session, opsforge tells you in your own
+  shell if a known CVE just hit one of your installed tools, then refreshes its
+  local cache in the background — reading from `~/.cache/opsforge/` (6h TTL) so
+  the prompt never blocks on the network. It's the only tool manager that warns
+  you *in your shell* the moment an advisory lands on your toolbox. Silence it
+  with `OPSFORGE_CVE_NOTICE=0`.
 - **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
@@ -489,6 +495,28 @@ supply-chain differentiator: no other CLI installer hands you a signed inventory
 of your toolbox *with* its vulnerabilities, ready to feed a scanner or a
 compliance gate.
 
+That's the full supply-chain chain in one binary: a **checksum** proves each
+download is intact, a **cosign signature** proves the release is authentic (see
+[the catalog](#the-catalog)), and the **SBOM** proves what you ended up with —
+CVEs included.
+
+### Proactive CVE notification
+
+opsforge doesn't wait for you to run `audit` — it tells you the moment an
+advisory lands on a tool you already have installed.
+
+- **In your shell.** Once per session, the [DevOps shell](#the-devops-shell-environment)
+  prints a heads-up if a known CVE affects an installed tool, then refreshes its
+  cache in the background (`OPSFORGE_CVE_NOTICE=0` to silence it).
+- **In `opsforge status`.** A **Security** line surfaces the same finding at a
+  glance — e.g. *"1 tool(s) with HIGH/CRITICAL CVEs"*.
+- **Never blocks.** Both read a local cache under `~/.cache/opsforge/` (6h TTL),
+  refreshed in the background — so a heads-up or a status check never waits on
+  the network.
+
+It's the only tool manager that proactively warns you — in your shell *and* your
+status cockpit — that a CVE just hit one of your tools.
+
 ---
 
 ## CI & integrations
@@ -606,6 +634,25 @@ catalog's `checksum:` field. A mismatch **refuses the install**; a release that
 publishes no checksum is a warning, not a failure (best-effort, so the ~85% of
 projects that ship none still install).
 
+**Supply-chain: signed provenance.** opsforge's own releases are **signed
+keyless with [cosign](https://github.com/sigstore/cosign) (Sigstore)** — no
+long-lived key, the certificate is bound to the release workflow's GitHub OIDC
+identity — plus a native GitHub **SLSA build-provenance attestation**. The
+release publishes `checksums.txt.sig` + `checksums.txt.pem` alongside
+`checksums.txt`. On **self-update**, if `cosign` is installed locally, opsforge
+verifies that signature against the expected identity and prints *"signature
+verified (cosign, keyless)"* — a valid checksum whose signature does **not**
+verify is refused like a mismatch. Verify it yourself:
+
+```sh
+cosign verify-blob \
+  --certificate checksums.txt.pem \
+  --signature   checksums.txt.sig \
+  --certificate-identity-regexp '^https://github.com/Mrg77/opsforge/\.github/workflows/release\.yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  checksums.txt
+```
+
 ### Add your own tools
 
 The catalog isn't a closed list. Point opsforge at an **overlay** and your own
@@ -681,12 +728,21 @@ The parts worth pointing a reviewer to:
   checked against a published checksum (`checksums.txt`, `<asset>.sha256`, or a
   catalog `checksum:` template) *before* they're made executable — a mismatch
   refuses the install; a release with no checksum degrades to a warning.
-- **A self-update that verifies its own integrity.** `opsforge self update`
-  fetches the latest release, checks its published SHA-256, and only then
-  replaces the running binary — atomically. The same supply-chain guarantee the
-  installer gives your tools, opsforge applies to itself: a tampered asset is
-  never made executable. `--check` reports availability with an exit code for
-  cron/CI, and a dev build (no release tag to compare) is a safe no-op.
+- **A self-update that verifies its own integrity — and provenance.**
+  `opsforge self update` fetches the latest release, checks its published
+  SHA-256, and only then replaces the running binary — atomically. The same
+  supply-chain guarantee the installer gives your tools, opsforge applies to
+  itself: a tampered asset is never made executable. Because our releases are
+  **cosign-signed keyless**, self-update also **verifies that signature**
+  (when cosign is installed) against the release-workflow OIDC identity — a
+  published-but-invalid signature is refused like a mismatch. `--check` reports
+  availability with an exit code for cron/CI, and a dev build (no release tag to
+  compare) is a safe no-op.
+- **Keyless-signed releases with SLSA provenance.** Releases are signed with
+  **cosign keyless (Sigstore/Fulcio)** off the GitHub Actions OIDC identity —
+  no key to store — and carry a native GitHub **SLSA build-provenance
+  attestation**. `checksums.txt.sig` + `checksums.txt.pem` ship on every
+  release; anyone can `cosign verify-blob` them against the workflow identity.
 - **One source of truth for tool families.** The DevOps "families" (`kube`,
   `tf`, `cloud`…) that `history` filters by and that the guard prefilter derives
   from now live in a single package (`internal/families`) — the taxonomy that
@@ -702,6 +758,12 @@ The parts worth pointing a reviewer to:
   linked CycloneDX vulnerabilities. No other tool manager emits a signed
   inventory of your toolbox *with* its vulnerabilities, feedable to grype/trivy
   or a compliance gate.
+- **Proactive CVE notification, never blocking.** opsforge keeps a local CVE
+  cache (`~/.cache/opsforge/`, 6h TTL) so both `opsforge status` (a *Security*
+  line) and the shell (a once-per-session heads-up via `cvenotify.zsh`, cache
+  refreshed in the background) can tell you a new advisory hit an installed tool
+  *without* a synchronous network call — a warning path that can never hang your
+  prompt. No other tool manager surfaces a fresh CVE in your shell and status.
 - **Reproducible env + a CVE gate in one file.** A committed `opsforge.yaml`
   (`version`, `tools`, `profiles`, `fail_on`) makes `opsforge sync` reproduce a
   repo's toolchain — and `fail_on: high|critical` audits *only the required
@@ -736,7 +798,7 @@ internal/secrets/   Leaked-credential scanner
 internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply / --check drift report
 internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
-internal/shellcfg/  zsh environment modules + completion cache + guard policy engine (policy.go)
+internal/shellcfg/  zsh environment modules (incl. cvenotify.zsh) + completion cache + guard policy engine (policy.go)
 internal/ui/        Shared visual identity + themes
 ```
 
@@ -757,8 +819,6 @@ upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 
 - [ ] bash & fish support for the shell layer (currently zsh-only)
 - [ ] Native Windows (winget/scoop + PowerShell completions)
-- [ ] Provenance verification — cosign/sigstore signature checks on release assets
-- [ ] Proactive CVE notification when a new advisory hits an installed tool
 - [ ] More `github:` templates for full brew-less coverage
 
 ## License
