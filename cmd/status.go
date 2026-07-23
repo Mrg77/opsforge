@@ -3,11 +3,14 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
+	"github.com/Mrg77/opsforge/internal/cve"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/output"
@@ -16,6 +19,48 @@ import (
 	"github.com/Mrg77/opsforge/internal/userprofiles"
 	"github.com/Mrg77/opsforge/internal/versions"
 )
+
+// printSecurityLine shows the cached CVE status (instant, no network). If
+// the cache is missing or stale it kicks off a detached background refresh
+// so the next `status`/prompt is accurate — the current call never waits.
+func printSecurityLine() {
+	s, ok := cve.Load()
+	switch {
+	case !ok || s.ScannedAt.IsZero():
+		fmt.Printf("  %s %s\n", ui.Label("Security", 10),
+			ui.Dim.Render("scan pending — `opsforge audit` for a full report"))
+	case s.HighOrCritical > 0:
+		fmt.Printf("  %s %s %s\n", ui.Label("Security", 10),
+			ui.Err.Render(fmt.Sprintf("%s %d tool(s) with HIGH/CRITICAL CVEs", ui.MarkErr, s.HighOrCritical)),
+			ui.Dim.Render("— `opsforge audit`"))
+	case s.Vulnerable > 0:
+		fmt.Printf("  %s %s %s\n", ui.Label("Security", 10),
+			ui.Warn.Render(fmt.Sprintf("%s %d tool(s) with CVEs", ui.MarkWarn, s.Vulnerable)),
+			ui.Dim.Render("— `opsforge audit`"))
+	default:
+		fmt.Printf("  %s %s\n", ui.Label("Security", 10),
+			ui.OK.Render(ui.MarkOK+" no known CVEs"))
+	}
+	if !ok || s.Stale(cve.DefaultTTL, time.Now().UTC()) {
+		refreshCVECacheInBackground()
+	}
+}
+
+// refreshCVECacheInBackground spawns `opsforge cve refresh` detached, so a
+// stale cache updates without holding up the current command.
+func refreshCVECacheInBackground() {
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	cmd := exec.Command(exe, "cve", "refresh")
+	cmd.Stdout, cmd.Stderr = nil, nil
+	// Detach: we don't wait, and we don't want it killed when we exit.
+	_ = cmd.Start()
+	if cmd.Process != nil {
+		_ = cmd.Process.Release()
+	}
+}
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
@@ -88,6 +133,13 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		} else if installed > 0 {
 			fmt.Printf("  %s %s\n", ui.Label("Updates", 10),
 				ui.OK.Render(ui.MarkOK+" everything up to date"))
+		}
+
+		// Security — from the cached CVE scan, so status never blocks on
+		// the network. A stale (or missing) cache triggers a background
+		// refresh for next time.
+		if installed > 0 {
+			printSecurityLine()
 		}
 
 		// Shell environment.
