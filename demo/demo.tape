@@ -51,6 +51,13 @@ Type "q"  Sleep 1s
 Type "clear" Enter
 Sleep 800ms
 
+# --- search the catalog: 249 tools, one term away ----------------------
+Type "opsforge list dns"  Sleep 500ms  Enter
+Sleep 5s
+
+Type "clear" Enter
+Sleep 800ms
+
 # --- stack profiles ----------------------------------------------------
 # 7 ready-made stacks; `opsforge install --profile <name>` installs one in one go
 Type "opsforge profiles"  Sleep 500ms  Enter
