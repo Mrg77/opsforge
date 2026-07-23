@@ -33,6 +33,24 @@ jobs:
       - name: Secret scan
         run: opsforge audit --secrets --json | tee secret-report.json
 
+      # Gate 3 — validate the team's guard policy (policy-as-code). Fails
+      # the job on a broken guards.yaml (bad regex, unknown action…), so a
+      # typo can't silently disable the prod safety rules at runtime.
+      - name: Lint guard policy
+        run: opsforge guard lint --json | tee guard-lint.json
+
+      # Gate 3b — assert specific rules hold (a contract test for policy).
+      - name: Assert prod terraform destroy is guarded
+        run: |
+          action=$(opsforge guard test "terraform destroy" --context prod --json | jq -r .action)
+          test "$action" = "confirm" || test "$action" = "deny"
+
+      # Gate 4 — baseline conformance: does this image match the team's
+      # workstation snapshot? Non-zero exit on drift (missing tools, wrong
+      # theme/guards…). Commit team-baseline.yaml in the repo.
+      - name: Verify workstation baseline
+        run: opsforge apply --check team-baseline.yaml --json | tee drift-report.json
+
       # Optional — a full workstation/image health check as JSON, for
       # dashboards. Does not fail the build (|| true), just records state.
       - name: Workstation health (report only)
