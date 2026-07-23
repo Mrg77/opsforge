@@ -15,7 +15,7 @@ prompt, and **policy-as-code guards** that stop you from nuking the wrong cluste
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
+**[Install](#install) · [Tour](#a-quick-tour) · [Shell](#the-devops-shell-environment) · [History](#history) · [Guards](#policy-as-code-guards) · [CI](#ci--machine-readable-output) · [Catalog](#the-catalog) · [Themes](#themes) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -78,6 +78,7 @@ opsforge audit --json # machine-readable output for CI (non-zero exit on HIGH/CR
 <tr><td><code>opsforge guard [init|list|test]</code></td><td>Policy-as-code guards on destructive commands (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
+<tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
 <tr><td><code>opsforge theme [set &lt;name&gt;]</code></td><td>List/preview/persist color themes</td></tr>
@@ -167,10 +168,23 @@ opsforge shell install && exec zsh
 Turns your **own zsh** into a DevOps-aware environment (modules under
 `~/.config/opsforge/shell/`, `shell uninstall` restores everything):
 
-- **Live completion menu** — a menu of matching subcommands/flags opens as you
-  type (no TAB), navigable with arrows; plus grey inline history suggestions
-  (→ accepts) and syntax coloring. Even terraform (which ships no zsh completion)
-  and opsforge itself are covered.
+- **Calm, on-demand editing** — nothing pops open as you type: just a grey inline
+  suggestion from your history. `↑`/`↓` search history by the **whole-line
+  prefix** you've typed, `→` accepts the whole suggestion, `Tab` accepts it one
+  word at a time, and the line is syntax-colored as you go. Even terraform (which
+  ships no zsh completion) and opsforge itself are covered.
+
+  <table>
+  <tr><th align="left">Key</th><th align="left">What it does</th></tr>
+  <tr><td><code>↑</code> / <code>↓</code></td><td>Walk history by the line prefix you've typed (<code>kubectl get pods -n s</code> + <code>↑</code> cycles only lines starting that way)</td></tr>
+  <tr><td><code>→</code></td><td>Accept the whole grey suggestion</td></tr>
+  <tr><td><code>Tab</code></td><td>Accept the grey suggestion one word at a time (<code>ansible-play</code> + <code>Tab</code> → <code>ansible-playbook </code>)</td></tr>
+  <tr><td><code>Ctrl-Space</code></td><td>File / command completion</td></tr>
+  <tr><td><code>Ctrl-R</code></td><td>Search your whole history</td></tr>
+  </table>
+
+  Prefer the old always-open live menu (zsh-autocomplete)? Set
+  `OPSFORGE_AUTOMENU=1`. Disable the whole layer with `OPSFORGE_INTERACTIVE=0`.
 - **`?` help** — press `?` on an empty line for a themed cheat-sheet; type
   `kubectl get ?` for that command's help, rendered under a framed header with
   `bat`-colored man syntax; type `??` to have an AI explain your last failure.
@@ -184,7 +198,10 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   confirm, warn, or block — driven by [declarative rules](#policy-as-code-guards),
   not hard-coded checks. `OPSFORGE_GUARDS=0` to disable.
 - **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
-  context/namespace (fzf picker when available).
+  context/namespace (fzf picker when available). The `history` builtin is widened
+  to show the last **200** lines (`history 1` for everything), and `hg <term>`
+  greps your whole history — while [`opsforge history`](#history) groups it by
+  DevOps tool family.
 - **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
@@ -195,8 +212,44 @@ reach your shell.
 <tr><td><code>opsforge shell install</code></td><td>Install the zsh environment into <code>~/.zshrc</code> (idempotent)</td></tr>
 <tr><td><code>opsforge shell uninstall</code></td><td>Remove it cleanly (restores <code>~/.zshrc</code>)</td></tr>
 <tr><td><code>opsforge shell doctor</code></td><td>Show what's provided and its state</td></tr>
-<tr><td><code>opsforge shell sync</code></td><td>Regenerate cached completions</td></tr>
+<tr><td><code>opsforge shell sync</code></td><td>Refresh the shell modules <em>and</em> cached completions (run after upgrading opsforge)</td></tr>
 </table>
+
+---
+
+## History
+
+Your shell history is full of the exact commands you need again — buried under
+everything else. `opsforge history` pulls out just one family of DevOps tools,
+so you can find last week's `kubectl port-forward` without scrolling.
+
+```sh
+opsforge history              # overview: every family, with how many recent commands each has
+opsforge history kube         # recent kubectl / helm / k9s / argocd… commands
+opsforge history tf           # terraform / tofu / terragrunt
+opsforge history terraform    # a single tool, by name
+opsforge history git -n 50    # more results (0 = no cap)
+opsforge history kube --json  # machine-readable
+```
+
+Built-in families group the tools you think of together — and deliberately mirror
+the domains used by [guards](#policy-as-code-guards) and profiles, so `kube`,
+`tf`, `cloud`… mean the same thing across the product:
+
+<table>
+<tr><th align="left">Family</th><th align="left">Tools</th></tr>
+<tr><td><code>kube</code></td><td>kubectl, helm, k9s, kubectx, kustomize, stern, kubeseal, flux, argocd…</td></tr>
+<tr><td><code>git</code></td><td>git, gh, glab, lazygit, tig</td></tr>
+<tr><td><code>tf</code></td><td>terraform, tofu, terragrunt, tflint, terraform-docs</td></tr>
+<tr><td><code>docker</code></td><td>docker, docker-compose, podman, nerdctl, colima</td></tr>
+<tr><td><code>cloud</code></td><td>aws, gcloud, az, doctl, eksctl, flyctl, vercel</td></tr>
+<tr><td><code>ansible</code></td><td>ansible, ansible-playbook, ansible-galaxy, ansible-vault</td></tr>
+</table>
+
+Pass a family name, or any executable to filter by that single tool. Results are
+distinct commands, most-recent first, with a `×N` run count; `--limit/-n` caps
+them (default 20, `0` = all) and `--json` emits them for scripts. History is
+parsed **passively** — opsforge reads the file, never executes anything.
 
 ---
 
@@ -383,6 +436,7 @@ internal/catalog/   Embedded YAML catalog + brew/github validation
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify)
 internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
+internal/history/   Passive shell-history reader + DevOps tool-family grouping
 internal/secrets/   Leaked-credential scanner
 internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply
