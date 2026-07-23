@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 	"time"
 
@@ -49,17 +48,7 @@ func printSecurityLine() {
 // refreshCVECacheInBackground spawns `opsforge cve refresh` detached, so a
 // stale cache updates without holding up the current command.
 func refreshCVECacheInBackground() {
-	exe, err := os.Executable()
-	if err != nil {
-		return
-	}
-	cmd := exec.Command(exe, "cve", "refresh")
-	cmd.Stdout, cmd.Stderr = nil, nil
-	// Detach: we don't wait, and we don't want it killed when we exit.
-	_ = cmd.Start()
-	if cmd.Process != nil {
-		_ = cmd.Process.Release()
-	}
+	spawnDetached("cve", "refresh")
 }
 
 var statusCmd = &cobra.Command{
