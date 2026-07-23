@@ -47,8 +47,8 @@ Shows the full plan and asks for confirmation before changing anything
 (use --yes to skip in scripts).
 
 With --check, compare this machine to the snapshot WITHOUT changing
-anything and exit non-zero if it has drifted from the baseline — a
-CI-native way to assert a workstation or image matches the team baseline.
+anything and exit non-zero if it has drifted — a CI-native way to assert
+that your workstation or build image still matches a snapshot you froze.
 Combine with --json for a structured drift report.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -85,7 +85,7 @@ func runCheck(snap snapshot.Snapshot, cat *catalog.Catalog) error {
 		return nil
 	}
 
-	fmt.Println(ui.Header("opsforge apply --check", "verify this machine against the team baseline"))
+	fmt.Println(ui.Header("opsforge apply --check", "verify this machine against your snapshot"))
 	fmt.Println()
 
 	if report.Compliant {

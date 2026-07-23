@@ -8,9 +8,10 @@ Pick your CLIs from an interactive terminal UI, install them in one go, and turn
 your zsh into a context-aware DevOps environment — live completion, a prod-aware
 prompt, and **policy-as-code guards** that stop you from nuking the wrong cluster.
 
-opsforge is the **supply-chain + policy layer for your workstation *and* your
-projects**: it installs your toolbox, guards how you use it, and hands you a
-CVE-correlated SBOM of the whole thing.
+opsforge is the **supply-chain + policy layer for your own workstation**: it
+installs your toolbox, guards how *you* use it, and hands you a CVE-correlated
+SBOM of the whole thing. It's a personal power tool, not a team platform — no
+server, no account, no lock-in.
 
 **English** · [Français](README.fr.md)
 
@@ -75,7 +76,7 @@ opsforge status       # one-glance cockpit of your workstation
 opsforge doctor       # full health check — incl. CVEs & leaked secrets
 opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
 opsforge guard test "terraform destroy" --context prod   # simulate a guard rule
-opsforge apply --check team-baseline.yaml                # verify this machine matches the baseline (CI)
+opsforge apply --check my-setup.yaml                     # verify this machine matches your snapshot (CI)
 opsforge self update  # self-update, checksum-verified before the swap
 ```
 
@@ -92,7 +93,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
-<tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against the baseline without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
+<tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against your snapshot without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
 <tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
@@ -123,9 +124,10 @@ Launch the bare binary to browse by category and install what you check.
 
 Three paths that show how the pieces fit together.
 
-### Onboard a new machine
+### Set up a new machine
 
-Rebuild a full workstation from one file instead of a day of manual setup.
+Switching laptops? Rebuild your full workstation from one file instead of a day
+of manual setup.
 
 ```sh
 opsforge snapshot -o my-setup.yaml         # on your current machine: tools + shell + theme + guards → one YAML
@@ -144,11 +146,10 @@ opsforge audit --secrets --json               # also fails on a leaked credentia
 
 Drop-in workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
 
-### Share & validate a prod-guard policy
+### Version & validate your prod-guard policy
 
-Version your team's prod-safety rules in one file and keep them honest in the
-pipeline. (opsforge can't force the guards onto anyone's shell — but it lets
-you commit the policy and prove it does what you think.)
+Version your own prod-safety rules in one file and keep them honest in the
+pipeline — the same way you'd version the rest of your dotfiles.
 
 ```sh
 opsforge guard init                                            # write a starter guards.yaml, then commit it
@@ -190,15 +191,16 @@ policy** (the raw `guards.yaml`), and the detected **version manager**. `apply`
 shows the full plan and asks before changing anything (`--yes` for scripts),
 restoring the theme and guard rules alongside the tools.
 
-**A verifiable team baseline.** `apply --check` compares this machine to the
-snapshot **without modifying anything**, exiting **non-zero on drift** — a
-missing tool, or a theme/guards/shell/version-manager that differs. With `--json`
-it emits a structured report — `{compliant, missing_tools, drift}` — so a CI job
-can assert that a laptop or a base image still matches the team baseline:
+**Check a machine against a known-good snapshot.** `apply --check` compares this
+machine to a snapshot **you froze earlier**, **without modifying anything**,
+exiting **non-zero on drift** — a missing tool, or a
+theme/guards/shell/version-manager that differs. With `--json` it emits a
+structured report — `{compliant, missing_tools, drift}` — so a CI job can assert
+that your laptop, or a build image, still matches your reference setup:
 
 ```sh
-opsforge apply --check team-baseline.yaml            # fails the job on any drift
-opsforge apply --check team-baseline.yaml --json | jq '.compliant'
+opsforge apply --check my-setup.yaml            # fails the job on any drift
+opsforge apply --check my-setup.yaml --json | jq '.compliant'
 ```
 
 Snapshots are **forward-compatible**: the format grew from v1 (tools, profiles,
@@ -387,7 +389,8 @@ opsforge guard test "kubectl delete ns" --context prod --json  # {command, conte
 ```
 
 **Policy you can version and validate in CI.** Because the rules live in one file,
-a team can commit `guards.yaml` to a repo and keep it honest in the pipeline:
+you can commit `guards.yaml` alongside your dotfiles and keep it honest in the
+pipeline:
 
 - `opsforge guard lint` validates the active policy and **exits non-zero** when
   it's broken — a bad regex, unknown action, or wrong version fails the job
@@ -398,8 +401,8 @@ a team can commit `guards.yaml` to a repo and keep it honest in the pipeline:
   `Evaluate` call the shell uses, so the test can't diverge from real behavior.
 
 This is the moat, extended: the guards apply on your own shell, and the policy
-that drives them is **testable and versionable** like the rest of your
-infrastructure — not a per-machine snowflake.
+that drives them is **testable and versionable** like the rest of your setup —
+not a per-machine snowflake.
 
 - **Context is read passively.** The context string is built from your kubeconfig
   `current-context`, `AWS_PROFILE`/`AWS_VAULT`, and the terraform workspace —
@@ -565,7 +568,7 @@ gates you switch on (`audit`, `secrets`, `guard-lint`, `sbom`, `baseline`):
     secrets: 'true'        # also fail on a leaked credential
     guard-lint: 'true'     # validate guards.yaml (policy-as-code)
     sbom: 'true'           # emit a CycloneDX SBOM, uploaded as an artifact
-    baseline: team-baseline.yaml   # assert this machine matches the snapshot
+    baseline: my-setup.yaml   # assert this machine matches your snapshot
 ```
 
 Full example: [`examples/github-action-usage.yml`](examples/github-action-usage.yml).
@@ -689,8 +692,9 @@ Merge semantics are predictable:
 - **Unknown YAML fields are rejected**, so a typo fails loudly instead of being
   silently ignored.
 
-This makes opsforge a real fit for a team: ship an overlay alongside your repo and
-everyone's internal tooling installs the same way as the public catalog.
+This is how you fold your own internal or private CLIs into opsforge: keep an
+overlay next to your dotfiles and your in-house tooling installs the same way as
+the public catalog.
 
 ---
 

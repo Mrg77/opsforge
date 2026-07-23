@@ -9,9 +9,11 @@ seul coup, et transformez votre zsh en un environnement DevOps sensible au
 contexte — complétion en direct, prompt conscient de la prod, et des **guards
 policy-as-code** qui vous empêchent de démolir le mauvais cluster.
 
-opsforge est la **couche supply-chain + policy de votre poste de travail *et* de
-vos projets** : il installe votre boîte à outils, garde-fou la façon dont vous
-l'utilisez, et vous remet un SBOM corrélé aux CVE de l'ensemble.
+opsforge est la **couche supply-chain + policy de votre propre poste de
+travail** : il installe votre boîte à outils, garde-fou la façon dont *vous*
+l'utilisez, et vous remet un SBOM corrélé aux CVE de l'ensemble. C'est un outil
+personnel, pas une plateforme d'équipe — pas de serveur, pas de compte, pas de
+verrouillage.
 
 [English](README.md) · **Français**
 
@@ -77,7 +79,7 @@ opsforge status       # cockpit de votre poste de travail en un coup d'œil
 opsforge doctor       # bilan de santé complet — CVE & secrets exposés inclus
 opsforge audit        # scan des CVE des outils installés (--secrets : creds exposés aussi)
 opsforge guard test "terraform destroy" --context prod   # simule une règle de guard
-opsforge apply --check team-baseline.yaml                # vérifie que cette machine respecte la base (CI)
+opsforge apply --check my-setup.yaml                     # vérifie que cette machine correspond à votre snapshot (CI)
 opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 ```
 
@@ -94,7 +96,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> reporte la dérive pour la CI · gate CVE optionnel (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Exporter / reconstruire tout un poste de travail</td></tr>
-<tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à la base sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
+<tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à votre snapshot sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Affiche la version ou se met à jour — checksum vérifié avant le remplacement (<code>--check</code> pour CI/cron)</td></tr>
 <tr><td><code>opsforge history [famille|outil]</code></td><td>Commandes shell récentes, groupées par famille d'outils (<code>kube</code>, <code>git</code>, <code>tf</code>… — voir <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Outils installés · catalogue complet · seulement les mises à jour (<code>--json</code> pour scripter)</td></tr>
@@ -126,10 +128,10 @@ Lancez le binaire nu pour parcourir par catégorie et installer ce que vous coch
 
 Trois parcours qui montrent comment les pièces s'emboîtent.
 
-### Mettre en route une nouvelle machine
+### Configurer votre nouvelle machine
 
-Reconstruisez un poste complet depuis un seul fichier, au lieu d'une journée de
-config manuelle.
+Vous changez de laptop ? Reconstruisez votre poste complet depuis un seul
+fichier, au lieu d'une journée de config manuelle.
 
 ```sh
 opsforge snapshot -o my-setup.yaml         # sur votre machine actuelle : outils + shell + thème + guards → un YAML
@@ -149,12 +151,11 @@ opsforge audit --secrets --json               # échoue aussi sur un identifiant
 
 Workflow prêt à l'emploi : [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
 
-### Partager & valider une politique de guards prod
+### Versionner & valider votre politique de guards prod
 
-Versionnez les règles de sûreté prod de votre équipe dans un seul fichier et
-gardez-les honnêtes dans le pipeline. (opsforge ne peut pas *imposer* les guards
-sur le shell de qui que ce soit — mais il vous laisse committer la politique et
-prouver qu'elle fait ce que vous croyez.)
+Versionnez vos propres règles de sûreté prod dans un seul fichier et
+gardez-les honnêtes dans le pipeline — comme vous versionneriez le reste de vos
+dotfiles.
 
 ```sh
 opsforge guard init                                            # écrit un guards.yaml de départ, puis committez-le
@@ -198,16 +199,17 @@ détecté. `apply` affiche le plan complet et demande confirmation avant de chan
 quoi que ce soit (`--yes` pour les scripts), restaurant le thème et les règles de
 guards en même temps que les outils.
 
-**Une base d'équipe vérifiable.** `apply --check` compare cette machine au snapshot
-**sans rien modifier**, avec un **code de sortie non nul en cas d'écart** — un
-outil manquant, ou un thème/guards/shell/gestionnaire de versions qui diffère.
-Avec `--json`, il émet un rapport structuré — `{compliant, missing_tools, drift}` —
-pour qu'un job CI puisse vérifier qu'un laptop ou une image de base correspond
-toujours à la base d'équipe :
+**Vérifier une machine contre un snapshot de référence.** `apply --check` compare
+cette machine à un snapshot **que vous avez figé plus tôt**, **sans rien
+modifier**, avec un **code de sortie non nul en cas d'écart** — un outil
+manquant, ou un thème/guards/shell/gestionnaire de versions qui diffère. Avec
+`--json`, il émet un rapport structuré — `{compliant, missing_tools, drift}` —
+pour qu'un job CI puisse vérifier que votre laptop, ou une image de build,
+correspond toujours à votre config de référence :
 
 ```sh
-opsforge apply --check team-baseline.yaml            # fait échouer le job au moindre écart
-opsforge apply --check team-baseline.yaml --json | jq '.compliant'
+opsforge apply --check my-setup.yaml            # fait échouer le job au moindre écart
+opsforge apply --check my-setup.yaml --json | jq '.compliant'
 ```
 
 Les snapshots sont **compatibles vers l'avant** : le format a évolué de v1
@@ -409,8 +411,8 @@ opsforge guard test "kubectl delete ns" --context prod --json  # {command, conte
 ```
 
 **Une politique que vous pouvez versionner et valider en CI.** Comme les règles
-vivent dans un seul fichier, une équipe peut committer `guards.yaml` dans un dépôt
-et la garder honnête dans le pipeline :
+vivent dans un seul fichier, vous pouvez committer `guards.yaml` à côté de vos
+dotfiles et le garder honnête dans le pipeline :
 
 - `opsforge guard lint` valide la politique active et **sort avec un code non nul**
   quand elle est cassée — une regex invalide, une action inconnue, ou une mauvaise
@@ -424,7 +426,7 @@ et la garder honnête dans le pipeline :
 
 C'est le fossé défensif, prolongé : les guards s'appliquent sur votre propre
 shell, et la politique qui les pilote est **testable et versionnable** comme le
-reste de votre infrastructure — pas un flocon de neige propre à chaque machine.
+reste de votre config — pas un flocon de neige propre à chaque machine.
 
 - **Le contexte est lu passivement.** La chaîne de contexte est construite à
   partir du `current-context` de votre kubeconfig, de `AWS_PROFILE`/`AWS_VAULT`, et
@@ -595,7 +597,7 @@ gates que vous activez (`audit`, `secrets`, `guard-lint`, `sbom`, `baseline`) :
     secrets: 'true'        # échoue aussi sur un identifiant exposé
     guard-lint: 'true'     # valide guards.yaml (policy-as-code)
     sbom: 'true'           # émet un SBOM CycloneDX, téléversé comme artefact
-    baseline: team-baseline.yaml   # vérifie que cette machine correspond au snapshot
+    baseline: my-setup.yaml   # vérifie que cette machine correspond à votre snapshot
 ```
 
 Exemple complet : [`examples/github-action-usage.yml`](examples/github-action-usage.yml).
@@ -723,9 +725,9 @@ La sémantique de merge est prévisible :
 - **Les champs YAML inconnus sont rejetés**, pour qu'une typo échoue bruyamment au
   lieu d'être silencieusement ignorée.
 
-Cela fait d'opsforge un vrai atout pour une équipe : livrez un overlay à côté de
-votre dépôt et l'outillage interne de chacun s'installe de la même façon que le
-catalogue public.
+C'est ainsi que vous intégrez vos propres CLI internes ou privés dans opsforge :
+gardez un overlay à côté de vos dotfiles et votre outillage maison s'installe de
+la même façon que le catalogue public.
 
 ---
 

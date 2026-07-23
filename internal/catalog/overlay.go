@@ -16,9 +16,9 @@ import (
 //  1. every ~/.config/opsforge/catalog.d/*.yaml (sorted)
 //  2. the file named by $OPSFORGE_CATALOG, if set
 //
-// This lets an engineer add internal/private tools without a PR against
-// the embedded catalog — the #1 reason the fixed 106-tool list wasn't
-// enough for real teams.
+// This lets you add your own internal/private tools without a PR against
+// the embedded catalog — every engineer has a tool the curated list
+// doesn't cover.
 func overlayPaths() []string {
 	var paths []string
 	if home, err := os.UserHomeDir(); err == nil {

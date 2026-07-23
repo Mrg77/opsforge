@@ -168,8 +168,8 @@ var guardTestCmd = &cobra.Command{
 }
 
 // guardLintCmd validates the active guards policy and exits non-zero when
-// it is invalid — the piece that makes policy-as-code CI-checkable. A team
-// commits guards.yaml and runs `opsforge guard lint` on every change; a typo
+// it is invalid — the piece that makes policy-as-code CI-checkable. You
+// commit guards.yaml and run `opsforge guard lint` on every change; a typo
 // (bad regex, unknown action, wrong version) fails the job instead of
 // silently falling back to the default policy at runtime.
 var guardLintCmd = &cobra.Command{
