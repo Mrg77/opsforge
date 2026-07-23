@@ -1,0 +1,43 @@
+# Example: gate your pipeline with the official opsforge GitHub Action.
+#
+# Instead of scripting install + audit by hand (see ci-security-gate.yml),
+# this uses the composite action at the repo root — `uses: Mrg77/opsforge@v1`
+# — and turns each check on with a boolean input. Run it on a build image
+# that ships the DevOps CLIs opsforge audits (kubectl, helm, terraform…).
+name: security-gate
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1" # weekly re-scan: new CVEs land against pinned versions
+
+jobs:
+  opsforge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # One step: install opsforge and run every enabled gate.
+      #   - audit       → fail on HIGH/CRITICAL CVEs
+      #   - secrets     → fail on a leaked credential
+      #   - guard-lint  → validate the committed guards.yaml
+      #   - sbom        → emit a CycloneDX SBOM, uploaded as an artifact
+      #   - baseline    → assert this image matches the team snapshot
+      - name: opsforge security gate
+        uses: Mrg77/opsforge@v1
+        with:
+          version: latest
+          audit: 'true'
+          secrets: 'true'
+          guard-lint: 'true'
+          sbom: 'true'
+          baseline: team-baseline.yaml
+
+  # Minimal variant: just the CVE gate, nothing else.
+  cve-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Mrg77/opsforge@v1
+        with:
+          audit: 'true'

@@ -1,0 +1,158 @@
+# opsforge — official GitHub Action
+#
+# A composite action that installs opsforge and runs its CI-native security
+# gates. Each check is opt-in and skipped unless you set its input to 'true'.
+#
+# Usage:
+#   - uses: Mrg77/opsforge@v1
+#     with:
+#       audit: 'true'          # fail on any HIGH/CRITICAL CVE in installed tools
+#       secrets: 'true'        # also fail on a leaked credential
+#       guard-lint: 'true'     # validate guards.yaml (policy-as-code)
+#       sbom: 'true'           # emit a CycloneDX SBOM (uploaded as an artifact)
+#       baseline: team-baseline.yaml   # assert this machine matches the snapshot
+#
+# opsforge relies on installed DevOps CLIs (kubectl, helm, terraform…) to
+# audit — run this on a build image that ships them, or after installing them.
+name: opsforge
+description: >-
+  Install opsforge and gate your pipeline on CVEs, leaked secrets, a
+  policy-as-code guard file, an SBOM, and a workstation baseline.
+author: Mrg77
+
+branding:
+  icon: shield
+  color: orange
+
+inputs:
+  version:
+    description: >-
+      opsforge version to install (e.g. v1.2.3). Defaults to 'latest', which
+      resolves the newest published release.
+    required: false
+    default: latest
+  audit:
+    description: >-
+      Run `opsforge audit --json`. Fails the job on any HIGH/CRITICAL CVE in
+      the installed tools. Writes the JSON report to opsforge-audit.json.
+    required: false
+    default: 'false'
+  secrets:
+    description: >-
+      Run `opsforge audit --secrets --json`. Scans shell history, rc files and
+      local .env files for leaked credentials and fails on a critical leak.
+      Writes the JSON report to opsforge-secrets.json.
+    required: false
+    default: 'false'
+  guard-lint:
+    description: >-
+      Run `opsforge guard lint --json` to validate the active guards.yaml
+      (policy-as-code). Fails on a bad regex, unknown action, or wrong version.
+    required: false
+    default: 'false'
+  sbom:
+    description: >-
+      Run `opsforge sbom --audit` to emit a CycloneDX 1.6 SBOM (with embedded
+      CVE findings) to the file named by `sbom-path`, exposed as the `sbom-path`
+      output. Set `sbom-upload: true` to also upload it as a workflow artifact.
+    required: false
+    default: 'false'
+  sbom-path:
+    description: Where to write the SBOM when `sbom` is enabled.
+    required: false
+    default: opsforge-sbom.json
+  sbom-upload:
+    description: >-
+      When 'true' and `sbom` is enabled, upload the SBOM as a workflow artifact
+      named 'opsforge-sbom'.
+    required: false
+    default: 'true'
+  baseline:
+    description: >-
+      Path (or URL) to a workstation snapshot. When set, runs
+      `opsforge apply --check <baseline> --json` and fails the job if this
+      machine or image has drifted from the baseline.
+    required: false
+    default: ''
+
+outputs:
+  version:
+    description: The opsforge version that was installed.
+    value: ${{ steps.install.outputs.version }}
+  sbom-path:
+    description: Path to the generated SBOM file (empty when `sbom` was not enabled).
+    value: ${{ steps.sbom.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      name: Install opsforge
+      shell: bash
+      env:
+        OPSFORGE_VERSION: ${{ inputs.version == 'latest' && '' || inputs.version }}
+      run: |
+        set -euo pipefail
+        # OPSFORGE_VERSION is honored by install.sh; empty means "latest".
+        curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
+        # install.sh drops the binary in ~/.local/bin — put it on PATH for later steps.
+        echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+        export PATH="$HOME/.local/bin:$PATH"
+        installed="$(opsforge --version 2>/dev/null || true)"
+        echo "version=${installed}" >> "$GITHUB_OUTPUT"
+        echo "Installed: ${installed}"
+
+    - id: audit
+      name: CVE audit
+      if: inputs.audit == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Exits non-zero on any HIGH/CRITICAL CVE — fails the job on its own.
+        opsforge audit --json | tee opsforge-audit.json
+
+    - id: secrets
+      name: Secret scan
+      if: inputs.secrets == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # --secrets adds leaked-credential findings; a critical leak fails the job.
+        opsforge audit --secrets --json | tee opsforge-secrets.json
+
+    - id: guard-lint
+      name: Lint guard policy
+      if: inputs.guard-lint == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Non-zero exit on an invalid guards.yaml (bad regex/action/version).
+        opsforge guard lint --json | tee opsforge-guard-lint.json
+
+    - id: sbom
+      name: Generate SBOM
+      if: inputs.sbom == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # `sbom` writes the CycloneDX document to stdout (summary to stderr).
+        opsforge sbom --audit > "${{ inputs.sbom-path }}"
+        echo "path=${{ inputs.sbom-path }}" >> "$GITHUB_OUTPUT"
+        echo "Wrote SBOM to ${{ inputs.sbom-path }}"
+
+    - id: sbom-upload
+      name: Upload SBOM artifact
+      if: inputs.sbom == 'true' && inputs.sbom-upload == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: opsforge-sbom
+        path: ${{ inputs.sbom-path }}
+
+    - id: baseline
+      name: Verify workstation baseline
+      if: inputs.baseline != ''
+      shell: bash
+      run: |
+        set -euo pipefail
+        # Non-zero exit on drift from the committed team baseline.
+        opsforge apply --check "${{ inputs.baseline }}" --json | tee opsforge-drift.json

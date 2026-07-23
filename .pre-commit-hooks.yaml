@@ -1,0 +1,33 @@
+# opsforge — reusable pre-commit hooks.
+#
+# Consume these from any repo's .pre-commit-config.yaml:
+#
+#   repos:
+#     - repo: https://github.com/Mrg77/opsforge
+#       rev: v1.0.0            # pin to a released tag
+#       hooks:
+#         - id: opsforge-guard-lint
+#         - id: opsforge-secrets
+#
+# These hooks use `language: system`, so they run the opsforge binary already
+# on your PATH — install it first with:
+#   curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
+#
+# pass_filenames is false: both hooks inspect the workstation/policy, not the
+# staged file list, so pre-commit must not append filenames to the command.
+
+- id: opsforge-guard-lint
+  name: opsforge guard lint
+  description: Validate the policy-as-code guard file (guards.yaml) — fails on a bad rule.
+  entry: opsforge guard lint
+  language: system
+  pass_filenames: false
+  always_run: true
+
+- id: opsforge-secrets
+  name: opsforge secret scan
+  description: Block a commit when a credential is leaking in history, rc files or .env files.
+  entry: opsforge audit --secrets
+  language: system
+  pass_filenames: false
+  always_run: true
