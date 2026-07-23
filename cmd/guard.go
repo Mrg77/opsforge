@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/ui"
 )
@@ -123,6 +124,22 @@ var guardTestCmd = &cobra.Command{
 		if context == "" {
 			context = shellcfg.CurrentContext()
 		}
+
+		// Machine path: emit the decision as JSON so a CI job can assert a
+		// command's action against the committed policy (e.g. that
+		// "terraform destroy" is denied on prod). Same Evaluate call as the
+		// human path, so the two never diverge.
+		if output.JSON {
+			d := policy.Evaluate(command, context)
+			return output.Emit(struct {
+				Command     string `json:"command"`
+				Context     string `json:"context"`
+				MatchedRule string `json:"matched_rule"`
+				Action      string `json:"action"`
+				Message     string `json:"message"`
+			}{command, context, d.Rule, string(d.Action), d.Message})
+		}
+
 		fmt.Println(ui.Header("opsforge guard test", ""))
 		fmt.Println()
 		fmt.Printf("  %s %s\n", ui.Label("command", 8), ui.Accent.Render(command))
@@ -145,6 +162,78 @@ var guardTestCmd = &cobra.Command{
 		}
 		if d.Message != "" {
 			fmt.Printf("      %s\n", ui.Dim.Render(d.Message))
+		}
+		return nil
+	},
+}
+
+// guardLintCmd validates the active guards policy and exits non-zero when
+// it is invalid — the piece that makes policy-as-code CI-enforceable. A team
+// commits guards.yaml and runs `opsforge guard lint` on every change; a typo
+// (bad regex, unknown action, wrong version) fails the job instead of
+// silently falling back to the default policy at runtime.
+var guardLintCmd = &cobra.Command{
+	Use:   "lint",
+	Short: "Validate guards.yaml (non-zero exit on error, for CI)",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		path, _ := shellcfg.PolicyPath()
+
+		// LoadPolicy validates as it loads: a present-but-broken file returns
+		// an error, an absent file yields the (always-valid) default. We split
+		// those cases so JSON reports a clean errors[] rather than a Go error.
+		policy, custom, err := shellcfg.LoadPolicy()
+		source := "no guards.yaml — built-in default policy"
+		if err != nil {
+			// A present-but-broken file: LoadPolicy reports custom=false, but
+			// the file exists — name it so the header points at what to fix.
+			source = path
+		} else if custom {
+			source = path
+		}
+
+		var errs []string
+		valid := true
+		rules := 0
+		if err != nil {
+			valid = false
+			errs = append(errs, err.Error())
+		} else {
+			rules = len(policy.Rules)
+			// LoadPolicy already validated, but re-run Validate so lint is
+			// self-contained and future-proof against a load that skips it.
+			if verr := policy.Validate(); verr != nil {
+				valid = false
+				errs = append(errs, verr.Error())
+			}
+		}
+
+		if output.JSON {
+			if emitErr := output.Emit(struct {
+				Valid  bool     `json:"valid"`
+				Rules  int      `json:"rules"`
+				Errors []string `json:"errors"`
+			}{valid, rules, errs}); emitErr != nil {
+				return emitErr
+			}
+		} else {
+			fmt.Println(ui.Header("opsforge guard lint", source))
+			fmt.Println()
+			if valid {
+				fmt.Printf("  %s policy is valid (%s)\n",
+					ui.OKMark(), plural(rules, "rule"))
+			} else {
+				fmt.Printf("  %s policy is invalid\n", ui.ErrMark())
+				for _, e := range errs {
+					fmt.Printf("      %s %s\n", ui.MarkArrow, ui.Err.Render(e))
+				}
+			}
+		}
+
+		if !valid {
+			// Non-zero exit for CI. SilenceErrors/SilenceUsage are set on
+			// root, and we've already printed the diagnostics ourselves, so
+			// exit directly rather than returning a (re-printed) error.
+			os.Exit(1)
 		}
 		return nil
 	},
@@ -291,6 +380,6 @@ func init() {
 		"context to simulate against (defaults to the current context)")
 	guardInitCmd.Flags().BoolVar(&guardInitForce, "force", false,
 		"overwrite an existing guards.yaml")
-	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardInitCmd, guardPrefilterCmd)
+	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardLintCmd, guardInitCmd, guardPrefilterCmd)
 	rootCmd.AddCommand(guardCmd)
 }
