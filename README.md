@@ -84,6 +84,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><th align="left">Command</th><th align="left">What it does</th></tr>
 <tr><td><code>opsforge</code></td><td>Interactive picker — browse, check, install</td></tr>
 <tr><td><code>opsforge status</code></td><td>Cockpit: tools, updates, shell, theme at a glance</td></tr>
+<tr><td><code>opsforge notify [--json]</code></td><td>One digest of what needs attention — CVEs, updates, leaked secrets, a newer opsforge (see <a href="#the-notify-digest">notify</a>)</td></tr>
 <tr><td><code>opsforge install kubectl helm</code></td><td>Non-interactive install by name (scriptable)</td></tr>
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
@@ -283,12 +284,13 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   to show the last **200** lines (`history 1` for everything), and `hg <term>`
   greps your whole history — while [`opsforge history`](#history) groups it by
   DevOps tool family.
-- **Proactive CVE heads-up** — once per session, opsforge tells you in your own
-  shell if a known CVE just hit one of your installed tools, then refreshes its
-  local cache in the background — reading from `~/.cache/opsforge/` (6h TTL) so
-  the prompt never blocks on the network. It's the only tool manager that warns
-  you *in your shell* the moment an advisory lands on your toolbox. Silence it
-  with `OPSFORGE_CVE_NOTICE=0`.
+- **Proactive heads-up** — once per session, opsforge prints a compact one-liner
+  in your own shell when something on your machine needs attention: a CVE just
+  hit an installed tool, updates are waiting, a secret is leaking, or a newer
+  opsforge is out. It reads a local cache (`~/.cache/opsforge/`, 6h TTL) and
+  refreshes a stale one in the background, so the prompt never blocks on the
+  network. Run [`opsforge notify`](#the-notify-digest) for the full breakdown;
+  silence the heads-up with `OPSFORGE_NOTIFY=0`.
 - **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
 
 Every module is validated with `zsh -n` in CI, so a broken script can never
@@ -506,22 +508,47 @@ download is intact, a **cosign signature** proves the release is authentic (see
 [the catalog](#the-catalog)), and the **SBOM** proves what you ended up with —
 CVEs included.
 
-### Proactive CVE notification
+### The notify digest
 
-opsforge doesn't wait for you to run `audit` — it tells you the moment an
-advisory lands on a tool you already have installed.
+opsforge doesn't wait for you to run `audit` — `opsforge notify` is **one
+digest of everything on *your* machine that needs attention**, in a single
+place:
 
-- **In your shell.** Once per session, the [DevOps shell](#the-devops-shell-environment)
-  prints a heads-up if a known CVE affects an installed tool, then refreshes its
-  cache in the background (`OPSFORGE_CVE_NOTICE=0` to silence it).
-- **In `opsforge status`.** A **Security** line surfaces the same finding at a
-  glance — e.g. *"1 tool(s) with HIGH/CRITICAL CVEs"*.
-- **Never blocks.** Both read a local cache under `~/.cache/opsforge/` (6h TTL),
-  refreshed in the background — so a heads-up or a status check never waits on
-  the network.
+- installed tools carrying a **known CVE** (HIGH/CRITICAL called out in red),
+- tools that **can be updated**,
+- **credentials leaking** in your shell history / rc / `.env` (when scanned),
+- a **newer opsforge** than the one you're running.
 
-It's the only tool manager that proactively warns you — in your shell *and* your
-status cockpit — that a CVE just hit one of your tools.
+Each line comes with the exact command that fixes it:
+
+```
+  ✗ 1 tool with a HIGH/CRITICAL CVE          → opsforge audit
+  ✗ 6 critical secrets leaking in your shell → opsforge audit --secrets
+  ⚠ 3 tools can be updated                   → opsforge upgrade -u
+```
+
+```sh
+opsforge notify            # the full digest, grouped by severity
+opsforge notify --json     # the structured Digest, for scripts
+opsforge notify --refresh  # recompute the cache now
+opsforge notify --quiet    # just the compact one-liner (used by the shell)
+```
+
+**A heads-up in your shell, once per session.** When something needs your
+attention, the [DevOps shell](#the-devops-shell-environment) prints a compact
+one-liner on startup — e.g. *"opsforge: 1 tool with a HIGH/CRITICAL CVE · 3
+tools can be updated — run `opsforge notify`"* — then you run `opsforge notify`
+for the breakdown. Silence it with `OPSFORGE_NOTIFY=0`.
+
+**Cached, instant, never blocking.** `notify` reads a local cache under
+`~/.cache/opsforge/` (6h TTL) and only ever *reads* it — a stale cache is
+refreshed in the background (or on demand with `--refresh`), so neither the
+digest nor the shell heads-up ever waits on the network. The same finding also
+surfaces at a glance in [`opsforge status`](#a-quick-tour).
+
+It's the only tool manager that folds CVEs, updates, leaked secrets *and* its
+own self-update into one digest and pushes it, proactively, into your shell —
+the moment an advisory lands on your toolbox, you know, without running a thing.
 
 ---
 
@@ -765,12 +792,13 @@ The parts worth pointing a reviewer to:
   linked CycloneDX vulnerabilities. No other tool manager emits a signed
   inventory of your toolbox *with* its vulnerabilities, feedable to grype/trivy
   or a compliance gate.
-- **Proactive CVE notification, never blocking.** opsforge keeps a local CVE
-  cache (`~/.cache/opsforge/`, 6h TTL) so both `opsforge status` (a *Security*
-  line) and the shell (a once-per-session heads-up via `cvenotify.zsh`, cache
-  refreshed in the background) can tell you a new advisory hit an installed tool
-  *without* a synchronous network call — a warning path that can never hang your
-  prompt. No other tool manager surfaces a fresh CVE in your shell and status.
+- **One cached digest, never blocking.** `opsforge notify` aggregates CVEs,
+  available updates, leaked secrets and a newer opsforge into a single cached
+  digest (`internal/notices`, `~/.cache/opsforge/`, 6h TTL). Both the shell (a
+  once-per-session one-liner via `notify.zsh`) and `opsforge status` read it
+  *without* a synchronous network call — a stale cache is recomputed in a
+  detached background process — so the heads-up path can never hang your prompt.
+  No other tool manager pushes a fresh CVE, update or leak into your shell.
 - **Reproducible env + a CVE gate in one file.** A committed `opsforge.yaml`
   (`version`, `tools`, `profiles`, `fail_on`) makes `opsforge sync` reproduce a
   repo's toolchain — and `fail_on: high|critical` audits *only the required
@@ -802,10 +830,11 @@ internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 sc
 internal/families/  Single source of truth for DevOps tool families (consumed by history + guard prefilter)
 internal/history/   Passive shell-history reader + DevOps tool-family grouping
 internal/secrets/   Leaked-credential scanner
+internal/notices/   Cached digest behind `opsforge notify` (CVEs + updates + secrets + self-update)
 internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply / --check drift report
 internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
-internal/shellcfg/  zsh environment modules (incl. cvenotify.zsh) + completion cache + guard policy engine (policy.go)
+internal/shellcfg/  zsh environment modules (incl. notify.zsh) + completion cache + guard policy engine (policy.go)
 internal/ui/        Shared visual identity + themes
 ```
 

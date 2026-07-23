@@ -87,6 +87,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><th align="left">Commande</th><th align="left">Ce qu'elle fait</th></tr>
 <tr><td><code>opsforge</code></td><td>Sélecteur interactif — parcourir, vérifier, installer</td></tr>
 <tr><td><code>opsforge status</code></td><td>Cockpit : outils, mises à jour, shell, thème en un coup d'œil</td></tr>
+<tr><td><code>opsforge notify [--json]</code></td><td>Un seul digest de ce qui mérite votre attention — CVE, mises à jour, secrets exposés, un opsforge plus récent (voir <a href="#le-digest-notify">notify</a>)</td></tr>
 <tr><td><code>opsforge install kubectl helm</code></td><td>Installation non interactive par nom (scriptable)</td></tr>
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Installe tout un preset de stack en une commande</td></tr>
 <tr><td><code>opsforge upgrade [-u] [outil…]</code></td><td>Met à jour tout, seulement l'obsolète (<code>-u</code>), ou des outils nommés</td></tr>
@@ -299,13 +300,14 @@ sous `~/.config/opsforge/shell/`, `shell uninstall` restaure tout) :
   est élargi pour montrer les **200** dernières lignes (`history 1` pour tout), et
   `hg <terme>` grep tout votre historique — tandis que
   [`opsforge history`](#history) le groupe par famille d'outils DevOps.
-- **Heads-up CVE proactif** — une fois par session, opsforge vous prévient dans
-  votre propre shell si une CVE connue vient de toucher un de vos outils
-  installés, puis rafraîchit son cache local en arrière-plan — en lisant depuis
-  `~/.cache/opsforge/` (TTL 6h) pour que le prompt ne bloque jamais sur le
-  réseau. C'est le seul gestionnaire d'outils qui vous prévient *dans votre
-  shell* dès qu'un advisory tombe sur votre boîte à outils. Coupez-le avec
-  `OPSFORGE_CVE_NOTICE=0`.
+- **Heads-up proactif** — une fois par session, opsforge affiche une one-line
+  compacte dans votre propre shell quand quelque chose sur votre machine mérite
+  votre attention : une CVE vient de toucher un outil installé, des mises à jour
+  attendent, un secret fuit, ou un opsforge plus récent est sorti. Il lit un
+  cache local (`~/.cache/opsforge/`, TTL 6h) et en rafraîchit un périmé en
+  arrière-plan, pour que le prompt ne bloque jamais sur le réseau. Lancez
+  [`opsforge notify`](#le-digest-notify) pour le détail complet ; coupez le
+  heads-up avec `OPSFORGE_NOTIFY=0`.
 - **Intégrations** — `fzf`, `zoxide`, `atuin` câblés quand présents.
 
 Chaque module est validé avec `zsh -n` en CI, donc un script cassé ne peut jamais
@@ -534,22 +536,49 @@ que chaque téléchargement est intact, une **signature cosign** prouve que la
 release est authentique (voir [le catalogue](#le-catalogue)), et le **SBOM**
 prouve ce que vous avez obtenu au final — CVE comprises.
 
-### Notification CVE proactive
+### Le digest notify
 
-opsforge n'attend pas que vous lanciez `audit` — il vous prévient dès qu'un
-advisory tombe sur un outil que vous avez déjà installé.
+opsforge n'attend pas que vous lanciez `audit` — `opsforge notify` est **un
+seul digest de tout ce qui, sur *votre* machine, mérite votre attention**, au
+même endroit :
 
-- **Dans votre shell.** Une fois par session, le [shell DevOps](#lenvironnement-shell-devops)
-  affiche un heads-up si une CVE connue touche un outil installé, puis rafraîchit
-  son cache en arrière-plan (`OPSFORGE_CVE_NOTICE=0` pour le couper).
-- **Dans `opsforge status`.** Une ligne **Security** fait remonter le même
-  constat en un coup d'œil — ex. *« 1 tool(s) with HIGH/CRITICAL CVEs »*.
-- **Ne bloque jamais.** Les deux lisent un cache local sous `~/.cache/opsforge/`
-  (TTL 6h), rafraîchi en arrière-plan — donc un heads-up ou une vérif de status
-  n'attend jamais sur le réseau.
+- les outils installés porteurs d'une **CVE connue** (HIGH/CRITICAL en rouge),
+- les outils qui **peuvent être mis à jour**,
+- les **identifiants qui fuient** dans votre historique shell / rc / `.env`
+  (quand scannés),
+- un **opsforge plus récent** que celui que vous exécutez.
 
-C'est le seul gestionnaire d'outils qui vous prévient proactivement — dans votre
-shell *et* votre cockpit de status — qu'une CVE vient de toucher un de vos outils.
+Chaque ligne s'accompagne de la commande exacte qui la corrige :
+
+```
+  ✗ 1 tool with a HIGH/CRITICAL CVE          → opsforge audit
+  ✗ 6 critical secrets leaking in your shell → opsforge audit --secrets
+  ⚠ 3 tools can be updated                   → opsforge upgrade -u
+```
+
+```sh
+opsforge notify            # le digest complet, groupé par sévérité
+opsforge notify --json     # le Digest structuré, pour les scripts
+opsforge notify --refresh  # recalcule le cache maintenant
+opsforge notify --quiet    # juste la one-line compacte (utilisée par le shell)
+```
+
+**Un heads-up dans votre shell, une fois par session.** Quand quelque chose
+mérite votre attention, le [shell DevOps](#lenvironnement-shell-devops) affiche
+une one-line compacte au démarrage — ex. *« opsforge: 1 tool with a
+HIGH/CRITICAL CVE · 3 tools can be updated — run `opsforge notify` »* — puis
+vous lancez `opsforge notify` pour le détail. Coupez-la avec `OPSFORGE_NOTIFY=0`.
+
+**En cache, instantané, ne bloque jamais.** `notify` lit un cache local sous
+`~/.cache/opsforge/` (TTL 6h) et ne fait jamais que le *lire* — un cache périmé
+est rafraîchi en arrière-plan (ou à la demande avec `--refresh`), donc ni le
+digest ni le heads-up du shell n'attendent sur le réseau. Le même constat
+remonte aussi en un coup d'œil dans [`opsforge status`](#aperçu-rapide).
+
+C'est le seul gestionnaire d'outils qui replie CVE, mises à jour, secrets
+exposés *et* sa propre self-update dans un seul digest et le pousse,
+proactivement, dans votre shell — dès qu'un advisory tombe sur votre boîte à
+outils, vous le savez, sans rien lancer.
 
 ---
 
@@ -806,13 +835,14 @@ Les parties vers lesquelles pointer un relecteur :
   d'OSV.dev comme vulnerabilities CycloneDX liées. Aucun autre gestionnaire d'outils
   n'émet un inventaire signé de votre boîte à outils *avec* ses vulnérabilités,
   alimentable par grype/trivy ou un gate de conformité.
-- **Notification CVE proactive, sans jamais bloquer.** opsforge maintient un cache
-  CVE local (`~/.cache/opsforge/`, TTL 6h) pour que `opsforge status` (une ligne
-  *Security*) comme le shell (un heads-up une fois par session via `cvenotify.zsh`,
-  cache rafraîchi en arrière-plan) puissent vous signaler qu'un nouvel advisory a
-  touché un outil installé *sans* appel réseau synchrone — un chemin
-  d'avertissement qui ne peut jamais bloquer votre prompt. Aucun autre gestionnaire
-  d'outils ne fait remonter une CVE fraîche dans votre shell et votre status.
+- **Un seul digest en cache, sans jamais bloquer.** `opsforge notify` agrège CVE,
+  mises à jour disponibles, secrets exposés et un opsforge plus récent dans un
+  unique digest en cache (`internal/notices`, `~/.cache/opsforge/`, TTL 6h). Le
+  shell (une one-line une fois par session via `notify.zsh`) comme `opsforge
+  status` le lisent *sans* appel réseau synchrone — un cache périmé est recalculé
+  dans un processus détaché en arrière-plan — donc le chemin du heads-up ne peut
+  jamais bloquer votre prompt. Aucun autre gestionnaire d'outils ne pousse une
+  CVE, une mise à jour ou une fuite fraîche dans votre shell.
 - **Env reproductible + gate CVE dans un seul fichier.** Un `opsforge.yaml`
   committé (`version`, `tools`, `profiles`, `fail_on`) fait reproduire à
   `opsforge sync` la boîte à outils d'un dépôt — et `fail_on: high|critical` audite
@@ -848,10 +878,11 @@ internal/audit/     Client OSV.dev + matching de version côté client + scoring
 internal/families/  Source de vérité unique des familles d'outils DevOps (consommée par history + pré-filtre des guards)
 internal/history/   Lecteur passif d'historique shell + regroupement par famille d'outils DevOps
 internal/secrets/   Scanner d'identifiants exposés
+internal/notices/   Digest en cache derrière `opsforge notify` (CVE + mises à jour + secrets + self-update)
 internal/output/    Émetteur JSON exploitable par machine pour le flag --json
 internal/snapshot/  Capture / apply / rapport d'écart --check du poste de travail
 internal/tui/       Sélecteur Bubble Tea avec onglets (stylé par le thème)
-internal/shellcfg/  Modules d'environnement zsh (dont cvenotify.zsh) + cache de complétions + moteur de politique des guards (policy.go)
+internal/shellcfg/  Modules d'environnement zsh (dont notify.zsh) + cache de complétions + moteur de politique des guards (policy.go)
 internal/ui/        Identité visuelle partagée + thèmes
 ```
 
