@@ -11,6 +11,10 @@ Set TypingSpeed 65ms
 Set PlaybackSpeed 1.0
 
 Hide
+# seed a realistic history so `opsforge history kube` has something to show
+Type "printf '%s\n' 'kubectl get pods -n staging' 'kubectl logs -f deploy/api' 'helm upgrade api ./chart -n prod' 'kubectl rollout restart deploy/web' 'k9s -n observability' 'kubectl get pods -n staging' > /tmp/opsforge-demo-history" Enter
+Type "export HISTFILE=/tmp/opsforge-demo-history" Enter
+Type "fc -R /tmp/opsforge-demo-history" Enter
 Type "clear" Enter
 Show
 Sleep 1s
@@ -70,6 +74,13 @@ Sleep 700ms
 # simulate: what happens if you run `terraform destroy` on prod?
 Type "opsforge guard test 'terraform destroy' --context prod"  Sleep 500ms  Enter
 Sleep 5s
+
+Type "clear" Enter
+Sleep 800ms
+
+# --- history: your recent commands, filtered by DevOps tool family -----
+Type "opsforge history kube"  Sleep 500ms  Enter
+Sleep 6s
 
 Type "clear" Enter
 Sleep 800ms

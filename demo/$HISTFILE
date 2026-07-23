@@ -1,0 +1,6 @@
+kubectl get pods -n staging
+kubectl logs -f deploy/api
+helm upgrade api ./chart -n prod
+kubectl rollout restart deploy/web
+k9s -n observability
+kubectl get pods -n staging
