@@ -16,7 +16,7 @@ profiles:
     tools: [terraform, opentofu, terragrunt, tflint, terraform-docs, ansible, packer]
   - name: observability
     description: Monitoring, load testing and log digging
-    tools: [k6, vegeta, btop, ctop, stern, lnav]
+    tools: [k6, vegeta, btop, ctop, stern, lnav, prometheus, node_exporter, grafana, otel-cli]
   - name: security
     description: DevSecOps essentials
     tools: [trivy, grype, syft, gitleaks, sops, age, cosign, hadolint]
@@ -29,6 +29,9 @@ profiles:
   - name: netsec
     description: Network reconnaissance and security testing
     tools: [nmap, masscan, nuclei, ffuf, gobuster, subfinder, httpx, dnsx, sslscan, semgrep]
+  - name: ai
+    description: Local and cloud LLM tooling for the terminal
+    tools: [ollama, llm, aichat, mods, aider]
 
 categories:
   - name: Kubernetes
@@ -196,6 +199,14 @@ categories:
         bin: ktop
         brew: ktop
         description: top-like tool for Kubernetes clusters
+      - name: crossplane
+        bin: crossplane
+        brew: crossplane
+        description: Build control planes without writing code (Crossplane CLI)
+      - name: timoni
+        bin: timoni
+        brew: timoni
+        description: Package manager for Kubernetes powered by CUE
 
   - name: Infrastructure as Code
     tools:
@@ -431,6 +442,38 @@ categories:
         bin: git-cliff
         brew: git-cliff
         description: Generate changelogs from conventional commits
+      - name: dagger
+        bin: dagger
+        brew: dagger
+        description: Portable devkit for CI/CD pipelines as code
+      - name: woodpecker-cli
+        bin: woodpecker-cli
+        brew: woodpecker-cli
+        description: CLI client for Woodpecker CI
+      - name: tkn
+        bin: tkn
+        brew: tektoncd-cli
+        description: CLI for Tekton pipelines on Kubernetes
+      - name: argo
+        bin: argo
+        brew: argo
+        description: CLI for Argo Workflows (container-native workflows)
+      - name: circleci
+        bin: circleci
+        brew: circleci
+        description: CircleCI CLI (validate configs, run jobs locally)
+      - name: gitlab-runner
+        bin: gitlab-runner
+        brew: gitlab-runner
+        description: Run GitLab CI/CD jobs locally or as a runner
+      - name: cue
+        bin: cue
+        brew: cue
+        description: Validate and define text-based and dynamic configuration
+      - name: bk
+        bin: bk
+        brew: bk
+        description: Buildkite CLI
 
   - name: Observability & Monitoring
     tools:
@@ -454,6 +497,46 @@ categories:
         brew: ctop
         description: top-like metrics for containers
         version_args: ["-v"]
+      - name: prometheus
+        bin: promtool
+        brew: prometheus
+        description: Prometheus toolkit (promtool validates rules and config)
+      - name: node_exporter
+        bin: node_exporter
+        brew: node_exporter
+        description: Prometheus exporter for machine metrics
+      - name: otel-cli
+        bin: otel-cli
+        brew: otel-cli
+        description: Send OpenTelemetry traces from the command line
+      - name: grafana
+        bin: grafana
+        brew: grafana
+        description: Open-source metrics dashboards and visualization
+      - name: netdata
+        bin: netdata
+        brew: netdata
+        description: Real-time performance and health monitoring
+      - name: wrk
+        bin: wrk
+        brew: wrk
+        description: Modern HTTP benchmarking tool
+      - name: hey
+        bin: hey
+        brew: hey
+        description: HTTP load generator (ab replacement)
+      - name: bombardier
+        bin: bombardier
+        brew: bombardier
+        description: Fast cross-platform HTTP benchmarking tool
+      - name: drill
+        bin: drill
+        brew: drill
+        description: HTTP load testing driven by a YAML plan
+      - name: locust
+        bin: locust
+        brew: locust
+        description: Scriptable load testing in Python
 
   - name: Logs
     tools:
@@ -466,6 +549,26 @@ categories:
         bin: goaccess
         brew: goaccess
         description: Real-time web log analyzer
+      - name: angle-grinder
+        bin: agrind
+        brew: angle-grinder
+        description: Slice and dice log files on the command line
+      - name: hl
+        bin: hl
+        brew: hl
+        description: Fast and powerful viewer for JSON logs
+      - name: tailspin
+        bin: tspin
+        brew: tailspin
+        description: Log file highlighter
+      - name: sift
+        bin: sift
+        brew: sift
+        description: Fast and powerful alternative to grep
+      - name: logcli
+        bin: logcli
+        brew: logcli
+        description: Query and tail logs from Grafana Loki
 
   - name: Networking & HTTP
     tools:
@@ -1035,6 +1138,22 @@ categories:
         bin: asdf
         brew: asdf
         description: Manage multiple runtime versions per project
+      - name: proto
+        bin: proto
+        brew: proto
+        description: Pluggable multi-language version manager
+      - name: aqua
+        bin: aqua
+        brew: aqua
+        description: Declarative CLI version manager
+      - name: vfox
+        bin: vfox
+        brew: vfox
+        description: Cross-platform version manager (Java, Node, Flutter, .NET)
+      - name: tenv
+        bin: tenv
+        brew: tenv
+        description: Version manager for OpenTofu, Terraform, Terragrunt and Atmos
 
   - name: Utilities
     tools:
@@ -1189,3 +1308,43 @@ categories:
         bin: jd
         brew: jd
         description: JSON diff and patch tool
+
+  - name: AI & LLM
+    tools:
+      - name: ollama
+        bin: ollama
+        brew: ollama
+        description: Run large language models locally
+      - name: llm
+        bin: llm
+        brew: llm
+        description: Access LLMs from the command line (Simon Willison)
+      - name: aichat
+        bin: aichat
+        brew: aichat
+        description: All-in-one AI-powered CLI chat and copilot
+      - name: mods
+        bin: mods
+        brew: mods
+        description: AI on the command line (Charmbracelet)
+      - name: fabric
+        bin: fabric
+        brew: fabric-ai
+        description: Framework for augmenting humans using AI (prompt patterns)
+      - name: aider
+        bin: aider
+        brew: aider
+        description: AI pair programming in your terminal
+      - name: gemini-cli
+        bin: gemini
+        brew: gemini-cli
+        description: Interact with Google Gemini from the command line
+      - name: promptfoo
+        bin: promptfoo
+        brew: promptfoo
+        description: Test and evaluate LLM apps locally
+      - name: codex
+        bin: codex
+        brew: codex
+        cask: true
+        description: OpenAI coding agent that runs in your terminal
