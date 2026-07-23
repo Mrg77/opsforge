@@ -11,37 +11,21 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+
+	"github.com/Mrg77/opsforge/internal/families"
 )
 
-// Family groups the command-line tools a DevOps engineer thinks of
-// together. The key is the name used on the CLI (`opsforge history kube`);
-// Bins are the executables whose invocations belong to the family.
-type Family struct {
-	Key   string
-	Label string
-	Bins  []string
-}
+// Family and the built-in groupings live in internal/families, the single
+// source of truth shared with the guard engine. These aliases keep the
+// history package's API stable while delegating the data.
+type Family = families.Family
 
-// Families are the built-in groupings. They deliberately mirror the tool
-// domains used elsewhere in opsforge (guards, profiles) so "kube", "tf"…
-// mean the same thing across the product.
-var Families = []Family{
-	{"kube", "Kubernetes", []string{"kubectl", "helm", "k9s", "kubectx", "kubens", "kustomize", "stern", "kubeseal", "flux", "argocd", "k", "kx", "kn"}},
-	{"git", "Git", []string{"git", "gh", "glab", "lazygit", "tig"}},
-	{"tf", "Terraform / IaC", []string{"terraform", "tofu", "terragrunt", "tflint", "terraform-docs", "tf"}},
-	{"docker", "Containers", []string{"docker", "docker-compose", "podman", "nerdctl", "colima", "dc"}},
-	{"cloud", "Cloud CLIs", []string{"aws", "gcloud", "az", "doctl", "eksctl", "flyctl", "vercel"}},
-	{"ansible", "Ansible", []string{"ansible", "ansible-playbook", "ansible-galaxy", "ansible-vault"}},
-}
+// Families are the built-in tool groupings (from internal/families).
+var Families = families.All
 
 // FamilyByKey returns the built-in family with the given key, or false.
 func FamilyByKey(key string) (Family, bool) {
-	for _, f := range Families {
-		if f.Key == key {
-			return f, true
-		}
-	}
-	return Family{}, false
+	return families.ByKey(key)
 }
 
 // Entry is one history command with how many times it appears.
