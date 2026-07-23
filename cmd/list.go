@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -29,7 +30,23 @@ const (
 	filterOutdated                    // only tools with an update
 )
 
-var listOutdatedOnly bool
+var (
+	listOutdatedOnly bool
+	listSearch       string
+)
+
+// matchesSearch reports whether a tool matches the search term (empty term
+// matches everything). It looks in the tool name, its description and its
+// category — case-insensitively — so `list all -s dns` finds doggo, dnsx…
+func matchesSearch(t catalog.Tool, category, term string) bool {
+	if term == "" {
+		return true
+	}
+	term = strings.ToLower(term)
+	return strings.Contains(strings.ToLower(t.Name), term) ||
+		strings.Contains(strings.ToLower(t.Description), term) ||
+		strings.Contains(strings.ToLower(category), term)
+}
 
 func runList(filter listFilter) error {
 	cat, err := catalog.Load()
@@ -63,6 +80,9 @@ func runList(filter listFilter) error {
 					continue
 				}
 			}
+			if !matchesSearch(t, c.Name, listSearch) {
+				continue
+			}
 			rows = append(rows, formatRow(t, s))
 			shown++
 		}
@@ -94,6 +114,9 @@ func listJSON(cat *catalog.Catalog, statuses map[string]detect.Status, filter li
 				if !s.Outdated {
 					continue
 				}
+			}
+			if !matchesSearch(t, c.Name, listSearch) {
+				continue
 			}
 			items = append(items, listItem{
 				Name:      t.Name,
@@ -128,6 +151,16 @@ func formatRow(t catalog.Tool, s detect.Status) string {
 
 func printListFooter(filter listFilter, shown, installed, outdated, total int) {
 	fmt.Println()
+	if listSearch != "" {
+		if shown == 0 {
+			fmt.Printf("%s\n", ui.Dim.Render(fmt.Sprintf("No tool matches %q.", listSearch)))
+			return
+		}
+		fmt.Printf("%s   %s\n",
+			ui.Dim.Render(fmt.Sprintf("%d match(es) for %q", shown, listSearch)),
+			ui.Dim.Render("of "+fmt.Sprintf("%d tools", total)))
+		return
+	}
 	switch filter {
 	case filterInstalled:
 		if shown == 0 {
@@ -154,20 +187,43 @@ func printListFooter(filter listFilter, shown, installed, outdated, total int) {
 }
 
 var listCmd = &cobra.Command{
-	Use:   "list",
-	Short: "List your installed catalog tools (use `list all` for the full catalog)",
+	Use:   "list [search]",
+	Short: "List installed tools — or search the whole catalog (list <term>)",
+	Long: `With no arguments, lists the catalog tools you have installed.
+
+  opsforge list              # what you have
+  opsforge list all          # the entire catalog (249 tools)
+  opsforge list -u           # only installed tools with an update
+  opsforge list dns          # search the whole catalog by name/description
+  opsforge list all -s kube  # same as 'list kube' (searches everything)
+
+A search term (positional or -s) matches the tool name, description or
+category, case-insensitively, and searches the FULL catalog.`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 1 {
+			listSearch = args[0]
+		}
 		if listOutdatedOnly {
 			return runList(filterOutdated)
+		}
+		// A search implies the whole catalog — otherwise you'd only find
+		// among what you've already installed, which is rarely the intent.
+		if listSearch != "" {
+			return runList(filterAll)
 		}
 		return runList(filterInstalled)
 	},
 }
 
 var listAllCmd = &cobra.Command{
-	Use:   "all",
+	Use:   "all [search]",
 	Short: "List the entire catalog with installation status",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 1 {
+			listSearch = args[0]
+		}
 		return runList(filterAll)
 	},
 }
@@ -175,6 +231,8 @@ var listAllCmd = &cobra.Command{
 func init() {
 	listCmd.Flags().BoolVarP(&listOutdatedOnly, "outdated", "u", false,
 		"show only installed tools with an update available")
+	listCmd.PersistentFlags().StringVarP(&listSearch, "search", "s", "",
+		"filter by name, description or category (searches the full catalog)")
 	listCmd.AddCommand(listAllCmd)
 	rootCmd.AddCommand(listCmd)
 }
