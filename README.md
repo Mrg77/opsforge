@@ -29,7 +29,7 @@ opsforge is **three tools in one binary**:
 |:--:|---|---|
 | 📦 | **Tool installer** | An interactive picker over **106 curated DevOps CLIs**. Detects what you have, what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
 | 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: a live completion menu, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
-| 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup to one YAML; `opsforge apply <url>` rebuilds it anywhere. Your machine becomes reproducible infrastructure. |
+| 📸 | **Workstation-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; `opsforge apply <url>` rebuilds it anywhere, and `apply --check` verifies a machine against it in CI. Your workstation becomes a reproducible, enforceable baseline. |
 
 > **Why:** setting up (or rebuilding) a DevOps workstation means installing 20+
 > CLIs, then wiring completions, aliases and a useful prompt for each — by hand,
@@ -51,6 +51,10 @@ Downloads the right binary for your OS/arch into `~/.local/bin` (override with
 go install github.com/Mrg77/opsforge@latest   # from source
 ```
 
+Then keep it current with `opsforge self update` — it downloads the latest
+release, **verifies its published SHA-256 before swapping the binary in place**,
+and no-ops when you're already up to date (`--check` for cron/CI).
+
 > **Windows:** use WSL — the installer backend is Homebrew and the shell layer
 > targets zsh. Native winget/scoop + PowerShell support is on the roadmap.
 
@@ -64,6 +68,8 @@ opsforge status       # one-glance cockpit of your workstation
 opsforge doctor       # full health check — incl. CVEs & leaked secrets
 opsforge audit        # scan installed tools for CVEs (--secrets: leaked creds too)
 opsforge guard test "terraform destroy" --context prod   # simulate a guard rule
+opsforge apply --check team-baseline.yaml   # verify this machine matches the baseline (CI)
+opsforge self update  # self-update, checksum-verified before the swap
 opsforge audit --json # machine-readable output for CI (non-zero exit on HIGH/CRITICAL)
 ```
 
@@ -75,9 +81,11 @@ opsforge audit --json # machine-readable output for CI (non-zero exit on HIGH/CR
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
-<tr><td><code>opsforge guard [init|list|test]</code></td><td>Policy-as-code guards on destructive commands (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
+<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-enforceable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
+<tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against the baseline without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
+<tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
 <tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>
@@ -119,12 +127,33 @@ profile to `~/.config/opsforge/profiles.yaml` — then
 Your machine setup shouldn't be a snowflake you rebuild by hand:
 
 ```sh
-opsforge snapshot -o my-setup.yaml    # tools + profiles + shell state → one file
+opsforge snapshot -o my-setup.yaml    # tools + profiles + shell + theme + guards + version manager → one file
 opsforge apply <file-or-url>          # rebuild it on any machine
+opsforge apply --check <file-or-url>  # verify a machine against it, without changing a thing
 ```
 
+A snapshot now captures the **whole** managed workstation — installed tools,
+your custom profiles, the shell-environment state, the active **theme**, your
+**guard policy** (the raw `guards.yaml`), and the detected **version manager**.
 `apply` shows the full plan and asks before changing anything (`--yes` for
-scripts). Onboarding a new engineer becomes one command.
+scripts), restoring the theme and guard rules alongside the tools. Onboarding a
+new engineer becomes one command.
+
+**A verifiable team baseline.** `apply --check` reads the snapshot and compares
+this machine to it **without modifying anything**, exiting **non-zero on drift** —
+a missing tool, or a theme/guards/shell/version-manager that differs. With
+`--json` it emits a structured report — `{compliant, missing_tools, drift}` —
+so a CI job can assert that a developer's laptop or a base image still matches
+the team baseline:
+
+```sh
+opsforge apply --check team-baseline.yaml            # fails the job on any drift
+opsforge apply --check team-baseline.yaml --json | jq '.compliant'
+```
+
+Snapshots are **forward-compatible**: the format grew from v1 (tools, profiles,
+shell) to v2 (adds theme, guards, version manager), and older v1 files still
+load — the new fields simply stay unset.
 
 ### Security audit
 
@@ -294,7 +323,23 @@ rules:
 opsforge guard init                                    # write a commented starter guards.yaml
 opsforge guard list                                    # show the active rules (built-in or yours)
 opsforge guard test "terraform destroy" --context prod # simulate: which rule fires, and the action
+opsforge guard lint                                    # validate guards.yaml — non-zero exit on error
+opsforge guard test "kubectl delete ns" --context prod --json  # {command, context, matched_rule, action, message}
 ```
+
+**Policy you can version and enforce in CI.** Because the rules live in one file,
+a team can commit `guards.yaml` to a repo and keep it honest in the pipeline:
+
+- `opsforge guard lint` validates the active policy and **exits non-zero** when
+  it's broken — a bad regex, unknown action, or wrong version fails the job
+  instead of silently falling back to the default policy at runtime.
+- `opsforge guard test "<cmd>" --context prod --json` emits the decision as
+  `{command, context, matched_rule, action, message}`, so a pipeline can
+  **assert** that, say, `terraform destroy` is `deny`ed on prod — the same
+  `Evaluate` call the shell uses, so the test can't diverge from real behavior.
+
+This is the moat, extended: the guards aren't just enforced on your machine,
+they're **testable and versionable** like the rest of your infrastructure.
 
 - **Context is read passively.** The context string is built from your kubeconfig
   `current-context`, `AWS_PROFILE`/`AWS_VAULT`, and the terraform workspace —
@@ -411,6 +456,17 @@ The parts worth pointing a reviewer to:
   checked against a published checksum (`checksums.txt`, `<asset>.sha256`, or a
   catalog `checksum:` template) *before* they're made executable — a mismatch
   refuses the install; a release with no checksum degrades to a warning.
+- **A self-update that verifies its own integrity.** `opsforge self update`
+  fetches the latest release, checks its published SHA-256, and only then
+  replaces the running binary — atomically. The same supply-chain guarantee the
+  installer gives your tools, opsforge applies to itself: a tampered asset is
+  never made executable. `--check` reports availability with an exit code for
+  cron/CI, and a dev build (no release tag to compare) is a safe no-op.
+- **One source of truth for tool families.** The DevOps "families" (`kube`,
+  `tf`, `cloud`…) that `history` filters by and that the guard prefilter derives
+  from now live in a single package (`internal/families`) — the taxonomy that
+  was once hard-coded in three diverging places. Adding a tool to a family, or a
+  new danger verb, is a one-line change consumed everywhere at once.
 - **Machine-readable, with exit codes that mean something.** A global `--json`
   flag renders `list`/`status`/`doctor`/`audit` as structured JSON; `audit` exits
   non-zero on HIGH/CRITICAL CVEs (and critical secret leaks with `--secrets`), so
@@ -431,15 +487,16 @@ The parts worth pointing a reviewer to:
 ### Architecture
 
 ```
-cmd/                Cobra commands (install, status, audit, guard, snapshot, doctor, shell, theme…)
+cmd/                Cobra commands (install, status, audit, guard, snapshot, apply, self, doctor, shell, theme…)
 internal/catalog/   Embedded YAML catalog + brew/github validation
 internal/detect/    Concurrent PATH + version detection + brew-outdated
-internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify)
+internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify; self-update)
 internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
+internal/families/  Single source of truth for DevOps tool families (consumed by history + guard prefilter)
 internal/history/   Passive shell-history reader + DevOps tool-family grouping
 internal/secrets/   Leaked-credential scanner
 internal/output/    Machine-readable JSON emitter for the --json flag
-internal/snapshot/  Workstation capture / apply
+internal/snapshot/  Workstation capture / apply / --check drift report
 internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
 internal/shellcfg/  zsh environment modules + completion cache + guard policy engine (policy.go)
 internal/ui/        Shared visual identity + themes
