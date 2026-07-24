@@ -331,3 +331,37 @@ func TestDefaultPolicyCatchesProdTerraformByCommand(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultPolicyGuardsGitCloudDockerDB(t *testing.T) {
+	p := DefaultPolicy()
+	// (command, context, shouldGuard)
+	cases := []struct {
+		cmd, ctx string
+		guard    bool
+	}{
+		{"git push --force origin main", "", true},
+		{"git push --force-with-lease origin master", "", true},
+		{"git reset --hard origin/main", "", true},
+		{"git push origin feature-x", "", false}, // normal push
+		{"git commit -m wip", "", false},         // benign
+		{"aws s3 rm s3://b --recursive", "", true},
+		{"aws ec2 terminate-instances --instance-ids i-1", "", true},
+		{"aws rds delete-db-instance --db-instance-identifier x", "", true},
+		{"aws s3 ls", "", false},                   // read-only
+		{"aws sts get-caller-identity", "", false}, // benign
+		{"docker system prune -a", "", true},
+		{"docker volume rm data", "", true},
+		{"docker ps", "", false}, // read-only
+		{"redis-cli flushall", "prod", true},
+		{"redis-cli flushall", "dev", false}, // not prod
+		{"psql -c 'drop database app'", "prod", true},
+	}
+	for _, c := range cases {
+		d := p.Evaluate(c.cmd, c.ctx)
+		got := d.Action != ActionAllow
+		if got != c.guard {
+			t.Errorf("Evaluate(%q, ctx=%q): guarded=%v, want %v (action=%s)",
+				c.cmd, c.ctx, got, c.guard, d.Action)
+		}
+	}
+}

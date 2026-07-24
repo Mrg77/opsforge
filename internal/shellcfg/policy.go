@@ -238,6 +238,46 @@ func DefaultPolicy() *GuardPolicy {
 				Action:  ActionConfirm,
 				Message: "This terraform command targets PRODUCTION (prod var-file / directory / workspace).",
 			},
+			{
+				// Force-pushing or hard-resetting main/master rewrites shared
+				// history — dangerous on any branch that others pull from,
+				// regardless of "prod" context.
+				Name:    "confirm git force-push or hard reset on main/master",
+				Match:   GuardMatch{Command: `git .*(push\s+(--force|-f|--force-with-lease).*\b(main|master)\b|push\s+\S+\s+(main|master)\s+(--force|-f)|reset\s+--hard.*\b(origin/)?(main|master)\b|branch\s+-D\s+(main|master))`},
+				Action:  ActionConfirm,
+				Message: "This rewrites shared history on main/master.",
+			},
+			{
+				// AWS commands that irreversibly delete data or terminate
+				// compute. `--recursive` on s3 rm and terminate/delete verbs are
+				// the classic foot-guns.
+				Name:    "confirm destructive aws command",
+				Match:   GuardMatch{Command: `aws .*(s3 rm .*(--recursive|\*)|s3 rb|(ec2 terminate-instances)|(rds delete-db-instance)|(dynamodb delete-table)|(cloudformation delete-stack)|(eks delete-cluster))`},
+				Action:  ActionConfirm,
+				Message: "This AWS command deletes resources or data — often irreversibly.",
+			},
+			{
+				// gcloud / az destructive verbs.
+				Name:    "confirm destructive gcloud/az command",
+				Match:   GuardMatch{Command: `(gcloud .*(delete|destroy)|az .*(delete|purge))`, Context: `prod|production`},
+				Action:  ActionConfirm,
+				Message: "This deletes cloud resources on a PRODUCTION account.",
+			},
+			{
+				// Docker/podman wipes: system prune -a drops all unused images,
+				// volume rm/prune can destroy stateful data.
+				Name:    "confirm docker/podman data wipe",
+				Match:   GuardMatch{Command: `(docker|podman) (system prune\s+.*-a|volume (rm|prune)|rm\s+-f)`},
+				Action:  ActionConfirm,
+				Message: "This can delete container images or volume data.",
+			},
+			{
+				// Database data-loss commands, in any client.
+				Name:    "confirm database data-loss command",
+				Match:   GuardMatch{Command: `(flushall|flushdb|drop\s+(database|table)|truncate\s+table)`, Context: `prod|production`},
+				Action:  ActionConfirm,
+				Message: "This drops or flushes PRODUCTION database data.",
+			},
 		},
 	}
 	// DefaultPolicy is trusted; if it ever fails to compile that's a
