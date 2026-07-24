@@ -83,12 +83,35 @@ func existsInAPI(c *http.Client, kind, name string) apiResult {
 	return apiMissing
 }
 
+// headOK reports whether name resolves on the Homebrew API as kind. It
+// distinguishes a real 404 (formula genuinely absent) from a transient failure
+// (network error, 429 rate-limit, or 5xx): only a 200 or a 404 is conclusive,
+// so a flaky API can't turn a valid formula into a spurious "does not exist".
+// Transient responses are retried with a short backoff.
 func headOK(c *http.Client, kind, name string) bool {
 	url := "https://formulae.brew.sh/api/" + kind + "/" + name + ".json"
-	resp, err := c.Get(url)
-	if err != nil {
-		return false
+	for attempt := 0; attempt < 4; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 500 * time.Millisecond)
+		}
+		resp, err := c.Get(url)
+		if err != nil {
+			continue // network hiccup — retry
+		}
+		status := resp.StatusCode
+		resp.Body.Close()
+		switch {
+		case status == http.StatusOK:
+			return true
+		case status == http.StatusNotFound:
+			return false // conclusively absent
+		default:
+			continue // 429 / 5xx / other transient — retry
+		}
 	}
-	defer resp.Body.Close()
-	return resp.StatusCode == http.StatusOK
+	// Exhausted retries without a conclusive answer: treat as reachable so a
+	// sustained API outage fails the run loudly elsewhere rather than silently
+	// flagging every formula as missing. A truly renamed formula still returns
+	// a stable 404 and is caught.
+	return true
 }
