@@ -1,43 +1,61 @@
 package cve
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
-
-	"github.com/Mrg77/opsforge/internal/audit"
 )
 
-func TestStale(t *testing.T) {
-	now := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	var empty Summary
-	if !empty.Stale(DefaultTTL, now) {
-		t.Error("never-scanned summary should be stale")
+func TestSaveLoadRoundTrip(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+
+	want := Summary{
+		ScannedAt:      time.Now().UTC().Truncate(time.Second),
+		Vulnerable:     2,
+		HighOrCritical: 1,
+		Tools: []Affected{
+			{Name: "argocd", TopSeverity: "CRITICAL"},
+			{Name: "helm", TopSeverity: "MEDIUM"},
+		},
 	}
-	fresh := Summary{ScannedAt: now.Add(-1 * time.Hour)}
-	if fresh.Stale(DefaultTTL, now) {
-		t.Error("1h-old summary should be fresh with a 6h TTL")
+	if err := Save(want); err != nil {
+		t.Fatalf("Save: %v", err)
 	}
-	old := Summary{ScannedAt: now.Add(-7 * time.Hour)}
-	if !old.Stale(DefaultTTL, now) {
-		t.Error("7h-old summary should be stale")
+
+	got, ok := Load()
+	if !ok {
+		t.Fatal("Load ok=false after Save")
+	}
+	if got.Vulnerable != want.Vulnerable || got.HighOrCritical != want.HighOrCritical {
+		t.Errorf("counts mismatch: got %+v want %+v", got, want)
+	}
+	if len(got.Tools) != 2 || got.Tools[0].Name != "argocd" || got.Tools[0].TopSeverity != "CRITICAL" {
+		t.Errorf("tools mismatch: %+v", got.Tools)
+	}
+	if !got.ScannedAt.Equal(want.ScannedAt) {
+		t.Errorf("ScannedAt mismatch: got %v want %v", got.ScannedAt, want.ScannedAt)
 	}
 }
 
-func TestSummarize(t *testing.T) {
-	now := time.Now().UTC()
-	findings := []audit.Finding{
-		{Tool: "argocd", Vulns: []audit.Vuln{{ID: "CVE-1", Severity: audit.SevCritical}}},
-		{Tool: "helm", Vulns: nil}, // clean → not counted
-		{Tool: "kubectl", Vulns: []audit.Vuln{{ID: "CVE-2", Severity: audit.SevMedium}}},
+func TestLoadMissingCacheIsNotOK(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	if _, ok := Load(); ok {
+		t.Error("Load should report ok=false when no cache exists")
 	}
-	s := Summarize(findings, now)
-	if s.Vulnerable != 2 {
-		t.Errorf("Vulnerable = %d, want 2", s.Vulnerable)
+}
+
+func TestLoadCorruptCacheIsNotOK(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	p := filepath.Join(home, ".cache", "opsforge", "cve-cache.json")
+	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		t.Fatal(err)
 	}
-	if s.HighOrCritical != 1 { // only argocd
-		t.Errorf("HighOrCritical = %d, want 1", s.HighOrCritical)
+	if err := os.WriteFile(p, []byte("{broken"), 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if len(s.Tools) != 2 {
-		t.Errorf("Tools = %d, want 2", len(s.Tools))
+	if _, ok := Load(); ok {
+		t.Error("Load should report ok=false on corrupt JSON (treated as unknown, not clean)")
 	}
 }

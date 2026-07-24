@@ -87,7 +87,10 @@ func Use(mgr Manager, tool, version string) ([]string, error) {
 	}
 }
 
-func run(argv []string) error {
+// run executes a command line, streaming to the user's terminal. It's a
+// package variable so tests can substitute a recorder and assert the exact
+// commands Use composes without spawning mise/asdf.
+var run = func(argv []string) error {
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
