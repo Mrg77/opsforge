@@ -2,3 +2,6 @@
 /dist/
 *.test
 .DS_Store
+
+# stray VHS/demo artifact (literal $HISTFILE created by an unexpanded var)
+demo/$HISTFILE
