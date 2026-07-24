@@ -12,9 +12,18 @@ import (
 // subprocesses. zsh keeps its completion/compinit wiring (see Env); fish just
 // sources its modules.
 func (sh Shell) EnvFor() (string, error) {
-	if sh == Zsh {
+	switch sh {
+	case Zsh:
 		return Env() // the original, completion-aware zsh path
+	case Fish:
+		return sh.fishEnv()
+	default: // Bash and any POSIX-ish shell
+		return sh.bashEnv()
 	}
+}
+
+// fishEnv renders the fish snippet that sources the modules.
+func (sh Shell) fishEnv() (string, error) {
 	cfgDir, err := sh.configDir()
 	if err != nil {
 		return "", err
@@ -31,14 +40,37 @@ func (sh Shell) EnvFor() (string, error) {
 	return b.String(), nil
 }
 
+// bashEnv renders the bash snippet that sources the modules.
+func (sh Shell) bashEnv() (string, error) {
+	cfgDir, err := sh.configDir()
+	if err != nil {
+		return "", err
+	}
+	sp := specs[sh]
+	var b strings.Builder
+	fmt.Fprintf(&b, "%s\n", markerStart)
+	fmt.Fprintf(&b, "if [ -d %[1]q ]; then\n", cfgDir)
+	for _, name := range sp.order {
+		f := fmt.Sprintf("%s/%s%s", cfgDir, name, sp.ext)
+		fmt.Fprintf(&b, "  [ -r %[1]q ] && . %[1]q\n", f)
+	}
+	fmt.Fprintf(&b, "fi\n")
+	fmt.Fprintf(&b, "%s\n", markerEnd)
+	return b.String(), nil
+}
+
 // evalLine is the single line opsforge writes into the rc file. Both zsh and
 // fish support `opsforge shell env --shell <sh> | source`-style loading; we use
 // each shell's idiom.
 func (sh Shell) evalLine() string {
-	if sh == Fish {
+	switch sh {
+	case Fish:
 		return "opsforge shell env --shell fish | source"
+	case Bash:
+		return `eval "$(opsforge shell env --shell bash)"`
+	default:
+		return `eval "$(opsforge shell env)"`
 	}
-	return `eval "$(opsforge shell env)"`
 }
 
 // InstallTo idempotently wires the opsforge layer into a shell's rc file and
@@ -132,10 +164,11 @@ type Shell string
 const (
 	Zsh  Shell = "zsh"
 	Fish Shell = "fish"
+	Bash Shell = "bash"
 )
 
 // SupportedShells lists the shells opsforge can install into.
-func SupportedShells() []Shell { return []Shell{Zsh, Fish} }
+func SupportedShells() []Shell { return []Shell{Zsh, Fish, Bash} }
 
 // spec holds the per-shell knobs the generic install/env code needs.
 type spec struct {
@@ -159,6 +192,14 @@ var specs = map[Shell]spec{
 		order:  []string{"leftprompt", "prompt", "aliases", "integrations", "interactive", "help", "guards", "notify"},
 		rcPath: func(home string) string { return filepath.Join(home, ".config", "fish", "config.fish") },
 	},
+	Bash: {
+		ext:    ".bash",
+		subdir: "bash",
+		// bash combines the prompt into one PS1 (no separate right prompt) and
+		// has no plugin-based interactive layer.
+		order:  []string{"prompt", "aliases", "integrations", "help", "guards", "notify"},
+		rcPath: func(home string) string { return filepath.Join(home, ".bashrc") },
+	},
 }
 
 // DetectShell picks the shell to target from $SHELL, defaulting to zsh (the
@@ -168,6 +209,8 @@ func DetectShell() Shell {
 	switch {
 	case strings.Contains(sh, "fish"):
 		return Fish
+	case strings.Contains(sh, "bash"):
+		return Bash
 	default:
 		return Zsh
 	}
@@ -181,8 +224,10 @@ func ParseShell(name string) (Shell, error) {
 		return Zsh, nil
 	case Fish:
 		return Fish, nil
+	case Bash:
+		return Bash, nil
 	default:
-		return "", fmt.Errorf("unsupported shell %q (supported: zsh, fish)", name)
+		return "", fmt.Errorf("unsupported shell %q (supported: zsh, fish, bash)", name)
 	}
 }
 

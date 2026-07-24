@@ -107,12 +107,19 @@ var shellInstallCmd = &cobra.Command{
 		}
 
 		fmt.Printf("\nopsforge shell environment installed in %s\n", path)
-		if sh == shellcfg.Fish {
+		switch sh {
+		case shellcfg.Fish:
 			fmt.Println("Run `exec fish` (or open a new terminal) to activate it.")
 			fmt.Println("fish already gives you inline autosuggestions, syntax highlighting")
 			fmt.Println("and prefix history search — opsforge adds the guards, the prod-aware")
 			fmt.Println("prompt, the `?` help and the DevOps aliases on top.")
-		} else {
+		case shellcfg.Bash:
+			fmt.Println("Run `exec bash` (or open a new terminal) to activate it — you get the")
+			fmt.Println("prod-aware prompt, `?` help, guards and DevOps aliases.")
+			fmt.Println("Note: bash can't cancel a command before it runs the way zsh/fish can,")
+			fmt.Println("so the blocking guard is best-effort here — for a hard block, use zsh")
+			fmt.Println("or fish. (opsforge guards are a safety net, not a security boundary.)")
+		default:
 			fmt.Println("Run `exec zsh` (or open a new terminal) to activate it — then just")
 			fmt.Println("start typing: a gray suggestion appears inline (→ to accept), ↑ walks")
 			fmt.Println("your history by what you've typed, Tab completes, and the line is")
@@ -198,8 +205,11 @@ var shellDoctorCmd = &cobra.Command{
 			for _, p := range shellcfg.InteractivePluginStatus() {
 				fmt.Printf("  %s %s\n", mark(p.Installed), p.Name)
 			}
-		} else {
+		} else if sh == shellcfg.Fish {
 			fmt.Println("\ninteractive experience: provided natively by fish")
+		} else {
+			fmt.Println("\ninteractive experience: bash uses its built-in readline")
+			fmt.Println("(inline suggestions/highlighting aren't provided — that's a zsh/fish extra)")
 		}
 
 		fmt.Println("\nintegrations detected on PATH:")
@@ -216,7 +226,7 @@ func init() {
 		"skip installing the interactive plugins (autosuggestions, menu, highlighting)")
 	// --shell selects the target shell (zsh|fish); empty auto-detects $SHELL.
 	for _, c := range []*cobra.Command{shellEnvCmd, shellInstallCmd, shellUninstallCmd, shellDoctorCmd} {
-		c.Flags().StringVar(&shellFlag, "shell", "", "target shell: zsh or fish (default: auto-detect from $SHELL)")
+		c.Flags().StringVar(&shellFlag, "shell", "", "target shell: zsh, fish or bash (default: auto-detect from $SHELL)")
 	}
 	shellCmd.AddCommand(shellEnvCmd, shellSyncCmd, shellInstallCmd, shellUninstallCmd, shellDoctorCmd)
 	rootCmd.AddCommand(shellCmd)
