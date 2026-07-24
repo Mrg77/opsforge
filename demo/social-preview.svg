@@ -45,5 +45,5 @@
   </g>
 
   <!-- footer -->
-  <text x="90" y="566" font-size="23" fill="#6e7681">Go · zsh · Sigstore-signed releases · MIT · a personal power tool, not a team platform</text>
+  <text x="90" y="566" font-size="22" fill="#6e7681">Go · zsh · Sigstore-signed releases · MIT · a personal power tool, no server</text>
 </svg>
