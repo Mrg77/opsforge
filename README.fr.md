@@ -5,10 +5,10 @@
 **Votre poste de travail DevOps, forgé en quelques minutes.**
 
 Choisissez vos CLI depuis une interface terminal interactive, installez-les d'un
-seul coup, et transformez votre zsh en un environnement DevOps qui connaît votre
-contexte — complétion en direct, un prompt qui vous alerte quand vous passez en
-prod, et des **guards policy-as-code** qui vous empêchent de flinguer le mauvais
-cluster.
+seul coup, et transformez votre shell (zsh, fish ou bash) en un environnement
+DevOps qui connaît votre contexte — complétion en direct, un prompt qui vous
+alerte quand vous passez en prod, et des **guards policy-as-code** qui vous
+empêchent de flinguer le mauvais cluster.
 
 opsforge, c'est la **couche supply-chain + policy de votre poste de travail** :
 il installe vos outils, encadre la façon dont *vous* les utilisez, et vous remet
@@ -28,7 +28,7 @@ vous enferme.
 [![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--chaîne-dapprovisionnement)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
-![opsforge demo](demo/demo-v0.3.2.gif)
+![opsforge demo](demo/demo.gif)
 
 **[Essayer](#essayer-dans-une-sandbox) · [Installation](#installation) · [Aperçu](#aperçu-rapide) · [Workflows](#workflows-courants) · [Shell](#lenvironnement-shell-devops) · [Guards](#guards-policy-as-code) · [Mode projet](#mode-projet) · [SBOM & VEX](#sbom--chaîne-dapprovisionnement) · [Agents IA (MCP)](#agents-ia-mcp) · [CI](#ci--intégrations) · [Catalogue](#le-catalogue) · [Sous le capot](#points-forts-dingénierie)**
 
@@ -105,7 +105,7 @@ Pour rester à jour, `opsforge self update` télécharge la dernière release,
 rien si vous êtes déjà à jour (`--check` pour cron/CI).
 
 > **Windows :** passez par WSL — l'installation s'appuie sur Homebrew et la couche
-> shell vise zsh. Le support natif winget/scoop + PowerShell est prévu.
+> shell vise zsh, fish et bash. Le support natif winget/scoop + PowerShell est prévu.
 
 ---
 

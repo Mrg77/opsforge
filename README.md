@@ -5,8 +5,9 @@
 **Your DevOps workstation, forged in minutes.**
 
 Pick your CLIs from an interactive terminal UI, install them in one go, and turn
-your zsh into a context-aware DevOps environment — live completion, a prod-aware
-prompt, and **policy-as-code guards** that stop you from nuking the wrong cluster.
+your shell (zsh, fish or bash) into a context-aware DevOps environment — live
+completion, a prod-aware prompt, and **policy-as-code guards** that stop you from
+nuking the wrong cluster.
 
 opsforge is the **supply-chain + policy layer for your own workstation**: it
 installs your toolbox, guards how *you* use it, and hands you a CVE-correlated
@@ -25,7 +26,7 @@ server, no account, no lock-in.
 [![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--supply-chain)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
-![opsforge demo](demo/demo-v0.3.2.gif)
+![opsforge demo](demo/demo.gif)
 
 **[Try it](#try-it-in-a-sandbox) · [Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
@@ -98,7 +99,8 @@ Keep it current with `opsforge self update` — it downloads the latest release,
 no-ops when you're already up to date (`--check` for cron/CI).
 
 > **Windows:** use WSL — the installer backend is Homebrew and the shell layer
-> targets zsh. Native winget/scoop + PowerShell support is on the roadmap.
+> targets zsh, fish and bash. Native winget/scoop + PowerShell support is on the
+> roadmap.
 
 ---
 
