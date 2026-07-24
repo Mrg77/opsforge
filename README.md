@@ -10,7 +10,8 @@ prompt, and **policy-as-code guards** that stop you from nuking the wrong cluste
 
 opsforge is the **supply-chain + policy layer for your own workstation**: it
 installs your toolbox, guards how *you* use it, and hands you a CVE-correlated
-SBOM of the whole thing. It's a personal power tool, not a team platform — no
+SBOM plus an **OpenVEX** document of the whole thing — prioritized by CISA's
+Known-Exploited catalog. It's a personal power tool, not a team platform — no
 server, no account, no lock-in.
 
 **English** · [Français](README.fr.md)
@@ -26,7 +27,7 @@ server, no account, no lock-in.
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM](#sbom--supply-chain) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
+**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -93,6 +94,8 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
+<tr><td><code>opsforge vex [--kev]</code></td><td>Emit an OpenVEX document of the CVEs on your tools · <code>--kev</code> flags the actively-exploited (CISA KEV) ones (see <a href="#vex--cisa-kev">VEX</a>)</td></tr>
+<tr><td><code>opsforge mcp</code></td><td>Run a read-only MCP server so an AI agent can query your workstation (see <a href="#ai-agents-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
 <tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against your snapshot without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
@@ -383,6 +386,13 @@ front of every command.
 
 Simulate any of these yourself with `opsforge guard test "<cmd>" --context <ctx>`.
 
+The built-in policy reaches past Kubernetes and Terraform: it also catches a
+**`git push --force` / `reset --hard` on `main`**, destructive **cloud** calls
+(`aws s3 rm --recursive`, `ec2 terminate`, `eks/rds/cloudformation delete`,
+`gcloud`/`az … delete` on prod), **container** footguns (`docker system prune`,
+`volume rm`, `rm -f`) and **database** wipes (`FLUSHALL`, `DROP DATABASE` on
+prod) — the everyday commands that ruin an afternoon, not just the obvious ones.
+
 Rules live in a single file, `~/.config/opsforge/guards.yaml`. Each rule matches a
 **command** regex and a **context** regex, and picks an action:
 
@@ -539,6 +549,33 @@ a pipeline to assert on:
 opsforge sync --check --json | jq '.compliant'   # fails the job on drift or a blocked CVE
 ```
 
+**A lockfile for verifiable reproducibility.** `opsforge sync` also writes an
+**`opsforge.lock`** next to the manifest, pinning each installed tool to its
+exact resolved version — the same idea as `package-lock.json` or `mise.lock`.
+Commit it, and `sync --check` no longer just verifies a tool is *present* — it
+verifies it's the *pinned version*, flagging **version drift** in both the human
+and JSON output:
+
+```yaml
+# opsforge.lock — written by sync, checked by sync --check (commit it)
+version: 1
+tools:
+  - name: helm
+    version: 3.14.0
+  - name: kubectl
+    version: 1.29.3
+```
+
+```sh
+opsforge sync --check --json | jq '.version_drift'
+# [{"name":"helm","expected":"3.14.0","got":"3.15.1"}]  → non-zero exit
+```
+
+It's non-breaking: with no lockfile, `--check` behaves exactly as before; a tool
+pinned with an unknown version is never flagged. That's what turns
+"workstation-as-code" from a wish into reproducibility a reviewer can trust —
+`opsforge.yaml` declares *what*, `opsforge.lock` proves *which exact version*.
+
 ---
 
 ## SBOM & supply-chain
@@ -575,6 +612,37 @@ That's the full supply-chain chain in one binary: a **checksum** proves each
 download is intact, a **cosign signature** proves the release is authentic (see
 [the catalog](#the-catalog)), and the **SBOM** proves what you ended up with —
 CVEs included.
+
+### VEX & CISA KEV
+
+A raw CVE list tells you a vulnerability *exists*. It doesn't tell you which of
+the dozens to fix **first** — and since the NVD stopped enriching most CVEs in
+2026, the CVSS score you'd sort by is often missing or stale. `opsforge vex`
+answers both questions.
+
+```sh
+opsforge vex                 # OpenVEX document → stdout (pairs with `opsforge sbom`)
+opsforge vex --kev           # + highlight the actively-exploited (CISA KEV) CVEs
+opsforge vex > vex.json      # capture the machine artifact
+```
+
+- **`opsforge vex`** turns the audit into an **[OpenVEX](https://openvex.dev)
+  v0.2.0** document: one machine-readable statement per (component, CVE) with a
+  status (`affected`) and an **action** — upgrade to the fixed version, or
+  monitor the advisory when none exists yet. Each component is identified by the
+  **same PURL the SBOM uses**, so a downstream scanner or auditor correlates the
+  two out of the box. Output is deterministically sorted, so it diffs and signs
+  cleanly.
+- **`opsforge vex --kev`** cross-references **CISA's Known Exploited
+  Vulnerabilities** catalog and calls out the CVEs being **exploited in the
+  wild** — the handful to fix *now*, ahead of the long tail. The catalog is
+  fetched once and cached (`~/.cache/opsforge/kev.json`, 24h TTL); it's
+  best-effort, so a network hiccup degrades to "no KEV data", never a failed
+  command.
+
+Prioritizing by **exploitability** instead of by a score that may not exist is
+the 2026-correct way to triage — and VEX is the artifact that carries that
+verdict to whatever consumes it next.
 
 ### The notify digest
 
@@ -617,6 +685,41 @@ surfaces at a glance in [`opsforge status`](#a-quick-tour).
 It's the only tool manager that folds CVEs, updates, leaked secrets *and* its
 own self-update into one digest and pushes it, proactively, into your shell —
 the moment an advisory lands on your toolbox, you know, without running a thing.
+
+---
+
+## AI agents (MCP)
+
+opsforge speaks the **[Model Context Protocol](https://modelcontextprotocol.io)**
+— so an AI agent (Claude Code, Cursor, any MCP client) can *ask about your
+workstation* through the same data the CLI computes, with no scraping and no
+guessing.
+
+```sh
+claude mcp add opsforge -- opsforge mcp   # register the stdio server once
+```
+
+`opsforge mcp` runs a stdio MCP server exposing **five read-only tools**:
+
+| Tool | What the agent gets |
+|:--|:--|
+| `list_installed_tools` | every installed tool, its version, category, and whether it's outdated |
+| `audit_vulnerabilities` | the CVEs on those tools (top severity + fixed-in), straight from OSV.dev |
+| `generate_sbom` | a CycloneDX 1.6 SBOM (optionally with embedded CVEs) |
+| `workstation_status` | one-glance summary: installed/outdated counts, shell state, kube/cloud/tf context |
+| `check_guard_policy` | evaluate a command against your guard policy — `allow`/`warn`/`confirm`/`deny` — *before* the agent suggests running it |
+
+> **Read-only by design.** Every tool is derived from read-only sources —
+> **nothing over MCP installs, upgrades, or changes the machine**. That's a
+> deliberate boundary: an agent can *inspect* your workstation and *reason*
+> about it (what's outdated, what carries a CVE, whether a command would trip a
+> prod guard), but the mutating actions stay behind the interactive CLI, where
+> *you* confirm them. `check_guard_policy` never runs the command, and — like
+> the shell — reading the context never invokes `kubectl`/`gcloud`.
+
+This turns opsforge into a **grounded source of truth** an agent can lean on:
+instead of hallucinating your tool versions or guessing whether `terraform
+destroy` is safe here, it asks.
 
 ---
 
@@ -860,6 +963,26 @@ The parts worth pointing a reviewer to:
   linked CycloneDX vulnerabilities. No other tool manager emits a signed
   inventory of your toolbox *with* its vulnerabilities, feedable to grype/trivy
   or a compliance gate.
+- **OpenVEX + exploitability triage.** `opsforge vex` re-uses the audit to emit
+  an OpenVEX v0.2.0 document — one `affected` statement per (PURL, CVE) with an
+  action — sharing the *exact* PURL the SBOM uses, so the two correlate. `--kev`
+  cross-references CISA's Known-Exploited catalog (cached, 24h TTL, best-effort)
+  to surface what's exploited *in the wild* — the 2026-correct way to prioritize
+  now that CVSS enrichment is unreliable. The builder is pure (id/timestamp
+  injected) and deterministically sorted, so the document diffs and signs.
+- **A read-only MCP server.** `opsforge mcp` exposes the workstation to AI agents
+  over the Model Context Protocol via five tools (installed tools, CVE audit,
+  SBOM, status, guard-policy check). The payload builders are pure functions over
+  data opsforge already computes, unit-tested without a live client; every tool
+  is `ReadOnlyHint` and derived from read-only sources — the mutating commands
+  stay behind the interactive CLI by design, so an agent can inspect but never
+  change the machine.
+- **A lockfile for verifiable reproducibility.** `opsforge sync` writes an
+  `opsforge.lock` pinning each tool's exact resolved version (normalized,
+  name-sorted for clean diffs); `sync --check` compares the machine against it
+  and reports *version* drift — not just missing tools — in JSON and human
+  output, non-zero on mismatch. `opsforge.yaml` declares *what*, `opsforge.lock`
+  proves *which version* — and it degrades gracefully (no lock → old behavior).
 - **One cached digest, never blocking.** `opsforge notify` aggregates CVEs,
   available updates, leaked secrets and a newer opsforge into a single cached
   digest (`internal/notices`, `~/.cache/opsforge/`, 6h TTL). Both the shell (a
@@ -888,10 +1011,12 @@ The parts worth pointing a reviewer to:
 ### Architecture
 
 ```
-cmd/                Cobra commands (install, status, audit, guard, sync, sbom, snapshot, apply, self, doctor, shell, theme…)
-internal/catalog/   Embedded YAML catalog + brew/github validation
-internal/project/   opsforge.yaml manifest: resolve tools/profiles, drift plan, CVE gate (sync)
+cmd/                Cobra commands (install, status, audit, guard, sync, sbom, vex, mcp, snapshot, apply, self, doctor, shell, theme…)
+internal/catalog/   Embedded YAML catalog + brew/github validation + OSV ecosystem mappings
+internal/project/   opsforge.yaml manifest: resolve tools/profiles, drift plan, CVE gate (sync) + opsforge.lock (lock.go)
 internal/sbom/      CycloneDX 1.6 builder (components + PURLs + embedded CVE vulnerabilities)
+internal/vex/       OpenVEX v0.2.0 builder + CISA KEV fetch/cache (kev.go)
+internal/mcp/        Read-only MCP payload builders (pure functions over catalog/detect/audit/guard)
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify; self-update)
 internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
