@@ -359,8 +359,8 @@ parsed **passively** — opsforge reads the file, never executes anything.
 
 </div>
 
-This is the part no other tool does. Homebrew Bundle, mise, chezmoi and aqua
-install your CLIs — none of them **guard how you use them**. opsforge turns the
+Tools like Homebrew Bundle, mise, chezmoi and aqua install your CLIs; opsforge
+adds a layer on top of that — it **guards how you use them**. It turns the
 prod-safety layer of the shell into a small policy engine: a declarative set of
 rules that decides whether a destructive command should run, warn, confirm, or be
 refused — based on the context you're actually in.
@@ -391,7 +391,7 @@ The built-in policy reaches past Kubernetes and Terraform: it also catches a
 (`aws s3 rm --recursive`, `ec2 terminate`, `eks/rds/cloudformation delete`,
 `gcloud`/`az … delete` on prod), **container** footguns (`docker system prune`,
 `volume rm`, `rm -f`) and **database** wipes (`FLUSHALL`, `DROP DATABASE` on
-prod) — the everyday commands that ruin an afternoon, not just the obvious ones.
+prod) — the everyday commands worth a second look, not just the obvious ones.
 
 Rules live in a single file, `~/.config/opsforge/guards.yaml`. Each rule matches a
 **command** regex and a **context** regex, and picks an action:
@@ -442,9 +442,9 @@ pipeline:
   **assert** that, say, `terraform destroy` is `deny`ed on prod — the same
   `Evaluate` call the shell uses, so the test can't diverge from real behavior.
 
-This is the moat, extended: the guards apply on your own shell, and the policy
-that drives them is **testable and versionable** like the rest of your setup —
-not a per-machine snowflake.
+The guards apply on your own shell, and the policy that drives them is
+**testable and versionable** like the rest of your setup — not a per-machine
+snowflake you tweak by hand.
 
 ### How opsforge knows you're on prod
 
@@ -511,8 +511,8 @@ Disable everything for one session with `OPSFORGE_GUARDS=0`.
 
 A workstation snapshot pins a whole *machine*. A **project** often needs less —
 just the toolchain *this repo* depends on. Commit an `opsforge.yaml` at its root
-and anyone reproduces it with one command — the reproducibility angle mise and
-devbox own, plus a CVE gate they don't have.
+and anyone reproduces it with one command — the same reproducibility mise and
+devbox give you, with a CVE gate added on top.
 
 ```yaml
 # opsforge.yaml — commit at the repo root
@@ -537,11 +537,11 @@ works from any subdirectory. It resolves `tools` + `profiles` into one
 de-duplicated list, installs only what's missing (via Homebrew or a GitHub
 release, per tool), and skips anything not in the catalog with a warning.
 
-**The differentiator: a CVE gate in the same file.** Set `fail_on: high` (or
+**A CVE gate in the same file.** Set `fail_on: high` (or
 `critical`) and `sync` audits *just the tools this project requires* against
 [OSV.dev](https://osv.dev) and **fails** when one carries a CVE at that level —
 so a single committed file gives you both a **reproducible environment** *and* a
-**supply-chain gate**, which mise/devbox don't combine. With `--json`, `sync
+**supply-chain gate** in one place. With `--json`, `sync
 --check` emits `{compliant, missing, present, unknown, cve_blocked, fail_on}` for
 a pipeline to assert on:
 
@@ -586,9 +586,8 @@ pinned with an unknown version is never flagged. That's what turns
 
 </div>
 
-opsforge is the only tool manager that emits a **CVE-correlated SBOM of your
-workstation** — a supply-chain artifact consumable by grype, `trivy sbom`, or a
-compliance pipeline.
+opsforge emits a **CVE-correlated SBOM of your workstation** — a supply-chain
+artifact consumable by grype, `trivy sbom`, or a compliance pipeline.
 
 ```sh
 opsforge sbom                # CycloneDX 1.6 JSON of your installed tools → stdout
@@ -603,10 +602,9 @@ opsforge sbom --audit > bom.json   # + embedded CVE findings, captured to a file
   and the recommended fix version. The SBOM ships CVE-corrected out of the box.
 
 The document goes to stdout (a short summary to stderr), so
-`opsforge sbom > bom.json` gives you a clean file plus feedback. This is a 2026
-supply-chain differentiator: no other CLI installer hands you a signed inventory
-of your toolbox *with* its vulnerabilities, ready to feed a scanner or a
-compliance gate.
+`opsforge sbom > bom.json` gives you a clean file plus feedback — a signed
+inventory of your toolbox *with* its vulnerabilities, ready to feed a scanner or
+a compliance gate.
 
 That's the full supply-chain chain in one binary: a **checksum** proves each
 download is intact, a **cosign signature** proves the release is authentic (see
@@ -640,8 +638,8 @@ opsforge vex > vex.json      # capture the machine artifact
   best-effort, so a network hiccup degrades to "no KEV data", never a failed
   command.
 
-Prioritizing by **exploitability** instead of by a score that may not exist is
-the 2026-correct way to triage — and VEX is the artifact that carries that
+Prioritizing by **exploitability** instead of by a score that may not exist is a
+sensible way to triage in 2026 — and VEX is the artifact that carries that
 verdict to whatever consumes it next.
 
 ### The notify digest
@@ -682,9 +680,9 @@ refreshed in the background (or on demand with `--refresh`), so neither the
 digest nor the shell heads-up ever waits on the network. The same finding also
 surfaces at a glance in [`opsforge status`](#a-quick-tour).
 
-It's the only tool manager that folds CVEs, updates, leaked secrets *and* its
-own self-update into one digest and pushes it, proactively, into your shell —
-the moment an advisory lands on your toolbox, you know, without running a thing.
+It folds CVEs, updates, leaked secrets *and* its own self-update into one digest
+and surfaces it, proactively, in your shell — so the moment an advisory lands on
+your toolbox, you know, without running a thing.
 
 ---
 
@@ -960,15 +958,14 @@ The parts worth pointing a reviewer to:
 - **A CVE-correlated SBOM of your workstation.** `opsforge sbom` builds a
   CycloneDX 1.6 document from the *detected* tools — each a component with its
   version and, when mapped, a PURL — and `--audit` embeds the OSV.dev CVEs as
-  linked CycloneDX vulnerabilities. No other tool manager emits a signed
-  inventory of your toolbox *with* its vulnerabilities, feedable to grype/trivy
-  or a compliance gate.
+  linked CycloneDX vulnerabilities — a signed inventory of your toolbox *with*
+  its vulnerabilities, feedable to grype/trivy or a compliance gate.
 - **OpenVEX + exploitability triage.** `opsforge vex` re-uses the audit to emit
   an OpenVEX v0.2.0 document — one `affected` statement per (PURL, CVE) with an
   action — sharing the *exact* PURL the SBOM uses, so the two correlate. `--kev`
   cross-references CISA's Known-Exploited catalog (cached, 24h TTL, best-effort)
-  to surface what's exploited *in the wild* — the 2026-correct way to prioritize
-  now that CVSS enrichment is unreliable. The builder is pure (id/timestamp
+  to surface what's exploited *in the wild* — a sensible way to prioritize now
+  that CVSS enrichment is unreliable. The builder is pure (id/timestamp
   injected) and deterministically sorted, so the document diffs and signs.
 - **A read-only MCP server.** `opsforge mcp` exposes the workstation to AI agents
   over the Model Context Protocol via five tools (installed tools, CVE audit,
@@ -989,12 +986,12 @@ The parts worth pointing a reviewer to:
   once-per-session one-liner via `notify.zsh`) and `opsforge status` read it
   *without* a synchronous network call — a stale cache is recomputed in a
   detached background process — so the heads-up path can never hang your prompt.
-  No other tool manager pushes a fresh CVE, update or leak into your shell.
+  A fresh CVE, update or leak surfaces in your shell without you asking for it.
 - **Reproducible env + a CVE gate in one file.** A committed `opsforge.yaml`
   (`version`, `tools`, `profiles`, `fail_on`) makes `opsforge sync` reproduce a
   repo's toolchain — and `fail_on: high|critical` audits *only the required
   tools* and fails the sync on a matching CVE. That's the reproducibility mise
-  and devbox own, plus a supply-chain gate they don't combine.
+  and devbox give you, plus a supply-chain gate in the same file.
 - **Auth-safe detection.** Probing `kubectl --version` where kubectl is a
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection

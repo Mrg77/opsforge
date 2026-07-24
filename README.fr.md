@@ -383,12 +383,12 @@ avec un compteur d'exécutions `×N` ; `--limit/-n` les plafonne (20 par défaut
 
 </div>
 
-C'est la partie qu'aucun autre outil ne fait. Homebrew Bundle, mise, chezmoi et
-aqua installent vos CLI — mais aucun ne **pose de garde-fous sur leur usage**.
-opsforge transforme la couche de sûreté prod du shell en un petit moteur de
-politique : un jeu de règles déclaratives qui décide si une commande destructrice
-doit s'exécuter, avertir, demander confirmation ou être refusée — selon le
-contexte dans lequel vous vous trouvez réellement.
+Des outils comme Homebrew Bundle, mise, chezmoi et aqua installent vos CLI ;
+opsforge ajoute une couche au-dessus — il **pose des garde-fous sur leur usage**.
+Il transforme la couche de sûreté prod du shell en un petit moteur de politique :
+un jeu de règles déclaratives qui décide si une commande destructrice doit
+s'exécuter, avertir, demander confirmation ou être refusée — selon le contexte
+dans lequel vous vous trouvez réellement.
 
 ### La seule règle à retenir
 
@@ -417,8 +417,8 @@ aussi un **`git push --force` / `reset --hard` sur `main`**, les appels **cloud*
 destructeurs (`aws s3 rm --recursive`, `ec2 terminate`, `eks/rds/cloudformation
 delete`, `gcloud`/`az … delete` en prod), les pièges **conteneurs** (`docker
 system prune`, `volume rm`, `rm -f`) et les effacements de **bases de données**
-(`FLUSHALL`, `DROP DATABASE` en prod) — les commandes du quotidien qui gâchent un
-après-midi, pas seulement les plus évidentes.
+(`FLUSHALL`, `DROP DATABASE` en prod) — les commandes du quotidien qui méritent
+un second coup d'œil, pas seulement les plus évidentes.
 
 Les règles tiennent dans un seul fichier, `~/.config/opsforge/guards.yaml`. Chaque
 règle matche une regex de **commande** et une regex de **contexte**, et choisit
@@ -472,10 +472,9 @@ dotfiles et le faire respecter en CI :
   c'est le même appel `Evaluate` que celui du shell, le test ne peut donc pas
   diverger du comportement réel.
 
-C'est le fossé défensif, poussé plus loin : les guards s'appliquent sur votre
-propre shell, et la politique qui les pilote est **testable et versionnable**
-comme le reste de votre config — au lieu d'être bricolée à la main, différente sur
-chaque machine.
+Les guards s'appliquent sur votre propre shell, et la politique qui les pilote
+est **testable et versionnable** comme le reste de votre config — au lieu d'être
+bricolée à la main, différente sur chaque machine.
 
 ### Comment opsforge sait que vous êtes en prod
 
@@ -548,8 +547,7 @@ Désactivez tout le temps d'une session avec `OPSFORGE_GUARDS=0`.
 Un snapshot de poste de travail épingle toute une *machine*. Un **projet** a
 souvent besoin de moins — juste la boîte à outils dont *ce dépôt-là* dépend.
 Committez un `opsforge.yaml` à sa racine et n'importe qui le reproduit en une
-commande : la reproductibilité qui fait la force de mise et devbox, plus un gate
-CVE qu'eux n'ont pas.
+commande : la même reproductibilité que mise ou devbox, avec un gate CVE en plus.
 
 ```yaml
 # opsforge.yaml — à committer à la racine du dépôt
@@ -575,12 +573,12 @@ et `profiles` en une seule liste dédoublonnée, n'installe que ce qui manque (v
 Homebrew ou une release GitHub, selon l'outil), et laisse de côté, avec un
 avertissement, tout ce qui n'est pas dans le catalogue.
 
-**Le vrai plus : un gate CVE dans le même fichier.** Mettez `fail_on: high` (ou
+**Un gate CVE dans le même fichier.** Mettez `fail_on: high` (ou
 `critical`) et `sync` audite *uniquement les outils requis par ce projet* contre
 [OSV.dev](https://osv.dev), et **échoue** dès que l'un porte une CVE de ce
 niveau — un seul fichier committé vous donne donc à la fois un **environnement
-reproductible** *et* un **gate supply-chain**, ce que mise/devbox ne réunissent
-pas. Avec `--json`, `sync --check` renvoie `{compliant, missing, present, unknown,
+reproductible** *et* un **gate supply-chain**, au même endroit. Avec `--json`,
+`sync --check` renvoie `{compliant, missing, present, unknown,
 cve_blocked, fail_on}` pour qu'un pipeline puisse s'appuyer dessus :
 
 ```sh
@@ -625,9 +623,8 @@ relecteur peut croire — `opsforge.yaml` déclare le *quoi*, `opsforge.lock` pr
 
 </div>
 
-opsforge est le seul gestionnaire d'outils à émettre un **SBOM de votre poste de
-travail corrélé aux CVE** — un artefact supply-chain exploitable par grype,
-`trivy sbom` ou un pipeline de conformité.
+opsforge émet un **SBOM de votre poste de travail corrélé aux CVE** — un artefact
+supply-chain exploitable par grype, `trivy sbom` ou un pipeline de conformité.
 
 ```sh
 opsforge sbom                # JSON CycloneDX 1.6 de vos outils installés → stdout
@@ -642,8 +639,7 @@ opsforge sbom --audit > bom.json   # + CVE embarquées, capturé dans un fichier
   la version de correctif recommandée. Le SBOM sort corrélé aux CVE d'emblée.
 
 Le document part sur stdout (un court résumé sur stderr) : `opsforge sbom > bom.json`
-vous donne donc un fichier propre, plus un retour à l'écran. C'est un vrai atout
-supply-chain en 2026 : aucun autre installeur CLI ne vous remet un inventaire signé
+vous donne donc un fichier propre, plus un retour à l'écran — un inventaire signé
 de votre boîte à outils *avec* ses vulnérabilités, prêt à alimenter un scanner ou un
 gate de conformité.
 
@@ -680,7 +676,7 @@ opsforge vex > vex.json      # capture l'artefact machine
   jamais en commande en échec.
 
 Prioriser par **exploitabilité** plutôt que par un score qui peut ne pas exister,
-c'est la bonne façon de trier en 2026 — et le VEX est l'artefact qui porte ce
+c'est une façon sensée de trier en 2026 — et le VEX est l'artefact qui porte ce
 verdict jusqu'à ce qui le consomme ensuite.
 
 ### Le digest notify
@@ -722,10 +718,9 @@ périmé est rafraîchi en arrière-plan (ou à la demande avec `--refresh`), si
 que ni le digest ni le signalement du shell n'attendent sur le réseau. Le même
 constat remonte aussi d'un coup d'œil dans [`opsforge status`](#aperçu-rapide).
 
-C'est le seul gestionnaire d'outils à réunir CVE, mises à jour, secrets exposés
-*et* sa propre self-update dans un seul digest, et à le pousser de lui-même dans
-votre shell — dès qu'un advisory tombe sur votre boîte à outils, vous le savez,
-sans avoir rien à lancer.
+Il réunit CVE, mises à jour, secrets exposés *et* sa propre self-update dans un
+seul digest, et le fait remonter de lui-même dans votre shell — dès qu'un advisory
+tombe sur votre boîte à outils, vous le savez, sans avoir rien à lancer.
 
 ---
 
@@ -1017,16 +1012,16 @@ Les points sur lesquels attirer l'œil d'un relecteur :
 - **Un SBOM de votre poste de travail corrélé aux CVE.** `opsforge sbom` construit
   un document CycloneDX 1.6 à partir des outils *détectés* — chacun un composant
   avec sa version et, quand il est rattaché, un PURL — et `--audit` y embarque les
-  CVE d'OSV.dev comme vulnerabilities CycloneDX liées. Aucun autre gestionnaire
-  d'outils n'émet un inventaire signé de votre boîte à outils *avec* ses
-  vulnérabilités, à donner en pâture à grype/trivy ou à un gate de conformité.
+  CVE d'OSV.dev comme vulnerabilities CycloneDX liées — un inventaire signé de
+  votre boîte à outils *avec* ses vulnérabilités, à donner en pâture à grype/trivy
+  ou à un gate de conformité.
 - **OpenVEX + tri par exploitabilité.** `opsforge vex` réutilise l'audit pour
   émettre un document OpenVEX v0.2.0 — une déclaration `affected` par couple
   (PURL, CVE) avec une action — en partageant le PURL *exact* qu'utilise le SBOM,
   pour que les deux se corrèlent. `--kev` croise le catalogue Known-Exploited de
   la CISA (en cache, TTL 24h, best-effort) pour faire ressortir ce qui est
-  exploité *dans la nature* — la bonne façon de prioriser en 2026, maintenant que
-  l'enrichissement CVSS n'est plus fiable. Le builder est pur (id/timestamp
+  exploité *dans la nature* — une façon sensée de prioriser en 2026, maintenant
+  que l'enrichissement CVSS n'est plus fiable. Le builder est pur (id/timestamp
   injectés) et trié de façon déterministe : le document se diffe et se signe.
 - **Un serveur MCP en lecture seule.** `opsforge mcp` expose le poste de travail
   aux agents IA via le Model Context Protocol, avec cinq outils (outils installés,
@@ -1049,14 +1044,14 @@ Les points sur lesquels attirer l'œil d'un relecteur :
   ligne une fois par session via `notify.zsh`) comme `opsforge status` le lisent
   *sans* appel réseau synchrone — un cache périmé est recalculé dans un processus
   détaché en arrière-plan — donc le signalement ne peut jamais bloquer votre prompt.
-  Aucun autre gestionnaire d'outils ne pousse une CVE, une mise à jour ou une fuite
-  fraîche dans votre shell.
+  Une CVE, une mise à jour ou une fuite fraîche remonte dans votre shell sans que
+  vous ayez à la demander.
 - **Env reproductible + gate CVE dans un seul fichier.** Un `opsforge.yaml` committé
   (`version`, `tools`, `profiles`, `fail_on`) fait reproduire à `opsforge sync` la
   boîte à outils d'un dépôt — et `fail_on: high|critical` audite *uniquement les
   outils requis* et fait échouer le sync sur une CVE correspondante. C'est la
-  reproductibilité qui fait la force de mise et devbox, plus un gate supply-chain
-  qu'eux ne réunissent pas.
+  même reproductibilité que mise et devbox, plus un gate supply-chain dans le même
+  fichier.
 - **Une détection qui ne casse pas l'auth.** Sonder `kubectl --version` là où
   kubectl est un dispatcher de SDK cloud branché à un plugin OIDC peut faire surgir
   un login navigateur. Chaque sonde tourne avec un `KUBECONFIG` neutralisé et un
