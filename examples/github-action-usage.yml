@@ -22,6 +22,7 @@ jobs:
       #   - secrets     → fail on a leaked credential
       #   - guard-lint  → validate the committed guards.yaml
       #   - sbom        → emit a CycloneDX SBOM, uploaded as an artifact
+      #   - vex         → emit an OpenVEX doc (KEV-prioritized), uploaded too
       #   - baseline    → assert this image matches the team snapshot
       - name: opsforge security gate
         uses: Mrg77/opsforge@v1
@@ -31,6 +32,7 @@ jobs:
           secrets: 'true'
           guard-lint: 'true'
           sbom: 'true'
+          vex: 'true'
           baseline: team-baseline.yaml
 
   # Minimal variant: just the CVE gate, nothing else.

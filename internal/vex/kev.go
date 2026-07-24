@@ -107,8 +107,14 @@ func saveKEVCache(set KEVSet) error {
 // fetchKEV downloads the CISA catalog and extracts the CVE ids. Returns nil
 // on any failure.
 func fetchKEV() KEVSet {
+	return fetchKEVFrom(kevURL)
+}
+
+// fetchKEVFrom is fetchKEV against an explicit URL, so the parsing path can be
+// exercised in tests against a local server without hitting cisa.gov.
+func fetchKEVFrom(url string) KEVSet {
 	client := &http.Client{Timeout: 20 * time.Second}
-	resp, err := client.Get(kevURL)
+	resp, err := client.Get(url)
 	if err != nil {
 		return nil
 	}

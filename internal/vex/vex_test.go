@@ -35,6 +35,51 @@ func TestBuildStatements(t *testing.T) {
 	}
 }
 
+func TestBuildActionStatements(t *testing.T) {
+	doc := Build([]Input{
+		{PURL: "pkg:golang/x@1.0.0", Vulns: []audit.Vuln{
+			{ID: "CVE-A", FixedIn: "1.2.0"}, // fix known → "Upgrade to…"
+			{ID: "CVE-B"},                   // no fix → "monitor the advisory"
+		}},
+	}, "id", "2026-01-01T00:00:00Z")
+
+	byID := map[string]Statement{}
+	for _, s := range doc.Statements {
+		byID[s.Vulnerability.Name] = s
+	}
+	if got := byID["CVE-A"].ActionStatement; got != "Upgrade to 1.2.0 or later." {
+		t.Errorf("CVE-A action = %q", got)
+	}
+	if got := byID["CVE-B"].ActionStatement; got == "" || got == "Upgrade to  or later." {
+		t.Errorf("CVE-B (no fix) should get a monitor action, got %q", got)
+	}
+}
+
+func TestSummaryCountsDistinctProducts(t *testing.T) {
+	doc := Build([]Input{
+		{PURL: "pkg:golang/x@1.0.0", Vulns: []audit.Vuln{{ID: "CVE-1"}, {ID: "CVE-2"}}},
+		{PURL: "pkg:golang/y@2.0.0", Vulns: []audit.Vuln{{ID: "CVE-3"}}},
+	}, "id", "2026-01-01T00:00:00Z")
+
+	// 3 statements across 2 distinct products.
+	if n := countProducts(doc); n != 2 {
+		t.Errorf("countProducts = %d, want 2 distinct products", n)
+	}
+	if s := doc.Summary(); s == "" {
+		t.Error("Summary should be non-empty")
+	}
+}
+
+func TestBuildEmptyInputYieldsNoStatements(t *testing.T) {
+	doc := Build(nil, "id", "2026-01-01T00:00:00Z")
+	if len(doc.Statements) != 0 {
+		t.Errorf("empty input should produce no statements, got %d", len(doc.Statements))
+	}
+	if doc.Author != "opsforge" || doc.Version != docVersion {
+		t.Errorf("header should still be populated: %+v", doc)
+	}
+}
+
 func TestKEVSet(t *testing.T) {
 	k := KEVSet{"CVE-2025-1234": true}
 	if !k.Has("cve-2025-1234") { // case-insensitive

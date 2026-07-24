@@ -51,6 +51,17 @@ jobs:
       - name: Verify workstation baseline
         run: opsforge apply --check team-baseline.yaml --json | tee drift-report.json
 
+      # Gate 5 — supply-chain artifacts. Emit a CVE-correlated SBOM and an
+      # OpenVEX document of the image's tooling, so a compliance pipeline (or
+      # grype / trivy sbom) has machine-readable inventory + triage to consume.
+      # These commands describe state; they don't fail the job on their own.
+      - name: SBOM + VEX
+        run: |
+          opsforge sbom --audit > sbom.cdx.json      # CycloneDX 1.6, CVEs embedded
+          opsforge vex --kev --json > vex.json       # OpenVEX, KEV cross-referenced
+        # vex.json carries the actively-exploited (CISA KEV) verdict per CVE —
+        # feed it to whatever triages next instead of a raw CVE dump.
+
       # Optional — a full workstation/image health check as JSON, for
       # dashboards. Does not fail the build (|| true), just records state.
       - name: Workstation health (report only)
@@ -61,4 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: opsforge-reports
-          path: "*-report.json"
+          path: |
+            *-report.json
+            sbom.cdx.json
+            vex.json

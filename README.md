@@ -764,6 +764,7 @@ gates you switch on (`audit`, `secrets`, `guard-lint`, `sbom`, `baseline`):
     secrets: 'true'        # also fail on a leaked credential
     guard-lint: 'true'     # validate guards.yaml (policy-as-code)
     sbom: 'true'           # emit a CycloneDX SBOM, uploaded as an artifact
+    vex: 'true'            # emit an OpenVEX doc (KEV-prioritized), uploaded too
     baseline: my-setup.yaml   # assert this machine matches your snapshot
 ```
 

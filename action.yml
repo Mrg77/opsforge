@@ -10,6 +10,7 @@
 #       secrets: 'true'        # also fail on a leaked credential
 #       guard-lint: 'true'     # validate guards.yaml (policy-as-code)
 #       sbom: 'true'           # emit a CycloneDX SBOM (uploaded as an artifact)
+#       vex: 'true'            # emit an OpenVEX doc, KEV-prioritized (artifact)
 #       baseline: team-baseline.yaml   # assert this machine matches the snapshot
 #
 # opsforge relies on installed DevOps CLIs (kubectl, helm, terraform…) to
@@ -17,7 +18,8 @@
 name: opsforge
 description: >-
   Install opsforge and gate your pipeline on CVEs, leaked secrets, a
-  policy-as-code guard file, an SBOM, and a workstation baseline.
+  policy-as-code guard file, an SBOM, an OpenVEX document, and a workstation
+  baseline.
 author: Mrg77
 
 branding:
@@ -67,6 +69,24 @@ inputs:
       named 'opsforge-sbom'.
     required: false
     default: 'true'
+  vex:
+    description: >-
+      Run `opsforge vex --kev` to emit an OpenVEX document of the CVEs on the
+      installed tools — cross-referenced against CISA's Known Exploited
+      Vulnerabilities catalog — to the file named by `vex-path`, exposed as the
+      `vex-path` output. Set `vex-upload: true` to also upload it as an artifact.
+    required: false
+    default: 'false'
+  vex-path:
+    description: Where to write the OpenVEX document when `vex` is enabled.
+    required: false
+    default: opsforge-vex.json
+  vex-upload:
+    description: >-
+      When 'true' and `vex` is enabled, upload the VEX document as a workflow
+      artifact named 'opsforge-vex'.
+    required: false
+    default: 'true'
   baseline:
     description: >-
       Path (or URL) to a workstation snapshot. When set, runs
@@ -82,6 +102,9 @@ outputs:
   sbom-path:
     description: Path to the generated SBOM file (empty when `sbom` was not enabled).
     value: ${{ steps.sbom.outputs.path }}
+  vex-path:
+    description: Path to the generated VEX document (empty when `vex` was not enabled).
+    value: ${{ steps.vex.outputs.path }}
 
 runs:
   using: composite
@@ -147,6 +170,26 @@ runs:
       with:
         name: opsforge-sbom
         path: ${{ inputs.sbom-path }}
+
+    - id: vex
+      name: Generate VEX
+      if: inputs.vex == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        # --json makes `vex` write the OpenVEX document to stdout (a summary to
+        # stderr); without it, --kev prints a human triage view instead.
+        opsforge vex --kev --json > "${{ inputs.vex-path }}"
+        echo "path=${{ inputs.vex-path }}" >> "$GITHUB_OUTPUT"
+        echo "Wrote VEX to ${{ inputs.vex-path }}"
+
+    - id: vex-upload
+      name: Upload VEX artifact
+      if: inputs.vex == 'true' && inputs.vex-upload == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: opsforge-vex
+        path: ${{ inputs.vex-path }}
 
     - id: baseline
       name: Verify workstation baseline

@@ -806,6 +806,7 @@ puis lance les gates que vous activez (`audit`, `secrets`, `guard-lint`, `sbom`,
     secrets: 'true'        # échoue aussi sur un identifiant exposé
     guard-lint: 'true'     # valide guards.yaml (policy-as-code)
     sbom: 'true'           # émet un SBOM CycloneDX, téléversé comme artefact
+    vex: 'true'            # émet un document OpenVEX (priorisé KEV), téléversé aussi
     baseline: my-setup.yaml   # vérifie que cette machine correspond à votre snapshot
 ```
 
