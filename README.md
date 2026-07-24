@@ -43,10 +43,22 @@ opsforge is **three tools in one binary**:
 | 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
 | 📸 | **Workstation- & project-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; a committed [`opsforge.yaml`](#project-mode) declares a repo's toolchain and `opsforge sync` reproduces it (with a CVE gate). `apply --check` / `sync --check` verify a machine in CI, and [`opsforge sbom`](#sbom--supply-chain) emits a CVE-correlated SBOM of it. |
 
-> **Why:** rebuilding a DevOps workstation means installing 20+ CLIs, then wiring
-> completions, aliases and a useful prompt for each — by hand, on every machine.
-> opsforge makes it a two-minute session and keeps your shell in sync as your
-> toolbox grows.
+### Why this exists
+
+Three recurring frictions on a DevOps machine, each usually solved by a
+different tool — or by hand:
+
+- **Rebuilding a workstation** means installing 20+ CLIs, then wiring
+  completions, aliases and a useful prompt for each, on every machine.
+- **A distracted `kubectl delete` on the wrong context** has no seatbelt: the
+  tools happily run it whether you're on staging or prod.
+- **Nobody knows what's actually on the box** — which versions, which CVEs,
+  which of them are being exploited.
+
+opsforge folds those into one binary because they share the same data (the
+detected toolbox) and the same home (your shell). It's deliberately a
+**personal power tool, not a team platform** — no server, no account, no
+lock-in — so it stays something you run, not something you operate.
 
 ---
 

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" font-family="'SF Mono','JetBrains Mono','DejaVu Sans Mono',monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0d1117"/>
+      <stop offset="1" stop-color="#161b22"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5fd7"/>
+      <stop offset="1" stop-color="#ffaf00"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <!-- top accent rule, forge electric blue -->
+  <rect x="0" y="0" width="1280" height="6" fill="#00afff"/>
+
+  <!-- wordmark -->
+  <text x="90" y="196" font-size="96" font-weight="700" fill="url(#flame)">❯ opsforge</text>
+
+  <!-- tagline -->
+  <text x="92" y="270" font-size="40" font-weight="600" fill="#e6edf3">Your DevOps workstation, forged in minutes.</text>
+
+  <!-- one-line what -->
+  <text x="92" y="330" font-size="27" fill="#8b949e">Pick your CLIs · guard your shell against prod mistakes · get a</text>
+  <text x="92" y="368" font-size="27" fill="#8b949e">CVE-correlated SBOM + OpenVEX of the whole box.</text>
+
+  <!-- keyword badges -->
+  <g font-size="24" font-weight="600">
+    <g>
+      <rect x="90"  y="430" width="232" height="52" rx="10" fill="#1f2937" stroke="#00afff" stroke-width="1.5"/>
+      <text x="206" y="464" fill="#58c4ff" text-anchor="middle">287 CLIs</text>
+    </g>
+    <g>
+      <rect x="338" y="430" width="300" height="52" rx="10" fill="#1f2937" stroke="#ff5fd7" stroke-width="1.5"/>
+      <text x="488" y="464" fill="#ff8fe3" text-anchor="middle">policy-as-code guards</text>
+    </g>
+    <g>
+      <rect x="654" y="430" width="170" height="52" rx="10" fill="#1f2937" stroke="#ffaf00" stroke-width="1.5"/>
+      <text x="739" y="464" fill="#ffc95a" text-anchor="middle">SBOM</text>
+    </g>
+    <g>
+      <rect x="840" y="430" width="210" height="52" rx="10" fill="#1f2937" stroke="#00ff87" stroke-width="1.5"/>
+      <text x="945" y="464" fill="#5affb0" text-anchor="middle">OpenVEX + KEV</text>
+    </g>
+  </g>
+
+  <!-- footer -->
+  <text x="90" y="566" font-size="23" fill="#6e7681">Go · zsh · Sigstore-signed releases · MIT · a personal power tool, not a team platform</text>
+</svg>

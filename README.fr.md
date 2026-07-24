@@ -46,11 +46,24 @@ opsforge, c'est **trois outils dans un seul binaire** :
 | 🐚 | **Shell DevOps** | Une seule commande transforme votre zsh en une expérience façon Warp/Fish : complétion en direct, aide inline via `?`, un prompt qui vous signale la prod, et des [**guards policy-as-code**](#guards-policy-as-code) sur les commandes destructrices. On ne remplace pas votre shell, on ne vous enferme nulle part. |
 | 📸 | **Poste de travail & projet as-code** | `opsforge snapshot` exporte toute votre config — outils, profils, shell, thème *et* politique de guards — dans un seul YAML ; un [`opsforge.yaml`](#mode-projet) committé déclare la boîte à outils d'un dépôt et `opsforge sync` la reproduit (avec un gate CVE). `apply --check` / `sync --check` vérifient une machine en CI, et [`opsforge sbom`](#sbom--chaîne-dapprovisionnement) en tire un SBOM corrélé aux CVE. |
 
-> **Pourquoi :** reconstruire un poste de travail DevOps, c'est installer une
-> vingtaine de CLI, puis brancher pour chacun les complétions, les alias et un
-> prompt qui tient la route — à la main, sur chaque machine. opsforge ramène tout
-> ça à une session de deux minutes et garde votre shell à jour à mesure que votre
-> boîte à outils s'étoffe.
+### Pourquoi ça existe
+
+Trois frictions récurrentes sur une machine DevOps, chacune résolue d'ordinaire
+par un outil différent — ou à la main :
+
+- **Reconstruire un poste**, c'est installer une vingtaine de CLI, puis brancher
+  pour chacun les complétions, les alias et un prompt qui tient la route, sur
+  chaque machine.
+- **Un `kubectl delete` étourdi sur le mauvais contexte** n'a aucune ceinture de
+  sécurité : les outils l'exécutent qu'on soit sur staging ou sur prod.
+- **Personne ne sait vraiment ce qu'il y a sur la machine** — quelles versions,
+  quelles CVE, lesquelles sont activement exploitées.
+
+opsforge réunit tout ça dans un seul binaire parce que ces problèmes partagent
+la même donnée (la boîte à outils détectée) et le même lieu (votre shell). C'est
+délibérément un **outil perso, pas une plateforme d'équipe** — pas de serveur,
+pas de compte, rien qui vous enferme — pour que ça reste quelque chose que vous
+lancez, pas quelque chose que vous opérez.
 
 ---
 
