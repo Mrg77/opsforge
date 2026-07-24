@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref (e.g. rapid pushes to a PR) so CI
+# minutes aren't spent on commits that are already outdated.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -24,6 +30,7 @@ jobs:
 
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -36,8 +43,22 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version: stable
-      - name: go test
-        run: go test -race ./...
+
+      # Install the shells the layer targets so their module syntax checks
+      # (`zsh -n`, `fish --no-execute`) actually RUN instead of being skipped.
+      # zsh ships on macOS; fish needs installing on both.
+      - name: Install shells (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends zsh fish
+      - name: Install fish (macOS)
+        if: runner.os == 'macOS'
+        run: brew install fish
+
+      - name: go test (race + coverage)
+        run: go test -race -coverprofile=coverage.out -covermode=atomic ./...
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
 
   # Validates that every brew reference in the catalog resolves to a real
   # formula/cask of the declared kind, via the public Homebrew API — so a
