@@ -19,7 +19,11 @@ import (
 	"github.com/Mrg77/opsforge/internal/vex"
 )
 
-var vexKEV bool
+var (
+	vexKEV     bool
+	vexSign    bool
+	vexSignOut string
+)
 
 var vexCmd = &cobra.Command{
 	Use:   "vex",
@@ -81,14 +85,25 @@ CVEs that are being actively exploited in the wild — the ones to fix first.
 			"https://openvex.dev/docs/opsforge/"+now.Format("20060102T150405Z"),
 			now.Format(time.RFC3339))
 
-		if output.JSON || !vexKEV {
+		// Signing operates on the machine artifact, so --sign implies JSON
+		// output (there's nothing to sign in the human triage view).
+		if output.JSON || !vexKEV || vexSign {
 			// The VEX document is the machine artifact — emit JSON to stdout.
 			b, err := json.MarshalIndent(doc, "", "  ")
 			if err != nil {
 				return err
 			}
-			fmt.Fprintln(os.Stdout, string(b))
+			// Emit with a trailing newline and sign the EXACT same bytes, so
+			// `cosign verify-blob <the-file>` matches what was written.
+			docBytes := append(b, '\n')
+			os.Stdout.Write(docBytes)
 			fmt.Fprintln(os.Stderr, ui.Dim.Render("  "+doc.Summary()))
+
+			if vexSign {
+				signCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+				defer cancel()
+				return signArtifact(signCtx, docBytes, vexSignOut, "VEX document")
+			}
 			return nil
 		}
 
@@ -143,5 +158,9 @@ func shortPURL(p string) string {
 func init() {
 	vexCmd.Flags().BoolVar(&vexKEV, "kev", false,
 		"cross-reference CISA KEV and highlight actively-exploited CVEs")
+	vexCmd.Flags().BoolVar(&vexSign, "sign", false,
+		"also write a Sigstore signature bundle (key-based, offline)")
+	vexCmd.Flags().StringVar(&vexSignOut, "sign-out", "vex.sigstore.json",
+		"path for the --sign Sigstore bundle")
 	rootCmd.AddCommand(vexCmd)
 }

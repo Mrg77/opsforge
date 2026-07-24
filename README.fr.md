@@ -133,8 +133,8 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
-<tr><td><code>opsforge sbom [--audit]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
-<tr><td><code>opsforge vex [--kev]</code></td><td>Émet un document OpenVEX des CVE de vos outils · <code>--kev</code> signale celles qui sont activement exploitées (CISA KEV) (voir <a href="#vex--cisa-kev">VEX</a>)</td></tr>
+<tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE · <code>--sign</code> ajoute un bundle Sigstore (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
+<tr><td><code>opsforge vex [--kev] [--sign]</code></td><td>Émet un document OpenVEX des CVE de vos outils · <code>--kev</code> signale celles activement exploitées (CISA KEV) · <code>--sign</code> le signe (voir <a href="#vex--cisa-kev">VEX</a>)</td></tr>
 <tr><td><code>opsforge mcp</code></td><td>Lance un serveur MCP en lecture seule pour qu'un agent IA interroge votre poste de travail (voir <a href="#agents-ia-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Exporter / reconstruire tout un poste de travail</td></tr>
 <tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à votre snapshot sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
@@ -715,6 +715,43 @@ Prioriser par **exploitabilité** plutôt que par un score qui peut ne pas exist
 c'est une façon sensée de trier en 2026 — et le VEX est l'artefact qui porte ce
 verdict jusqu'à ce qui le consomme ensuite.
 
+### Signer les artefacts
+
+Le SBOM comme le VEX peuvent être signés dans un **bundle
+[Sigstore](https://www.sigstore.dev)** auto-contenu, que vous remettez à qui
+vous voulez :
+
+```sh
+opsforge sbom --sign > bom.json      # + un bundle bom.sigstore.json
+opsforge vex  --sign > vex.json      # + un bundle vex.sigstore.json
+cosign verify-blob --key ~/.config/opsforge/signing.pub \
+  --bundle bom.sigstore.json bom.json
+```
+
+`--sign` signe le document **par clé** avec une clé opsforge locale persistante
+(une clé ECDSA P-256 générée au premier usage sous `~/.config/opsforge/`) et
+écrit un bundle Sigstore que `cosign verify-blob` — ou n'importe quel vérifieur
+Sigstore — accepte. C'est entièrement **hors-ligne** : pas de login OIDC, pas de
+certificat, aucune entrée dans un log de transparence public.
+
+Ce dernier point est un choix assumé, et il mérite d'être précis :
+
+- **La signature locale est par clé, volontairement.** La signature keyless de
+  Sigstore publierait l'identité OIDC du signataire (votre email) dans Rekor —
+  un log public et immuable — à *chaque* signature, et elle ne prouverait rien
+  sur la *provenance* supply-chain d'un document généré à la main sur un poste.
+  opsforge signe donc avec une clé locale à la place.
+- **Soyez clair sur ce que ça prouve.** Une signature par clé prouve
+  l'**intégrité** du document et son **attribution à votre clé** — pas qu'il a
+  été produit par un pipeline de confiance. La provenance est une propriété de
+  CI : ce sont les *releases* d'opsforge qui sont signées **keyless avec
+  provenance SLSA** (voir [le catalogue](#le-catalogue)), parce que là,
+  l'identité *est* le pipeline.
+
+Les mêmes primitives, le bon outil pour chaque tâche — l'intégrité locale pour
+les artefacts que vous générez, la provenance keyless pour les binaires que vous
+livrez.
+
 ### Le digest notify
 
 opsforge n'attend pas que vous lanciez `audit` — `opsforge notify` rassemble **au
@@ -1064,6 +1101,18 @@ Les points sur lesquels attirer l'œil d'un relecteur :
   exploité *dans la nature* — une façon sensée de prioriser en 2026, maintenant
   que l'enrichissement CVSS n'est plus fiable. Le builder est pur (id/timestamp
   injectés) et trié de façon déterministe : le document se diffe et se signe.
+- **Signature Sigstore par clé, un choix assumé.** `sbom --sign` / `vex --sign`
+  produisent un bundle Sigstore auto-contenu via `sigstore-go` (une dépendance
+  légère — pas cosign-as-library, qui gonflerait le go.mod), en implémentant
+  l'interface `Keypair` sur une clé ECDSA P-256 locale persistante : la signature
+  est entièrement hors-ligne et la clé publique reste stable d'une signature à
+  l'autre. C'est par clé, pas keyless, volontairement : le keyless publierait
+  l'identité du signataire dans un log Rekor public et ne prouverait rien sur la
+  provenance d'un document généré à la main — la signature locale prouve donc
+  intégrité + attribution à la clé, et la provenance keyless reste sur les
+  releases signées en CI. Vérifiable avec `cosign verify-blob` ; les octets
+  signés sont exactement ceux écrits, pour que la vérification corresponde au
+  fichier.
 - **Un serveur MCP en lecture seule.** `opsforge mcp` expose le poste de travail
   aux agents IA via le Model Context Protocol, avec cinq outils (outils installés,
   audit CVE, SBOM, statut, vérification de la politique de guards). Les builders
@@ -1117,6 +1166,7 @@ internal/catalog/   Catalogue YAML embarqué + validation brew/github + mappings
 internal/project/   Manifest opsforge.yaml : résolution tools/profiles, plan de dérive, gate CVE (sync) + opsforge.lock (lock.go)
 internal/sbom/      Builder CycloneDX 1.6 (composants + PURL + vulnerabilities CVE embarquées)
 internal/vex/       Builder OpenVEX v0.2.0 + récupération/cache du catalogue CISA KEV (kev.go)
+internal/attest/    Signature Sigstore par clé du SBOM/VEX (clé ECDSA locale → bundle Sigstore)
 internal/mcp/        Builders de payload MCP en lecture seule (fonctions pures sur catalog/detect/audit/guard)
 internal/detect/    Détection concurrente PATH + version + brew-outdated
 internal/installer/ Routeur de backend : Homebrew + téléchargement releases GitHub (checksum.go : vérif SHA-256 ; self-update)

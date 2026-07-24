@@ -16,7 +16,11 @@ import (
 	"github.com/Mrg77/opsforge/internal/ui"
 )
 
-var sbomWithAudit bool
+var (
+	sbomWithAudit bool
+	sbomSign      bool
+	sbomSignOut   string
+)
 
 var sbomCmd = &cobra.Command{
 	Use:   "sbom",
@@ -29,9 +33,15 @@ With --audit, opsforge cross-references the OSV.dev database and embeds the
 known CVEs as CycloneDX vulnerabilities, so the SBOM is CVE-correlated out
 of the box (feed it to grype, trivy sbom, or a compliance pipeline).
 
+With --sign, opsforge also writes a self-contained Sigstore bundle of the SBOM,
+signed key-based with a local opsforge key (offline — no OIDC, no Rekor). It
+proves the document's integrity and attribution to your key; verify it with
+'cosign verify-blob --key ~/.config/opsforge/signing.pub --bundle …'.
+
   opsforge sbom            # SBOM to stdout (CycloneDX JSON)
   opsforge sbom --audit    # + embedded CVE findings
-  opsforge sbom > bom.json # capture it`,
+  opsforge sbom > bom.json # capture it
+  opsforge sbom --sign > bom.json   # + a bom.sigstore.json signature bundle`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {
@@ -82,8 +92,17 @@ of the box (feed it to grype, trivy sbom, or a compliance pipeline).
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(os.Stdout, string(b))
+		// Emit the document with a trailing newline; sign the EXACT same bytes
+		// so `cosign verify-blob <the-file>` matches what landed on disk/stdout.
+		docBytes := append(b, '\n')
+		os.Stdout.Write(docBytes)
 		fmt.Fprintln(os.Stderr, ui.Dim.Render("  "+doc.Summary()))
+
+		if sbomSign {
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			return signArtifact(ctx, docBytes, sbomSignOut, "SBOM")
+		}
 		return nil
 	},
 }
@@ -91,5 +110,9 @@ of the box (feed it to grype, trivy sbom, or a compliance pipeline).
 func init() {
 	sbomCmd.Flags().BoolVar(&sbomWithAudit, "audit", false,
 		"cross-reference OSV.dev and embed known CVEs in the SBOM")
+	sbomCmd.Flags().BoolVar(&sbomSign, "sign", false,
+		"also write a Sigstore signature bundle (key-based, offline)")
+	sbomCmd.Flags().StringVar(&sbomSignOut, "sign-out", "bom.sigstore.json",
+		"path for the --sign Sigstore bundle")
 	rootCmd.AddCommand(sbomCmd)
 }

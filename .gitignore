@@ -5,3 +5,8 @@
 
 # stray VHS/demo artifact (literal $HISTFILE created by an unexpanded var)
 demo/$HISTFILE
+
+# never commit a signing key or a produced bundle from a local test
+signing.key
+signing.pub
+*.sigstore.json
