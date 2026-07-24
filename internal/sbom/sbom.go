@@ -117,18 +117,23 @@ func Build(inputs []Input, timestamp string) Doc {
 	return doc
 }
 
-// purl builds a Package URL (purl) for a tool from its OSV ecosystem +
-// package, e.g. pkg:golang/helm.sh/helm/v3@3.14.0. Returns "" when the
-// tool has no ecosystem mapping — a bare generic purl carries no useful
-// coordinates, so we omit it rather than emit a misleading one.
+// purl builds a Package URL for a tool from its OSV ecosystem + package,
+// e.g. pkg:golang/helm.sh/helm/v3@3.14.0. Returns "" when the tool has no
+// ecosystem mapping — a bare generic purl carries no useful coordinates,
+// so we omit it rather than emit a misleading one.
 func purl(in Input) string {
-	if in.Ecosystem == "" || in.Package == "" {
+	return PURL(in.Ecosystem, in.Package, in.Version)
+}
+
+// PURL builds a Package URL from an OSV ecosystem, package name and raw
+// version string. Exported so other supply-chain artifacts (e.g. VEX)
+// identify the same component the same way. Returns "" without coordinates.
+func PURL(ecosystem, pkg, version string) string {
+	if ecosystem == "" || pkg == "" {
 		return ""
 	}
-	eco := purlEcosystem(in.Ecosystem)
-	ver := audit.NormalizeVersion(in.Version)
-	p := "pkg:" + eco + "/" + in.Package
-	if ver != "" {
+	p := "pkg:" + purlEcosystem(ecosystem) + "/" + pkg
+	if ver := audit.NormalizeVersion(version); ver != "" {
 		p += "@" + ver
 	}
 	return p
