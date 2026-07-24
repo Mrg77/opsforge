@@ -34,10 +34,16 @@ Enable it once with 'opsforge shell install', then 'exec zsh'.`,
 
 var shellEnvCmd = &cobra.Command{
 	Use:   "env",
-	Short: "Print the zsh snippet to eval from ~/.zshrc",
-	Long:  "Meant to be used as: eval \"$(opsforge shell env)\"",
+	Short: "Print the shell snippet to load from your rc file",
+	Long: `Meant to be used from your shell rc:
+  zsh:  eval "$(opsforge shell env)"
+  fish: opsforge shell env --shell fish | source`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		out, err := shellcfg.Env()
+		sh, err := resolveShell()
+		if err != nil {
+			return err
+		}
+		out, err := sh.EnvFor()
 		if err != nil {
 			return err
 		}
@@ -70,35 +76,48 @@ var shellSyncCmd = &cobra.Command{
 
 var shellInstallCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Install the opsforge shell environment into ~/.zshrc (idempotent)",
+	Short: "Install the opsforge shell environment into your rc file (idempotent)",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		path, err := shellcfg.InstallToZshrc()
+		sh, err := resolveShell()
 		if err != nil {
 			return err
 		}
-		if cat, err := catalog.Load(); err == nil {
-			shellcfg.Sync(cat.Tools())
+		path, err := sh.InstallTo()
+		if err != nil {
+			return err
 		}
 
-		// Install the interactive plugins (inline suggestions, auto menu,
-		// syntax highlighting) so the experience is complete out of the box.
-		if !shellNoPlugins {
-			fmt.Println("Setting up the interactive experience (this may take a minute)…")
-			installed, failed := shellcfg.EnsureInteractivePlugins()
-			for _, p := range installed {
-				fmt.Printf("  %s installed %s\n", docOKGreen.Render("✓"), p)
+		if sh == shellcfg.Zsh {
+			if cat, err := catalog.Load(); err == nil {
+				shellcfg.Sync(cat.Tools())
 			}
-			if len(failed) > 0 {
-				fmt.Printf("  %s could not install: %v (features degrade gracefully)\n",
-					docDimGrey.Render("·"), failed)
+			// zsh needs plugins for inline suggestions / menu / highlighting;
+			// fish ships all of that natively, so this step is zsh-only.
+			if !shellNoPlugins {
+				fmt.Println("Setting up the interactive experience (this may take a minute)…")
+				installed, failed := shellcfg.EnsureInteractivePlugins()
+				for _, p := range installed {
+					fmt.Printf("  %s installed %s\n", docOKGreen.Render("✓"), p)
+				}
+				if len(failed) > 0 {
+					fmt.Printf("  %s could not install: %v (features degrade gracefully)\n",
+						docDimGrey.Render("·"), failed)
+				}
 			}
 		}
 
 		fmt.Printf("\nopsforge shell environment installed in %s\n", path)
-		fmt.Println("Run `exec zsh` (or open a new terminal) to activate it — then just")
-		fmt.Println("start typing: a gray suggestion appears inline (→ to accept), ↑ walks")
-		fmt.Println("your history by what you've typed, Tab completes, and the line is")
-		fmt.Println("colored as you go. (Prefer an always-on menu? OPSFORGE_AUTOMENU=1.)")
+		if sh == shellcfg.Fish {
+			fmt.Println("Run `exec fish` (or open a new terminal) to activate it.")
+			fmt.Println("fish already gives you inline autosuggestions, syntax highlighting")
+			fmt.Println("and prefix history search — opsforge adds the guards, the prod-aware")
+			fmt.Println("prompt, the `?` help and the DevOps aliases on top.")
+		} else {
+			fmt.Println("Run `exec zsh` (or open a new terminal) to activate it — then just")
+			fmt.Println("start typing: a gray suggestion appears inline (→ to accept), ↑ walks")
+			fmt.Println("your history by what you've typed, Tab completes, and the line is")
+			fmt.Println("colored as you go. (Prefer an always-on menu? OPSFORGE_AUTOMENU=1.)")
+		}
 		return nil
 	},
 }
@@ -107,20 +126,35 @@ var shellNoPlugins bool
 
 var shellUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
-	Short: "Remove the opsforge shell environment from ~/.zshrc",
+	Short: "Remove the opsforge shell environment from your rc file",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !shellcfg.InstalledInZshrc() {
+		sh, err := resolveShell()
+		if err != nil {
+			return err
+		}
+		if !sh.InstalledIn() {
 			fmt.Println("opsforge shell environment is not installed.")
 			return nil
 		}
-		path, err := shellcfg.UninstallFromZshrc()
+		path, err := sh.UninstallFrom()
 		if err != nil {
 			return err
 		}
 		fmt.Printf("Removed the opsforge block from %s and deleted its modules.\n", path)
-		fmt.Println("Run `exec zsh` to apply.")
+		fmt.Printf("Run `exec %s` to apply.\n", sh)
 		return nil
 	},
+}
+
+// shellFlag holds the --shell value; empty means auto-detect from $SHELL.
+var shellFlag string
+
+// resolveShell turns the --shell flag (or $SHELL auto-detection) into a Shell.
+func resolveShell() (shellcfg.Shell, error) {
+	if shellFlag == "" {
+		return shellcfg.DetectShell(), nil
+	}
+	return shellcfg.ParseShell(shellFlag)
 }
 
 var (
@@ -139,22 +173,33 @@ var shellDoctorCmd = &cobra.Command{
 			return docDimGrey.Render("·")
 		}
 
-		fmt.Printf("%s installed in ~/.zshrc\n", mark(shellcfg.InstalledInZshrc()))
+		sh, err := resolveShell()
+		if err != nil {
+			return err
+		}
+		rc, _ := sh.RcPath()
+		fmt.Printf("shell: %s\n", sh)
+		fmt.Printf("%s installed in %s\n", mark(sh.InstalledIn()), rc)
 
-		cfgDir, _ := shellcfg.ConfigDir()
-		mods, _ := shellcfg.Modules()
-		for _, m := range mods {
-			_, err := os.Stat(filepath.Join(cfgDir, m.Name+".zsh"))
-			fmt.Printf("  %s module %s\n", mark(err == nil), m.Name)
+		cfgDir, _ := sh.ModuleDir()
+		for _, name := range sh.ModuleNames() {
+			_, err := os.Stat(filepath.Join(cfgDir, name+sh.Ext()))
+			fmt.Printf("  %s module %s\n", mark(err == nil), name)
 		}
 
-		complDir, _ := shellcfg.CompletionsDir()
-		entries, _ := os.ReadDir(complDir)
-		fmt.Printf("%s %d cached tool completion(s)\n", mark(len(entries) > 0), len(entries))
+		// Completions cache and the plugin layer are zsh-specific (fish ships
+		// autosuggestions/highlighting/completions natively).
+		if sh == shellcfg.Zsh {
+			complDir, _ := shellcfg.CompletionsDir()
+			entries, _ := os.ReadDir(complDir)
+			fmt.Printf("%s %d cached tool completion(s)\n", mark(len(entries) > 0), len(entries))
 
-		fmt.Println("\ninteractive experience (inline suggestions, auto menu, highlighting):")
-		for _, p := range shellcfg.InteractivePluginStatus() {
-			fmt.Printf("  %s %s\n", mark(p.Installed), p.Name)
+			fmt.Println("\ninteractive experience (inline suggestions, auto menu, highlighting):")
+			for _, p := range shellcfg.InteractivePluginStatus() {
+				fmt.Printf("  %s %s\n", mark(p.Installed), p.Name)
+			}
+		} else {
+			fmt.Println("\ninteractive experience: provided natively by fish")
 		}
 
 		fmt.Println("\nintegrations detected on PATH:")
@@ -169,6 +214,10 @@ var shellDoctorCmd = &cobra.Command{
 func init() {
 	shellInstallCmd.Flags().BoolVar(&shellNoPlugins, "no-plugins", false,
 		"skip installing the interactive plugins (autosuggestions, menu, highlighting)")
+	// --shell selects the target shell (zsh|fish); empty auto-detects $SHELL.
+	for _, c := range []*cobra.Command{shellEnvCmd, shellInstallCmd, shellUninstallCmd, shellDoctorCmd} {
+		c.Flags().StringVar(&shellFlag, "shell", "", "target shell: zsh or fish (default: auto-detect from $SHELL)")
+	}
 	shellCmd.AddCommand(shellEnvCmd, shellSyncCmd, shellInstallCmd, shellUninstallCmd, shellDoctorCmd)
 	rootCmd.AddCommand(shellCmd)
 }

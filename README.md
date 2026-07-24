@@ -40,7 +40,7 @@ opsforge is **three tools in one binary**:
 | | | |
 |:--:|---|---|
 | 📦 | **Tool installer** | An interactive picker over **287 curated CLIs across every IT discipline** — including a new **AI & LLM** category. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
-| 🐚 | **DevOps shell** | One command turns your own zsh into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
+| 🐚 | **DevOps shell** | One command turns your own **zsh or fish** into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
 | 📸 | **Workstation- & project-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; a committed [`opsforge.yaml`](#project-mode) declares a repo's toolchain and `opsforge sync` reproduces it (with a CVE gate). `apply --check` / `sync --check` verify a machine in CI, and [`opsforge sbom`](#sbom--supply-chain) emits a CVE-correlated SBOM of it. |
 
 ### Why this exists
@@ -282,8 +282,20 @@ Delegates to **mise** (preferred) or **asdf** — no version-manager reinvention
 ## The DevOps shell environment
 
 ```sh
-opsforge shell install && exec zsh
+opsforge shell install && exec zsh    # zsh
+opsforge shell install && exec fish   # fish (auto-detected from $SHELL)
 ```
+
+Turns your **own zsh or fish** into a DevOps-aware environment (`shell install`
+auto-detects your shell from `$SHELL`, or pass `--shell zsh|fish`; `shell
+uninstall` restores everything).
+
+> **zsh & fish.** The guards, the prod-aware prompt, the `?` inline help and the
+> DevOps aliases work in both. The interactive niceties below (inline
+> suggestions, syntax highlighting, prefix history search) are **built into
+> fish**, so opsforge just wires up the guards and prompt on top; on zsh it
+> installs the plugins that provide them. The description below details the zsh
+> experience.
 
 Turns your **own zsh** into a DevOps-aware environment (modules under
 `~/.config/opsforge/shell/`, `shell uninstall` restores everything):
@@ -1027,6 +1039,14 @@ The parts worth pointing a reviewer to:
   validated on load, with a behavior-preserving built-in default. Context is read
   passively (kubeconfig / env / tf workspace) so evaluation never triggers an OIDC
   login, and the shell only calls the engine on commands that look destructive.
+- **One policy, two shells.** The guard/prompt logic lives in Go and is exposed
+  as plain text commands (`guard check`, `guard prefilter`), so porting from zsh
+  to **fish** was a matter of the hook, not the logic: the zsh `accept-line` ZLE
+  widget maps to fish's `bind enter` + `commandline -f execute` (the only place
+  either shell can cancel a command before it runs). A small `Shell` abstraction
+  (`internal/shellcfg/shell.go`) parameterizes install/env/modules per shell;
+  every module is parse-checked in CI (`zsh -n`, `fish --no-execute`). fish's
+  native autosuggestions/highlighting mean opsforge adds only what fish lacks.
 - **CVE audit with real version matching.** Queries OSV.dev per tool, filters
   vulnerabilities *client-side* against OSV's affected ranges (semver
   `introduced`/`fixed`) and dedupes CVEs listed under multiple advisory IDs — so
@@ -1154,7 +1174,7 @@ internal/notices/   Cached digest behind `opsforge notify` (CVEs + updates + sec
 internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply / --check drift report
 internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
-internal/shellcfg/  zsh environment modules (incl. notify.zsh) + completion cache + guard policy engine (policy.go)
+internal/shellcfg/  zsh + fish environment modules (modules/, modules/fish/) + per-shell install (shell.go) + guard policy engine (policy.go)
 internal/ui/        Shared visual identity + themes
 ```
 
@@ -1180,10 +1200,12 @@ upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 - [x] One-command interactive [demo sandbox](#try-it-in-a-sandbox) (Docker + Codespaces)
 - [x] Read-only [MCP server](#ai-agents-mcp) for AI agents
 - [x] `opsforge.lock` — verifiable, reproducible toolchains
+- [x] **fish** support for the shell layer (guards, prompt, `?` help, aliases)
 
 **Next**
 
-- [ ] bash & fish support for the shell layer (currently zsh-only)
+- [ ] bash support for the shell layer (guards are harder there — bash can't
+      cancel a command pre-execution the way zsh/fish can)
 - [ ] Native Windows (winget/scoop + PowerShell completions)
 - [ ] More `github:` templates for full brew-less coverage
 

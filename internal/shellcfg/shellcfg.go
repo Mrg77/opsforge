@@ -28,7 +28,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/detect"
 )
 
-//go:embed modules/*.zsh
+//go:embed modules/*.zsh modules/fish/*.fish
 var moduleFS embed.FS
 
 const (
