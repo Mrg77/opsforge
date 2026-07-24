@@ -755,6 +755,12 @@ livrez.
 
 ### Scanner une image de conteneur
 
+<div align="center">
+
+![opsforge scan node:16-alpine --diff — CVE de l'image + corrélation avec le poste](demo/screenshots/scan.gif)
+
+</div>
+
 `opsforge scan` étend le même moteur OSV à une image de conteneur — et y ajoute
 ce qu'un scanner isolé ne fait pas : **la corrélation avec votre propre poste**.
 
@@ -1241,6 +1247,16 @@ contre l'amont et cross-compile toutes les cibles. Les releases sont produites p
 GoReleaser sur tag.
 
 ## Feuille de route
+
+**Livré récemment**
+
+- [x] `opsforge scan <image>` — scan CVE d'image corrélé avec votre poste
+- [x] `opsforge sbom/vex --sign` — signature Sigstore par clé des artefacts
+- [x] [Sandbox de démo](#essayer-dans-une-sandbox) interactive en une commande (Docker + Codespaces)
+- [x] [Serveur MCP](#agents-ia-mcp) en lecture seule pour les agents IA
+- [x] `opsforge.lock` — boîtes à outils reproductibles et vérifiables
+
+**À venir**
 
 - [ ] Support bash & fish pour la couche shell (zsh uniquement pour l'instant)
 - [ ] Windows natif (winget/scoop + complétions PowerShell)

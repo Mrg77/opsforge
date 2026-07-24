@@ -712,6 +712,12 @@ generate, keyless provenance for the binaries you ship.
 
 ### Scanning a container image
 
+<div align="center">
+
+![opsforge scan node:16-alpine --diff — image CVEs plus workstation correlation](demo/screenshots/scan.gif)
+
+</div>
+
 `opsforge scan` extends the same OSV engine to a container image — and adds the
 part a standalone scanner can't: **correlation with your own workstation**.
 
@@ -1166,6 +1172,16 @@ CI runs gofmt, vet, race tests on Linux & macOS, validates the catalog against
 upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 
 ## Roadmap
+
+**Recently shipped**
+
+- [x] `opsforge scan <image>` — image CVE scan correlated with your workstation
+- [x] `opsforge sbom/vex --sign` — key-based Sigstore signing of the artifacts
+- [x] One-command interactive [demo sandbox](#try-it-in-a-sandbox) (Docker + Codespaces)
+- [x] Read-only [MCP server](#ai-agents-mcp) for AI agents
+- [x] `opsforge.lock` — verifiable, reproducible toolchains
+
+**Next**
 
 - [ ] bash & fish support for the shell layer (currently zsh-only)
 - [ ] Native Windows (winget/scoop + PowerShell completions)
