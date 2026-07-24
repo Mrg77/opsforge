@@ -40,6 +40,7 @@ categories:
         bin: kubectl
         brew: kubernetes-cli
         description: Kubernetes command-line tool
+        osv: {ecosystem: Go, name: k8s.io/kubernetes}
         version_args: ["version", "--client"]
         completion_zsh: ["kubectl", "completion", "zsh"]
       - name: helm
@@ -53,6 +54,7 @@ categories:
         bin: k9s
         brew: k9s
         description: Terminal UI to manage Kubernetes clusters
+        osv: {ecosystem: Go, name: github.com/derailed/k9s}
         version_args: ["version", "--short"]
         completion_zsh: ["k9s", "completion", "zsh"]
         github:
@@ -64,6 +66,7 @@ categories:
         bin: kubectx
         brew: kubectx
         description: Fast context and namespace switching (kubectx + kubens)
+        osv: {ecosystem: Go, name: github.com/ahmetb/kubectx}
         github:
           repo: ahmetb/kubectx
           asset: "kubectx_{tag}_{os}_{arch}.tar.gz"
@@ -73,6 +76,7 @@ categories:
         bin: kind
         brew: kind
         description: Run local Kubernetes clusters in Docker
+        osv: {ecosystem: Go, name: sigs.k8s.io/kind}
         completion_zsh: ["kind", "completion", "zsh"]
         github:
           repo: kubernetes-sigs/kind
@@ -81,11 +85,13 @@ categories:
         bin: minikube
         brew: minikube
         description: Local single-node Kubernetes cluster
+        osv: {ecosystem: Go, name: k8s.io/minikube}
         completion_zsh: ["minikube", "completion", "zsh"]
       - name: stern
         bin: stern
         brew: stern
         description: Multi-pod log tailing for Kubernetes
+        osv: {ecosystem: Go, name: github.com/stern/stern}
         completion_zsh: ["stern", "--completion", "zsh"]
         github:
           repo: stern/stern
@@ -94,6 +100,7 @@ categories:
         bin: kustomize
         brew: kustomize
         description: Template-free Kubernetes manifest customization
+        osv: {ecosystem: Go, name: sigs.k8s.io/kustomize/kustomize/v5}
         version_args: ["version"]
         completion_zsh: ["kustomize", "completion", "zsh"]
       - name: argocd
@@ -110,6 +117,7 @@ categories:
         bin: flux
         brew: fluxcd/tap/flux
         description: GitOps toolkit CLI (Flux CD)
+        osv: {ecosystem: Go, name: github.com/fluxcd/flux2/v2}
         completion_zsh: ["flux", "completion", "zsh"]
         github:
           repo: fluxcd/flux2
@@ -118,12 +126,14 @@ categories:
         bin: velero
         brew: velero
         description: Kubernetes backup and restore
+        osv: {ecosystem: Go, name: github.com/vmware-tanzu/velero}
         version_args: ["version", "--client-only"]
         completion_zsh: ["velero", "completion", "zsh"]
       - name: kubeseal
         bin: kubeseal
         brew: kubeseal
         description: Encrypt secrets for Sealed Secrets controller
+        osv: {ecosystem: Go, name: github.com/bitnami-labs/sealed-secrets}
       - name: krew
         bin: kubectl-krew
         brew: krew
@@ -132,33 +142,40 @@ categories:
         bin: helmfile
         brew: helmfile
         description: Declarative spec for deploying Helm charts
+        osv: {ecosystem: Go, name: github.com/helmfile/helmfile}
         completion_zsh: ["helmfile", "completion", "zsh"]
       - name: kubeconform
         bin: kubeconform
         brew: kubeconform
         description: Fast Kubernetes manifest validation
+        osv: {ecosystem: Go, name: github.com/yannh/kubeconform}
       - name: popeye
         bin: popeye
         brew: popeye
         description: Kubernetes cluster sanitizer / linter
+        osv: {ecosystem: Go, name: github.com/derailed/popeye}
       - name: skaffold
         bin: skaffold
         brew: skaffold
         description: Continuous development for Kubernetes apps
+        osv: {ecosystem: Go, name: github.com/GoogleContainerTools/skaffold}
         completion_zsh: ["skaffold", "completion", "zsh"]
       - name: k3d
         bin: k3d
         brew: k3d
         description: Run k3s (lightweight Kubernetes) in Docker
+        osv: {ecosystem: Go, name: github.com/k3d-io/k3d/v5}
         completion_zsh: ["k3d", "completion", "zsh"]
       - name: kyverno
         bin: kyverno
         brew: kyverno
         description: Kubernetes policy management CLI
+        osv: {ecosystem: Go, name: github.com/kyverno/kyverno}
       - name: vcluster
         bin: vcluster
         brew: vcluster
         description: Create virtual Kubernetes clusters
+        osv: {ecosystem: Go, name: github.com/loft-sh/vcluster}
       - name: chart-testing
         bin: ct
         brew: chart-testing
@@ -203,10 +220,12 @@ categories:
         bin: crossplane
         brew: crossplane
         description: Build control planes without writing code (Crossplane CLI)
+        osv: {ecosystem: Go, name: github.com/crossplane/crossplane}
       - name: timoni
         bin: timoni
         brew: timoni
         description: Package manager for Kubernetes powered by CUE
+        osv: {ecosystem: Go, name: github.com/stefanprodan/timoni}
 
   - name: Infrastructure as Code
     tools:
@@ -220,38 +239,46 @@ categories:
         bin: tofu
         brew: opentofu
         description: Open-source Terraform fork (Linux Foundation)
+        osv: {ecosystem: Go, name: github.com/opentofu/opentofu}
         version_args: ["version"]
       - name: terragrunt
         bin: terragrunt
         brew: terragrunt
         description: Terraform wrapper for DRY multi-env configs
+        osv: {ecosystem: Go, name: github.com/gruntwork-io/terragrunt}
       - name: tflint
         bin: tflint
         brew: terraform-linters/tap/tflint
         cask: true
         description: Terraform linter
+        osv: {ecosystem: Go, name: github.com/terraform-linters/tflint}
       - name: terraform-docs
         bin: terraform-docs
         brew: terraform-docs
         description: Generate docs from Terraform modules
+        osv: {ecosystem: Go, name: github.com/terraform-docs/terraform-docs}
       - name: infracost
         bin: infracost
         brew: infracost
         description: Cloud cost estimates for Terraform
+        osv: {ecosystem: Go, name: github.com/infracost/infracost}
         completion_zsh: ["infracost", "completion", "--shell", "zsh"]
       - name: packer
         bin: packer
         brew: hashicorp/tap/packer
         description: Machine image builder
+        osv: {ecosystem: Go, name: github.com/hashicorp/packer}
         version_args: ["version"]
       - name: ansible
         bin: ansible
         brew: ansible
         description: Agentless configuration management
+        osv: {ecosystem: PyPI, name: ansible}
       - name: pulumi
         bin: pulumi
         brew: pulumi
         description: Infrastructure as code in real languages
+        osv: {ecosystem: Go, name: github.com/pulumi/pulumi}
         completion_zsh: ["pulumi", "gen-completion", "zsh"]
 
   - name: Cloud CLIs
@@ -260,16 +287,19 @@ categories:
         bin: aws
         brew: awscli
         description: Amazon Web Services CLI v2
+        osv: {ecosystem: PyPI, name: awscli}
       - name: eksctl
         bin: eksctl
         brew: eksctl
         description: Create and manage EKS clusters
+        osv: {ecosystem: Go, name: github.com/weaveworks/eksctl}
         version_args: ["version"]
         completion_zsh: ["eksctl", "completion", "zsh"]
       - name: azure
         bin: az
         brew: azure-cli
         description: Microsoft Azure CLI
+        osv: {ecosystem: PyPI, name: azure-cli}
       - name: gcloud
         bin: gcloud
         brew: gcloud-cli
@@ -279,6 +309,7 @@ categories:
         bin: doctl
         brew: doctl
         description: DigitalOcean CLI
+        osv: {ecosystem: Go, name: github.com/digitalocean/doctl}
         completion_zsh: ["doctl", "completion", "zsh"]
       - name: scw
         bin: scw
@@ -289,18 +320,22 @@ categories:
         bin: s5cmd
         brew: s5cmd
         description: Fast, parallel S3 and local filesystem command runner
+        osv: {ecosystem: Go, name: github.com/peak/s5cmd/v2}
       - name: steampipe
         bin: steampipe
         brew: steampipe
         description: Query cloud APIs and services with SQL
+        osv: {ecosystem: Go, name: github.com/turbot/steampipe}
       - name: aws-vault
         bin: aws-vault
         brew: aws-vault
         description: Securely store and access AWS credentials
+        osv: {ecosystem: Go, name: github.com/99designs/aws-vault}
       - name: saml2aws
         bin: saml2aws
         brew: saml2aws
         description: Get AWS credentials via SAML SSO providers
+        osv: {ecosystem: Go, name: github.com/Versent/saml2aws}
       - name: granted
         bin: granted
         brew: granted
@@ -309,6 +344,7 @@ categories:
         bin: cloud-nuke
         brew: cloud-nuke
         description: Delete all resources in an AWS account
+        osv: {ecosystem: Go, name: github.com/gruntwork-io/cloud-nuke}
       - name: aws-nuke
         bin: aws-nuke
         brew: aws-nuke
@@ -317,18 +353,22 @@ categories:
         bin: terraformer
         brew: terraformer
         description: Generate Terraform from existing cloud infrastructure
+        osv: {ecosystem: Go, name: github.com/GoogleCloudPlatform/terraformer}
       - name: driftctl
         bin: driftctl
         brew: driftctl
         description: Detect infrastructure drift against Terraform state
+        osv: {ecosystem: Go, name: github.com/snyk/driftctl}
       - name: aws-sam-cli
         bin: sam
         brew: aws-sam-cli
         description: Build and test AWS serverless applications (SAM)
+        osv: {ecosystem: PyPI, name: aws-sam-cli}
       - name: cfn-lint
         bin: cfn-lint
         brew: cfn-lint
         description: Validate AWS CloudFormation templates
+        osv: {ecosystem: PyPI, name: cfn-lint}
 
   - name: Containers
     tools:
@@ -336,24 +376,29 @@ categories:
         bin: docker
         brew: docker
         description: Docker CLI (pair with colima as runtime on macOS)
+        osv: {ecosystem: Go, name: github.com/docker/cli}
       - name: docker-compose
         bin: docker-compose
         brew: docker-compose
         description: Multi-container applications
+        osv: {ecosystem: Go, name: github.com/docker/compose/v2}
       - name: colima
         bin: colima
         brew: colima
         description: Container runtime for macOS (Docker Desktop alternative)
+        osv: {ecosystem: Go, name: github.com/abiosoft/colima}
         version_args: ["version"]
       - name: podman
         bin: podman
         brew: podman
         description: Daemonless container engine
+        osv: {ecosystem: Go, name: github.com/containers/podman/v5}
         completion_zsh: ["podman", "completion", "zsh"]
       - name: lazydocker
         bin: lazydocker
         brew: lazydocker
         description: Terminal UI for Docker
+        osv: {ecosystem: Go, name: github.com/jesseduffield/lazydocker}
         github:
           repo: jesseduffield/lazydocker
           asset: "lazydocker_{version}_{os}_{arch}.tar.gz"
@@ -363,14 +408,17 @@ categories:
         bin: dive
         brew: dive
         description: Explore and optimize Docker image layers
+        osv: {ecosystem: Go, name: github.com/wagoodman/dive}
       - name: skopeo
         bin: skopeo
         brew: skopeo
         description: Inspect and copy container images between registries
+        osv: {ecosystem: Go, name: github.com/containers/skopeo}
       - name: crane
         bin: crane
         brew: crane
         description: Interact with container registries
+        osv: {ecosystem: Go, name: github.com/google/go-containerregistry}
         version_args: ["version"]
       - name: hadolint
         bin: hadolint
@@ -380,26 +428,32 @@ categories:
         bin: buildctl
         brew: buildkit
         description: Concurrent, cache-efficient container image builder
+        osv: {ecosystem: Go, name: github.com/moby/buildkit}
       - name: ko
         bin: ko
         brew: ko
         description: Build and deploy Go container images without a Dockerfile
+        osv: {ecosystem: Go, name: github.com/google/ko}
       - name: earthly
         bin: earthly
         brew: earthly
         description: Repeatable container-based builds
+        osv: {ecosystem: Go, name: github.com/earthly/earthly}
       - name: apko
         bin: apko
         brew: apko
         description: Build OCI images from apk packages declaratively
+        osv: {ecosystem: Go, name: chainguard.dev/apko}
       - name: melange
         bin: melange
         brew: melange
         description: Build apk packages from declarative YAML
+        osv: {ecosystem: Go, name: chainguard.dev/melange}
       - name: umoci
         bin: umoci
         brew: umoci
         description: Manipulate OCI container images
+        osv: {ecosystem: Go, name: github.com/opencontainers/umoci}
 
   - name: Git & CI/CD
     tools:
@@ -413,19 +467,23 @@ categories:
         bin: glab
         brew: glab
         description: GitLab CLI
+        osv: {ecosystem: Go, name: gitlab.com/gitlab-org/cli}
         completion_zsh: ["glab", "completion", "-s", "zsh"]
       - name: act
         bin: act
         brew: act
         description: Run GitHub Actions locally
+        osv: {ecosystem: Go, name: github.com/nektos/act}
       - name: pre-commit
         bin: pre-commit
         brew: pre-commit
         description: Git hooks framework
+        osv: {ecosystem: PyPI, name: pre-commit}
       - name: lazygit
         bin: lazygit
         brew: lazygit
         description: Terminal UI for git
+        osv: {ecosystem: Go, name: github.com/jesseduffield/lazygit}
         github:
           repo: jesseduffield/lazygit
           asset: "lazygit_{version}_{os}_{arch}.tar.gz"
@@ -434,18 +492,22 @@ categories:
         bin: delta
         brew: git-delta
         description: Syntax-highlighting pager for git diffs
+        osv: {ecosystem: crates.io, name: git-delta}
       - name: gitui
         bin: gitui
         brew: gitui
         description: Blazing fast terminal UI for git
+        osv: {ecosystem: crates.io, name: gitui}
       - name: git-cliff
         bin: git-cliff
         brew: git-cliff
         description: Generate changelogs from conventional commits
+        osv: {ecosystem: crates.io, name: git-cliff}
       - name: dagger
         bin: dagger
         brew: dagger
         description: Portable devkit for CI/CD pipelines as code
+        osv: {ecosystem: Go, name: github.com/dagger/dagger}
       - name: woodpecker-cli
         bin: woodpecker-cli
         brew: woodpecker-cli
@@ -454,10 +516,12 @@ categories:
         bin: tkn
         brew: tektoncd-cli
         description: CLI for Tekton pipelines on Kubernetes
+        osv: {ecosystem: Go, name: github.com/tektoncd/cli}
       - name: argo
         bin: argo
         brew: argo
         description: CLI for Argo Workflows (container-native workflows)
+        osv: {ecosystem: Go, name: github.com/argoproj/argo-workflows/v3}
       - name: circleci
         bin: circleci
         brew: circleci
@@ -470,6 +534,7 @@ categories:
         bin: cue
         brew: cue
         description: Validate and define text-based and dynamic configuration
+        osv: {ecosystem: Go, name: cuelang.org/go}
       - name: bk
         bin: bk
         brew: bk
@@ -481,12 +546,14 @@ categories:
         bin: k6
         brew: k6
         description: Modern load testing (Grafana k6)
+        osv: {ecosystem: Go, name: go.k6.io/k6}
         version_args: ["version"]
         completion_zsh: ["k6", "completion", "zsh"]
       - name: vegeta
         bin: vegeta
         brew: vegeta
         description: HTTP load testing and attack tool
+        osv: {ecosystem: Go, name: github.com/tsenart/vegeta/v12}
         version_args: ["-version"]
       - name: btop
         bin: btop
@@ -501,10 +568,12 @@ categories:
         bin: promtool
         brew: prometheus
         description: Prometheus toolkit (promtool validates rules and config)
+        osv: {ecosystem: Go, name: github.com/prometheus/prometheus}
       - name: node_exporter
         bin: node_exporter
         brew: node_exporter
         description: Prometheus exporter for machine metrics
+        osv: {ecosystem: Go, name: github.com/prometheus/node_exporter}
       - name: otel-cli
         bin: otel-cli
         brew: otel-cli
@@ -513,10 +582,12 @@ categories:
         bin: grafana
         brew: grafana
         description: Open-source metrics dashboards and visualization
+        osv: {ecosystem: Go, name: github.com/grafana/grafana}
       - name: netdata
         bin: netdata
         brew: netdata
         description: Real-time performance and health monitoring
+        osv: {ecosystem: Go, name: github.com/netdata/netdata}
       - name: wrk
         bin: wrk
         brew: wrk
@@ -529,6 +600,7 @@ categories:
         bin: bombardier
         brew: bombardier
         description: Fast cross-platform HTTP benchmarking tool
+        osv: {ecosystem: Go, name: github.com/codesenberg/bombardier}
       - name: drill
         bin: drill
         brew: drill
@@ -537,6 +609,7 @@ categories:
         bin: locust
         brew: locust
         description: Scriptable load testing in Python
+        osv: {ecosystem: PyPI, name: locust}
 
   - name: Logs
     tools:
@@ -549,6 +622,7 @@ categories:
         bin: goaccess
         brew: goaccess
         description: Real-time web log analyzer
+        osv: {ecosystem: Go, name: github.com/allinurl/goaccess}
       - name: angle-grinder
         bin: agrind
         brew: angle-grinder
@@ -569,6 +643,7 @@ categories:
         bin: logcli
         brew: logcli
         description: Query and tail logs from Grafana Loki
+        osv: {ecosystem: Go, name: github.com/grafana/loki}
 
   - name: Networking & HTTP
     tools:
@@ -576,6 +651,7 @@ categories:
         bin: http
         brew: httpie
         description: Human-friendly HTTP client
+        osv: {ecosystem: PyPI, name: httpie}
       - name: curlie
         bin: curlie
         brew: curlie
@@ -584,11 +660,13 @@ categories:
         bin: grpcurl
         brew: grpcurl
         description: curl for gRPC services
+        osv: {ecosystem: Go, name: github.com/fullstorydev/grpcurl}
         version_args: ["-version"]
       - name: websocat
         bin: websocat
         brew: websocat
         description: WebSocket client and swiss-army knife
+        osv: {ecosystem: crates.io, name: websocat}
       - name: doggo
         bin: doggo
         brew: doggo
@@ -601,6 +679,7 @@ categories:
         bin: nmap
         brew: nmap
         description: Network discovery and port scanning
+        osv: {ecosystem: Debian, name: nmap}
       - name: tcpdump
         bin: tcpdump
         brew: tcpdump
@@ -617,14 +696,17 @@ categories:
         bin: bandwhich
         brew: bandwhich
         description: Terminal bandwidth utilization by process and connection
+        osv: {ecosystem: crates.io, name: bandwhich}
       - name: gping
         bin: gping
         brew: gping
         description: ping with a real-time graph
+        osv: {ecosystem: crates.io, name: gping}
       - name: trippy
         bin: trip
         brew: trippy
         description: Network diagnostic combining traceroute and ping
+        osv: {ecosystem: crates.io, name: trippy}
       - name: fping
         bin: fping
         brew: fping
@@ -661,6 +743,7 @@ categories:
         bin: cloudflared
         brew: cloudflared
         description: Cloudflare Tunnel client
+        osv: {ecosystem: Go, name: github.com/cloudflare/cloudflared}
       - name: wireguard-tools
         bin: wg
         brew: wireguard-tools
@@ -677,10 +760,12 @@ categories:
         bin: oha
         brew: oha
         description: HTTP load generator with a live TUI
+        osv: {ecosystem: crates.io, name: oha}
       - name: xh
         bin: xh
         brew: xh
         description: Fast HTTPie-like HTTP client written in Rust
+        osv: {ecosystem: crates.io, name: xh}
 
   - name: System & SysAdmin
     tools:
@@ -692,26 +777,32 @@ categories:
         bin: glances
         brew: glances
         description: Cross-platform system monitoring tool
+        osv: {ecosystem: PyPI, name: Glances}
       - name: bottom
         bin: btm
         brew: bottom
         description: Graphical process and system monitor
+        osv: {ecosystem: crates.io, name: bottom}
       - name: procs
         bin: procs
         brew: procs
         description: Modern replacement for ps
+        osv: {ecosystem: crates.io, name: procs}
       - name: hyperfine
         bin: hyperfine
         brew: hyperfine
         description: Command-line benchmarking tool
+        osv: {ecosystem: crates.io, name: hyperfine}
       - name: dust
         bin: dust
         brew: dust
         description: More intuitive version of du
+        osv: {ecosystem: crates.io, name: du-dust}
       - name: duf
         bin: duf
         brew: duf
         description: Disk usage / free utility with a better UI
+        osv: {ecosystem: Go, name: github.com/muesli/duf}
       - name: ncdu
         bin: ncdu
         brew: ncdu
@@ -720,6 +811,7 @@ categories:
         bin: gdu
         brew: gdu
         description: Fast disk usage analyzer with a console UI
+        osv: {ecosystem: Go, name: github.com/dundee/gdu/v5}
       - name: tree
         bin: tree
         brew: tree
@@ -736,6 +828,7 @@ categories:
         bin: zellij
         brew: zellij
         description: Terminal workspace and multiplexer
+        osv: {ecosystem: crates.io, name: zellij}
       - name: rsync
         bin: rsync
         brew: rsync
@@ -744,10 +837,12 @@ categories:
         bin: rclone
         brew: rclone
         description: Sync files to and from cloud storage
+        osv: {ecosystem: Go, name: github.com/rclone/rclone}
       - name: croc
         bin: croc
         brew: croc
         description: Securely transfer files between computers
+        osv: {ecosystem: Go, name: github.com/schollz/croc/v10}
       - name: mosh
         bin: mosh
         brew: mosh
@@ -756,6 +851,7 @@ categories:
         bin: sd
         brew: sd
         description: Intuitive find-and-replace CLI (sed alternative)
+        osv: {ecosystem: crates.io, name: sd}
       - name: choose-rust
         bin: choose
         brew: choose-rust
@@ -764,6 +860,7 @@ categories:
         bin: watchexec
         brew: watchexec
         description: Run commands when files change
+        osv: {ecosystem: crates.io, name: watchexec}
       - name: entr
         bin: entr
         brew: entr
@@ -779,10 +876,12 @@ categories:
         bin: pgcli
         brew: pgcli
         description: PostgreSQL client with autocompletion
+        osv: {ecosystem: PyPI, name: pgcli}
       - name: mycli
         bin: mycli
         brew: mycli
         description: MySQL/MariaDB client with autocompletion
+        osv: {ecosystem: PyPI, name: mycli}
       - name: usql
         bin: usql
         brew: xo/xo/usql
@@ -791,6 +890,7 @@ categories:
         bin: litecli
         brew: litecli
         description: SQLite client with autocompletion and syntax highlighting
+        osv: {ecosystem: PyPI, name: litecli}
       - name: mongosh
         bin: mongosh
         brew: mongosh
@@ -803,6 +903,7 @@ categories:
         bin: iredis
         brew: iredis
         description: Redis client with autocompletion and syntax highlighting
+        osv: {ecosystem: PyPI, name: iredis}
       - name: pgweb
         bin: pgweb
         brew: pgweb
@@ -815,22 +916,27 @@ categories:
         bin: sqlite-utils
         brew: sqlite-utils
         description: CLI and library for manipulating SQLite databases
+        osv: {ecosystem: PyPI, name: sqlite-utils}
       - name: dbmate
         bin: dbmate
         brew: dbmate
         description: Lightweight database migration tool
+        osv: {ecosystem: Go, name: github.com/amacneil/dbmate/v2}
       - name: golang-migrate
         bin: migrate
         brew: golang-migrate
         description: Database migrations CLI (many databases)
+        osv: {ecosystem: Go, name: github.com/golang-migrate/migrate/v4}
       - name: goose
         bin: goose
         brew: goose
         description: Database migration tool (Go, embeddable)
+        osv: {ecosystem: Go, name: github.com/pressly/goose/v3}
       - name: atlas
         bin: atlas
         brew: atlas
         description: Manage database schemas as code
+        osv: {ecosystem: Go, name: ariga.io/atlas}
       - name: pspg
         bin: pspg
         brew: pspg
@@ -839,10 +945,12 @@ categories:
         bin: sqlfluff
         brew: sqlfluff
         description: SQL linter and formatter
+        osv: {ecosystem: PyPI, name: sqlfluff}
       - name: octosql
         bin: octosql
         brew: octosql
         description: Query files and databases with SQL joins
+        osv: {ecosystem: Go, name: github.com/cube2222/octosql}
       - name: dsq
         bin: dsq
         brew: dsq
@@ -851,10 +959,12 @@ categories:
         bin: vd
         brew: visidata
         description: Terminal spreadsheet for exploring tabular data
+        osv: {ecosystem: PyPI, name: visidata}
       - name: csvkit
         bin: csvlook
         brew: csvkit
         description: Suite of command-line tools for working with CSV
+        osv: {ecosystem: PyPI, name: csvkit}
 
   - name: Security & Compliance
     tools:
@@ -896,6 +1006,7 @@ categories:
         bin: cosign
         brew: cosign
         description: Sign and verify container images
+        osv: {ecosystem: Go, name: github.com/sigstore/cosign/v2}
         version_args: ["version"]
         completion_zsh: ["cosign", "completion", "zsh"]
         github:
@@ -905,6 +1016,7 @@ categories:
         bin: oras
         brew: oras
         description: Manage OCI artifacts in registries
+        osv: {ecosystem: Go, name: oras.land/oras/v2}
         completion_zsh: ["oras", "completion", "zsh"]
       - name: kubent
         bin: kubent
@@ -914,50 +1026,62 @@ categories:
         bin: nuclei
         brew: nuclei
         description: Template-based vulnerability scanner
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/nuclei/v3}
       - name: ffuf
         bin: ffuf
         brew: ffuf
         description: Fast web fuzzer
+        osv: {ecosystem: Go, name: github.com/ffuf/ffuf/v2}
       - name: gobuster
         bin: gobuster
         brew: gobuster
         description: Directory, DNS and vhost brute-forcer
+        osv: {ecosystem: Go, name: github.com/OJ/gobuster/v3}
       - name: subfinder
         bin: subfinder
         brew: subfinder
         description: Passive subdomain discovery tool
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/subfinder/v2}
       - name: httpx
         bin: httpx
         brew: httpx
         description: Fast and multi-purpose HTTP probing toolkit
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/httpx}
       - name: amass
         bin: amass
         brew: amass
         description: In-depth attack surface mapping and asset discovery
+        osv: {ecosystem: Go, name: github.com/owasp-amass/amass/v4}
       - name: naabu
         bin: naabu
         brew: naabu
         description: Fast port scanner
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/naabu/v2}
       - name: dnsx
         bin: dnsx
         brew: dnsx
         description: Fast and multi-purpose DNS toolkit
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/dnsx}
       - name: katana
         bin: katana
         brew: katana
         description: Next-generation crawling and spidering framework
+        osv: {ecosystem: Go, name: github.com/projectdiscovery/katana}
       - name: feroxbuster
         bin: feroxbuster
         brew: feroxbuster
         description: Fast content discovery / forced browsing tool
+        osv: {ecosystem: crates.io, name: feroxbuster}
       - name: gau
         bin: gau
         brew: gau
         description: Fetch known URLs from Wayback, OTX and Common Crawl
+        osv: {ecosystem: Go, name: github.com/lc/gau/v2}
       - name: sqlmap
         bin: sqlmap
         brew: sqlmap
         description: Automatic SQL injection and takeover tool
+        osv: {ecosystem: PyPI, name: sqlmap}
       - name: nikto
         bin: nikto
         brew: nikto
@@ -974,22 +1098,27 @@ categories:
         bin: dnstwist
         brew: dnstwist
         description: Detect typosquatting and phishing domains
+        osv: {ecosystem: PyPI, name: dnstwist}
       - name: theharvester
         bin: theHarvester
         brew: theharvester
         description: OSINT gathering of emails, subdomains and hosts
+        osv: {ecosystem: PyPI, name: theHarvester}
       - name: semgrep
         bin: semgrep
         brew: semgrep
         description: Fast static analysis for finding bugs and security issues
+        osv: {ecosystem: PyPI, name: semgrep}
       - name: trufflehog
         bin: trufflehog
         brew: trufflehog
         description: Find leaked credentials across repos and files
+        osv: {ecosystem: Go, name: github.com/trufflesecurity/trufflehog/v3}
       - name: osv-scanner
         bin: osv-scanner
         brew: osv-scanner
         description: Vulnerability scanner using the OSV database
+        osv: {ecosystem: Go, name: github.com/google/osv-scanner}
       - name: dependency-check
         bin: dependency-check
         brew: dependency-check
@@ -1010,42 +1139,52 @@ categories:
         bin: opa
         brew: opa
         description: Open Policy Agent policy engine
+        osv: {ecosystem: Go, name: github.com/open-policy-agent/opa}
       - name: conftest
         bin: conftest
         brew: conftest
         description: Test configuration files against Rego policies
+        osv: {ecosystem: Go, name: github.com/open-policy-agent/conftest}
       - name: checkov
         bin: checkov
         brew: checkov
         description: Static analysis for IaC (Terraform, Kubernetes, etc.)
+        osv: {ecosystem: PyPI, name: checkov}
       - name: tfsec
         bin: tfsec
         brew: tfsec
         description: Security scanner for Terraform code
+        osv: {ecosystem: Go, name: github.com/aquasecurity/tfsec}
       - name: terrascan
         bin: terrascan
         brew: terrascan
         description: Detect compliance and security violations in IaC
+        osv: {ecosystem: Go, name: github.com/tenable/terrascan}
       - name: kics
         bin: kics
         brew: kics
         description: Find security vulnerabilities in IaC (Keep IaC Secure)
+        osv: {ecosystem: Go, name: github.com/Checkmarx/kics}
       - name: kubescape
         bin: kubescape
         brew: kubescape
         description: Kubernetes security posture scanner
+        osv: {ecosystem: Go, name: github.com/kubescape/kubescape/v3}
       - name: kube-bench
         bin: kube-bench
         brew: kube-bench
         description: Check Kubernetes against the CIS benchmark
+        osv: {ecosystem: Go, name: github.com/aquasecurity/kube-bench}
       - name: kube-linter
         bin: kube-linter
         brew: kube-linter
         description: Lint Kubernetes manifests for security and correctness
+        osv: {ecosystem: Go, name: golang.stackrox.io/kube-linter}
       - name: kube-score
         bin: kube-score
         brew: kube-score
         description: Static code analysis of Kubernetes object definitions
+        osv: {ecosystem: Go, name: github.com/zegl/kube-score}
 
   - name: Secrets & Identity
     tools:
@@ -1053,14 +1192,17 @@ categories:
         bin: sops
         brew: sops
         description: Encrypted secrets in git (age/KMS/PGP)
+        osv: {ecosystem: Go, name: github.com/getsops/sops/v3}
       - name: age
         bin: age
         brew: age
         description: Simple, modern file encryption
+        osv: {ecosystem: Go, name: filippo.io/age}
       - name: vault
         bin: vault
         brew: hashicorp/tap/vault
         description: HashiCorp secrets management
+        osv: {ecosystem: Go, name: github.com/hashicorp/vault}
         version_args: ["version"]
       - name: 1password-cli
         bin: op
@@ -1075,6 +1217,7 @@ categories:
         bin: infisical
         brew: infisical
         description: Open-source secrets management platform CLI
+        osv: {ecosystem: Go, name: github.com/Infisical/infisical/cli}
       - name: doppler
         bin: doppler
         brew: doppler
@@ -1088,19 +1231,23 @@ categories:
         bin: step
         brew: step
         description: Zero-trust certificate and PKI toolkit (smallstep)
+        osv: {ecosystem: Go, name: github.com/smallstep/cli}
         completion_zsh: ["step", "completion", "zsh"]
       - name: cfssl
         bin: cfssl
         brew: cfssl
         description: CloudFlare's PKI/TLS toolkit
+        osv: {ecosystem: Go, name: github.com/cloudflare/cfssl}
       - name: gopass
         bin: gopass
         brew: gopass
         description: Team password manager on top of git + GPG
+        osv: {ecosystem: Go, name: github.com/gopasspw/gopass}
       - name: mkcert
         bin: mkcert
         brew: mkcert
         description: Locally-trusted development certificates
+        osv: {ecosystem: Go, name: filippo.io/mkcert}
 
   - name: Serverless & PaaS
     tools:
@@ -1108,14 +1255,17 @@ categories:
         bin: vercel
         brew: vercel
         description: Deploy frontends and serverless functions (Vercel)
+        osv: {ecosystem: npm, name: vercel}
       - name: netlify
         bin: netlify
         brew: netlify-cli
         description: Deploy and manage sites on Netlify
+        osv: {ecosystem: npm, name: netlify-cli}
       - name: flyctl
         bin: flyctl
         brew: flyctl
         description: Deploy apps close to users on Fly.io
+        osv: {ecosystem: Go, name: github.com/superfly/flyctl}
         completion_zsh: ["flyctl", "completion", "zsh"]
       - name: railway
         bin: railway
@@ -1126,6 +1276,7 @@ categories:
         bin: serverless
         brew: serverless
         description: Serverless Framework CLI (AWS Lambda et al.)
+        osv: {ecosystem: npm, name: serverless}
 
   - name: Runtime & Versions
     tools:
@@ -1133,6 +1284,7 @@ categories:
         bin: mise
         brew: mise
         description: Polyglot tool-version manager (asdf successor)
+        osv: {ecosystem: Go, name: github.com/jdx/mise}
         completion_zsh: ["mise", "completion", "zsh"]
       - name: asdf
         bin: asdf
@@ -1146,6 +1298,7 @@ categories:
         bin: aqua
         brew: aqua
         description: Declarative CLI version manager
+        osv: {ecosystem: Go, name: github.com/aquaproj/aqua/v2}
       - name: vfox
         bin: vfox
         brew: vfox
@@ -1154,6 +1307,7 @@ categories:
         bin: tenv
         brew: tenv
         description: Version manager for OpenTofu, Terraform, Terragrunt and Atmos
+        osv: {ecosystem: Go, name: github.com/tofuutils/tenv/v4}
 
   - name: Utilities
     tools:
@@ -1161,27 +1315,33 @@ categories:
         bin: jq
         brew: jq
         description: JSON processor
+        osv: {ecosystem: Debian, name: jq}
       - name: yq
         bin: yq
         brew: yq
         description: YAML/XML/TOML processor
+        osv: {ecosystem: Go, name: github.com/mikefarah/yq/v4}
         completion_zsh: ["yq", "shell-completion", "zsh"]
       - name: fzf
         bin: fzf
         brew: fzf
         description: Fuzzy finder for the command line
+        osv: {ecosystem: Go, name: github.com/junegunn/fzf}
       - name: ripgrep
         bin: rg
         brew: ripgrep
         description: Blazing fast recursive grep
+        osv: {ecosystem: crates.io, name: ripgrep}
       - name: bat
         bin: bat
         brew: bat
         description: cat with syntax highlighting
+        osv: {ecosystem: crates.io, name: bat}
       - name: fd
         bin: fd
         brew: fd
         description: Fast and friendly alternative to find
+        osv: {ecosystem: crates.io, name: fd-find}
       - name: tldr
         bin: tldr
         brew: tldr
@@ -1190,10 +1350,12 @@ categories:
         bin: direnv
         brew: direnv
         description: Per-directory environment variables
+        osv: {ecosystem: Go, name: github.com/direnv/direnv}
       - name: zoxide
         bin: zoxide
         brew: zoxide
         description: Smarter cd that learns your habits
+        osv: {ecosystem: crates.io, name: zoxide}
         github:
           repo: ajeetdsouza/zoxide
           asset: "zoxide-{version}-{arch}-{os}.tar.gz"
@@ -1203,6 +1365,7 @@ categories:
         bin: atuin
         brew: atuin
         description: Full-text shell history with sync
+        osv: {ecosystem: crates.io, name: atuin}
         # No github: block — atuin ships no macOS-amd64 release binary,
         # so brew (which builds it) is the only backend that covers every
         # platform. Adding a partial github block would fail on Intel Macs.
@@ -1210,10 +1373,12 @@ categories:
         bin: eza
         brew: eza
         description: Modern replacement for ls
+        osv: {ecosystem: crates.io, name: eza}
       - name: just
         bin: just
         brew: just
         description: Command runner (a modern make for tasks)
+        osv: {ecosystem: crates.io, name: just}
         completion_zsh: ["just", "--completions", "zsh"]
       - name: task
         bin: task
@@ -1224,6 +1389,7 @@ categories:
         bin: gron
         brew: gron
         description: Make JSON greppable
+        osv: {ecosystem: Go, name: github.com/tomnomnom/gron}
       - name: jless
         bin: jless
         brew: jless
@@ -1232,10 +1398,12 @@ categories:
         bin: hurl
         brew: hurl
         description: Run and test HTTP requests in plain text
+        osv: {ecosystem: crates.io, name: hurl}
       - name: duckdb
         bin: duckdb
         brew: duckdb
         description: In-process analytical SQL database
+        osv: {ecosystem: PyPI, name: duckdb}
       - name: fx
         bin: fx
         brew: fx
@@ -1244,10 +1412,12 @@ categories:
         bin: dasel
         brew: dasel
         description: Query and modify JSON, YAML, TOML, XML and CSV
+        osv: {ecosystem: Go, name: github.com/tomwright/dasel/v2}
       - name: gojq
         bin: gojq
         brew: gojq
         description: Pure Go implementation of jq
+        osv: {ecosystem: Go, name: github.com/itchyny/gojq}
       - name: yj
         bin: yj
         brew: yj
@@ -1268,6 +1438,7 @@ categories:
         bin: shfmt
         brew: shfmt
         description: Shell script formatter
+        osv: {ecosystem: Go, name: mvdan.cc/sh/v3}
       - name: yamlfmt
         bin: yamlfmt
         brew: yamlfmt
@@ -1276,10 +1447,12 @@ categories:
         bin: yamllint
         brew: yamllint
         description: Linter for YAML files
+        osv: {ecosystem: PyPI, name: yamllint}
       - name: taplo
         bin: taplo
         brew: taplo
         description: TOML toolkit (formatter, linter, language server)
+        osv: {ecosystem: crates.io, name: taplo}
       - name: evans
         bin: evans
         brew: evans
@@ -1292,14 +1465,17 @@ categories:
         bin: restish
         brew: restish
         description: CLI for interacting with REST APIs
+        osv: {ecosystem: Go, name: github.com/danielgtaylor/restish}
       - name: posting
         bin: posting
         brew: posting
         description: Terminal UI HTTP/API client
+        osv: {ecosystem: PyPI, name: posting}
       - name: spectral-cli
         bin: spectral
         brew: spectral-cli
         description: Lint and validate OpenAPI and AsyncAPI specs
+        osv: {ecosystem: npm, name: "@stoplight/spectral-cli"}
       - name: fblog
         bin: fblog
         brew: fblog
@@ -1315,10 +1491,12 @@ categories:
         bin: ollama
         brew: ollama
         description: Run large language models locally
+        osv: {ecosystem: Go, name: github.com/ollama/ollama}
       - name: llm
         bin: llm
         brew: llm
         description: Access LLMs from the command line (Simon Willison)
+        osv: {ecosystem: PyPI, name: llm}
       - name: aichat
         bin: aichat
         brew: aichat
@@ -1335,16 +1513,20 @@ categories:
         bin: aider
         brew: aider
         description: AI pair programming in your terminal
+        osv: {ecosystem: PyPI, name: aider-chat}
       - name: gemini-cli
         bin: gemini
         brew: gemini-cli
         description: Interact with Google Gemini from the command line
+        osv: {ecosystem: npm, name: "@google/gemini-cli"}
       - name: promptfoo
         bin: promptfoo
         brew: promptfoo
         description: Test and evaluate LLM apps locally
+        osv: {ecosystem: npm, name: promptfoo}
       - name: codex
         bin: codex
         brew: codex
         cask: true
         description: OpenAI coding agent that runs in your terminal
+        osv: {ecosystem: npm, name: "@openai/codex"}
