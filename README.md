@@ -27,7 +27,7 @@ server, no account, no lock-in.
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
+**[Try it](#try-it-in-a-sandbox) · [Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -47,6 +47,27 @@ opsforge is **three tools in one binary**:
 > completions, aliases and a useful prompt for each — by hand, on every machine.
 > opsforge makes it a two-minute session and keeps your shell in sync as your
 > toolbox grows.
+
+---
+
+## Try it in a sandbox
+
+Want to see the guards fire without installing anything or touching real infra?
+Run the throwaway demo image — a forged zsh shell already sitting in a **fake
+prod context**, with no-op `kubectl`/`terraform`/`helm` stubs:
+
+```sh
+docker run --rm -it ghcr.io/mrg77/opsforge-demo
+```
+
+It opens a short guided tour (status → guards → SBOM), then drops you into the
+shell so you can type `kubectl delete namespace payments` yourself and watch the
+prod guard intercept it. Nothing there can reach a real cluster — the "prod"
+context is a one-line fake kubeconfig, read passively, and the tools are stubs.
+
+Prefer the browser? Open it in a Codespace — same image, zero local install:
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Mrg77/opsforge?quickstart=1)
 
 ---
 
@@ -778,6 +799,10 @@ any command against a build image that has your CLIs:
 ```sh
 docker run --rm ghcr.io/mrg77/opsforge audit --json
 ```
+
+This is the production image — minimal, non-interactive. For a *playground* with
+a shell and the guards wired up, see [Try it in a sandbox](#try-it-in-a-sandbox)
+(`ghcr.io/mrg77/opsforge-demo`).
 
 ### pre-commit hooks
 

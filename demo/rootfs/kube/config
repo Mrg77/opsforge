@@ -1,0 +1,19 @@
+# Fake kubeconfig for the opsforge demo sandbox.
+#
+# opsforge reads `current-context` PASSIVELY (it never runs kubectl), so this
+# single line is all it takes to make the prompt turn prod-red and the guards
+# treat destructive commands as production. There are no real credentials here
+# and nothing points at a real cluster.
+apiVersion: v1
+kind: Config
+current-context: gke_acme-corp_europe-west1_prod
+clusters:
+  - name: prod
+    cluster:
+      server: https://demo.invalid
+contexts:
+  - name: gke_acme-corp_europe-west1_prod
+    context:
+      cluster: prod
+      namespace: payments
+users: []

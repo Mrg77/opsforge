@@ -1,0 +1,4 @@
+#!/bin/sh
+# Fake helm for the opsforge demo sandbox — a no-op. Present on PATH only so
+# the shell layer and guards see a realistic toolbox.
+echo "[demo] helm $* — no-op (this sandbox has no real release)"

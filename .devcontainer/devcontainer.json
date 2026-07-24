@@ -1,0 +1,19 @@
+{
+  "name": "opsforge demo",
+  "//": "Opens the interactive opsforge sandbox in a Codespace / dev container. Builds the same image as `docker run -it opsforge-demo` (demo/Dockerfile.demo): a forged zsh shell in a fake prod context, with no-op tool stubs. Nothing here reaches real infrastructure.",
+  "build": {
+    "dockerfile": "../demo/Dockerfile.demo",
+    "context": ".."
+  },
+  "overrideCommand": true,
+  "//postAttach": "The image ENTRYPOINT is the guided tour; in a Codespace open a terminal and run ./demo-tour.sh, or just start typing — the shell is already forged.",
+  "postAttachCommand": "opsforge status",
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh"
+      }
+    }
+  },
+  "remoteUser": "demo"
+}

@@ -30,7 +30,7 @@ vous enferme.
 
 ![opsforge demo](demo/demo-v0.3.2.gif)
 
-**[Installation](#installation) · [Aperçu](#aperçu-rapide) · [Workflows](#workflows-courants) · [Shell](#lenvironnement-shell-devops) · [Guards](#guards-policy-as-code) · [Mode projet](#mode-projet) · [SBOM & VEX](#sbom--chaîne-dapprovisionnement) · [Agents IA (MCP)](#agents-ia-mcp) · [CI](#ci--intégrations) · [Catalogue](#le-catalogue) · [Sous le capot](#points-forts-dingénierie)**
+**[Essayer](#essayer-dans-une-sandbox) · [Installation](#installation) · [Aperçu](#aperçu-rapide) · [Workflows](#workflows-courants) · [Shell](#lenvironnement-shell-devops) · [Guards](#guards-policy-as-code) · [Mode projet](#mode-projet) · [SBOM & VEX](#sbom--chaîne-dapprovisionnement) · [Agents IA (MCP)](#agents-ia-mcp) · [CI](#ci--intégrations) · [Catalogue](#le-catalogue) · [Sous le capot](#points-forts-dingénierie)**
 
 </div>
 
@@ -51,6 +51,29 @@ opsforge, c'est **trois outils dans un seul binaire** :
 > prompt qui tient la route — à la main, sur chaque machine. opsforge ramène tout
 > ça à une session de deux minutes et garde votre shell à jour à mesure que votre
 > boîte à outils s'étoffe.
+
+---
+
+## Essayer dans une sandbox
+
+Envie de voir les guards se déclencher sans rien installer ni toucher à de la
+vraie infra ? Lancez l'image de démo jetable — un shell zsh déjà forgé, placé
+dans un **faux contexte de prod**, avec des stubs no-op `kubectl`/`terraform`/`helm` :
+
+```sh
+docker run --rm -it ghcr.io/mrg77/opsforge-demo
+```
+
+Elle ouvre un court tour guidé (status → guards → SBOM), puis vous rend la main
+dans le shell : tapez vous-même `kubectl delete namespace payments` et regardez
+le guard prod l'intercepter. Rien ne peut atteindre un vrai cluster — le contexte
+« prod » est un faux kubeconfig d'une ligne, lu passivement, et les outils sont
+des stubs.
+
+Vous préférez le navigateur ? Ouvrez-la dans un Codespace — même image, zéro
+installation locale :
+
+[![Ouvrir dans GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Mrg77/opsforge?quickstart=1)
 
 ---
 
@@ -821,6 +844,10 @@ CLI :
 ```sh
 docker run --rm ghcr.io/mrg77/opsforge audit --json
 ```
+
+C'est l'image de production — minimale, non interactive. Pour un *bac à sable*
+avec un shell et les guards branchés, voir [Essayer dans une sandbox](#essayer-dans-une-sandbox)
+(`ghcr.io/mrg77/opsforge-demo`).
 
 ### Hooks pre-commit
 

@@ -1,0 +1,67 @@
+# opsforge — interactive demo image.
+#
+# UNLIKE the production image (../Dockerfile, distroless, no shell), this one
+# is built to be *poked at*: it ships zsh with the opsforge shell layer already
+# forged, a fake "prod" kubeconfig, and no-op kubectl/terraform/helm stubs, so
+# anyone can experience the guards and the prompt without any real infra.
+#
+# Build (from the repo root):
+#   docker build -f demo/Dockerfile.demo -t opsforge-demo .
+# Run:
+#   docker run --rm -it opsforge-demo
+#
+# Everything is throwaway and unprivileged; there is nothing real to break.
+
+# --- build stage: compile the binary (mirrors ../Dockerfile) --------------
+FROM golang:1.26 AS build
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+ARG VERSION=demo
+RUN CGO_ENABLED=0 go build \
+      -trimpath \
+      -ldflags "-s -w -X github.com/Mrg77/opsforge/cmd.version=${VERSION}" \
+      -o /opsforge .
+
+# --- final stage: a small, interactive playground -------------------------
+FROM debian:stable-slim
+
+LABEL org.opencontainers.image.title="opsforge-demo" \
+      org.opencontainers.image.description="Throwaway interactive sandbox to try opsforge (forged zsh, fake prod context, guards)." \
+      org.opencontainers.image.source="https://github.com/Mrg77/opsforge"
+
+# zsh for the shell layer; jq/git for the tour; ca-certificates so the online
+# CVE audit works if the sandbox has network (it degrades gracefully offline).
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends zsh jq git ca-certificates bat \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd -m -s /usr/bin/zsh demo
+
+COPY --from=build /opsforge /usr/local/bin/opsforge
+
+# No-op tool stubs on PATH (kubectl/terraform/helm) so the toolbox looks real.
+COPY demo/rootfs/bin/ /usr/local/bin/
+RUN chmod +x /usr/local/bin/kubectl /usr/local/bin/terraform /usr/local/bin/helm
+
+USER demo
+WORKDIR /home/demo
+ENV HOME=/home/demo
+
+# The fake prod kubeconfig — the single thing that puts us "in prod".
+COPY --chown=demo:demo demo/rootfs/kube/config /home/demo/.kube/config
+# AWS_PROFILE adds the cloud segment to the prompt (env-only, never probed).
+ENV AWS_PROFILE=prod-admin
+
+# Forge the shell layer and write the default guard policy at build time, so
+# the container starts fully set up with no first-run network calls.
+# --no-plugins keeps the build hermetic (no git-clone of zsh plugins); the
+# guards, prompt, aliases and completions are all still installed.
+RUN opsforge shell install --no-plugins \
+ && opsforge guard init
+
+COPY --chown=demo:demo demo/demo-tour.sh /home/demo/demo-tour.sh
+RUN chmod +x /home/demo/demo-tour.sh
+
+# Start with the guided tour; it ends by exec'ing into the forged zsh.
+ENTRYPOINT ["/home/demo/demo-tour.sh"]

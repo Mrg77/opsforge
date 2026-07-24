@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fake kubectl for the opsforge demo sandbox. It NEVER touches a cluster — it
+# only exists on PATH so the forged prompt and completions look real, and so a
+# guarded `kubectl delete …` has something to (not) run once you confirm.
+echo "[demo] kubectl $* — no-op (this sandbox has no real cluster)"

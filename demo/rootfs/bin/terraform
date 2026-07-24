@@ -1,0 +1,5 @@
+#!/bin/sh
+# Fake terraform for the opsforge demo sandbox — a no-op, never plans or
+# applies anything. Present on PATH so `terraform destroy` is a realistic thing
+# to type at the guarded prompt.
+echo "[demo] terraform $* — no-op (this sandbox has no real state)"
