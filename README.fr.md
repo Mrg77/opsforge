@@ -135,6 +135,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE · <code>--sign</code> ajoute un bundle Sigstore (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
 <tr><td><code>opsforge vex [--kev] [--sign]</code></td><td>Émet un document OpenVEX des CVE de vos outils · <code>--kev</code> signale celles activement exploitées (CISA KEV) · <code>--sign</code> le signe (voir <a href="#vex--cisa-kev">VEX</a>)</td></tr>
+<tr><td><code>opsforge scan &lt;image&gt; [--diff]</code></td><td>Scanne une image de conteneur (via syft/trivy + le moteur OSV d'opsforge) · <code>--diff</code> la corrèle avec votre poste (voir <a href="#scanner-une-image-de-conteneur">scan</a>)</td></tr>
 <tr><td><code>opsforge mcp</code></td><td>Lance un serveur MCP en lecture seule pour qu'un agent IA interroge votre poste de travail (voir <a href="#agents-ia-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Exporter / reconstruire tout un poste de travail</td></tr>
 <tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à votre snapshot sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
@@ -752,6 +753,35 @@ Les mêmes primitives, le bon outil pour chaque tâche — l'intégrité locale 
 les artefacts que vous générez, la provenance keyless pour les binaires que vous
 livrez.
 
+### Scanner une image de conteneur
+
+`opsforge scan` étend le même moteur OSV à une image de conteneur — et y ajoute
+ce qu'un scanner isolé ne fait pas : **la corrélation avec votre propre poste**.
+
+```sh
+opsforge scan node:16-alpine          # CVE dans l'image
+opsforge scan mon-image-ci --diff     # + son écart avec votre machine
+opsforge scan mon-image --json        # lisible machine, non-zéro sur HIGH/CRITICAL
+```
+
+opsforge **ne réimplémente pas l'extraction du SBOM d'image** — c'est le travail
+de syft/trivy, et les importer en bibliothèque gonflerait le binaire sans rien
+apporter. Il pilote donc celui qui est installé (comme il délègue déjà l'épinglage
+de versions à mise/asdf), relit le SBOM CycloneDX, et fait passer ces composants
+par le moteur OSV **maison** d'opsforge — exactement le matcher qu'utilise
+`opsforge audit` sur votre machine, scoring CVSS et versions de correctif par
+branche compris.
+
+Avec **`--diff`**, il répond à une question que trivy ne pose pas : *un outil que
+je lance en local est-il embarqué dans une version différente dans cette image ?*
+Il corrèle les composants de l'image avec votre boîte à outils installée et
+signale la dérive de version — l'écart poste↔CI que le « ça marche chez moi »
+masque. Comme `audit`, il sort avec un code non nul sur une CVE HIGH/CRITICAL :
+il s'insère donc dans un pipeline comme barrière.
+
+> Nécessite `syft` ou `trivy` dans le PATH (`opsforge install syft`). opsforge
+> apporte la corrélation et le verdict OSV partagé, pas un scanner d'image de plus.
+
 ### Le digest notify
 
 opsforge n'attend pas que vous lanciez `audit` — `opsforge notify` rassemble **au
@@ -1128,6 +1158,19 @@ Les points sur lesquels attirer l'œil d'un relecteur :
   outils manquants — en JSON comme en sortie humaine, avec un code non nul en cas
   d'écart. `opsforge.yaml` déclare le *quoi*, `opsforge.lock` prouve *quelle
   version* — et il se dégrade proprement (pas de lock → comportement d'avant).
+- **Scan d'image par corrélation, pas par réinvention.** `opsforge scan` pilote
+  un syft/trivy installé pour le SBOM de l'image (les importer en bibliothèque
+  triplerait le go.mod), puis fait passer les composants par le matcher OSV
+  *maison* d'opsforge et — avec `--diff` — les corrèle avec la boîte à outils du
+  poste pour révéler une dérive de version qu'un scanner isolé ne voit pas. Les
+  pièces réutilisables (`internal/imagescan` : un parseur purl→OSV, la
+  corrélation) sont testées unitairement ; l'extraction du SBOM est déléguée,
+  volontairement.
+- **Transport OSV en batch.** L'audit trouve tous les outils affectés en un seul
+  appel `/v1/querybatch`, puis récupère chaque CVE distincte une fois — moins de
+  requêtes sur le chemin sain et l'endpoint respectueux du rate-limit d'OSV, avec
+  un repli par outil si le batch est indisponible. Le moteur de matching
+  CVSS/semver est inchangé.
 - **Un seul digest en cache, sans jamais bloquer.** `opsforge notify` agrège CVE,
   mises à jour disponibles, secrets exposés et un opsforge plus récent dans un seul
   digest en cache (`internal/notices`, `~/.cache/opsforge/`, TTL 6h). Le shell (une
@@ -1161,12 +1204,13 @@ Les points sur lesquels attirer l'œil d'un relecteur :
 ### Architecture
 
 ```
-cmd/                Commandes Cobra (install, status, audit, guard, sync, sbom, vex, mcp, snapshot, apply, self, doctor, shell, theme…)
+cmd/                Commandes Cobra (install, status, audit, guard, sync, sbom, vex, scan, mcp, snapshot, apply, self, doctor, shell, theme…)
 internal/catalog/   Catalogue YAML embarqué + validation brew/github + mappings d'écosystème OSV
 internal/project/   Manifest opsforge.yaml : résolution tools/profiles, plan de dérive, gate CVE (sync) + opsforge.lock (lock.go)
 internal/sbom/      Builder CycloneDX 1.6 (composants + PURL + vulnerabilities CVE embarquées)
 internal/vex/       Builder OpenVEX v0.2.0 + récupération/cache du catalogue CISA KEV (kev.go)
 internal/attest/    Signature Sigstore par clé du SBOM/VEX (clé ECDSA locale → bundle Sigstore)
+internal/imagescan/ Scan d'image de conteneur : SBOM syft/trivy → moteur OSV d'opsforge → corrélation poste
 internal/mcp/        Builders de payload MCP en lecture seule (fonctions pures sur catalog/detect/audit/guard)
 internal/detect/    Détection concurrente PATH + version + brew-outdated
 internal/installer/ Routeur de backend : Homebrew + téléchargement releases GitHub (checksum.go : vérif SHA-256 ; self-update)

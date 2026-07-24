@@ -128,6 +128,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs · <code>--sign</code> adds a Sigstore bundle (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
 <tr><td><code>opsforge vex [--kev] [--sign]</code></td><td>Emit an OpenVEX document of the CVEs on your tools · <code>--kev</code> flags the actively-exploited (CISA KEV) ones · <code>--sign</code> signs it (see <a href="#vex--cisa-kev">VEX</a>)</td></tr>
+<tr><td><code>opsforge scan &lt;image&gt; [--diff]</code></td><td>Scan a container image for CVEs (via syft/trivy + opsforge's OSV engine) · <code>--diff</code> correlates it with your workstation (see <a href="#scanning-a-container-image">scan</a>)</td></tr>
 <tr><td><code>opsforge mcp</code></td><td>Run a read-only MCP server so an AI agent can query your workstation (see <a href="#ai-agents-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
 <tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against your snapshot without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
@@ -709,6 +710,33 @@ That last part is deliberate, and worth being precise about:
 Same primitives, right tool for each job — local integrity for the artifacts you
 generate, keyless provenance for the binaries you ship.
 
+### Scanning a container image
+
+`opsforge scan` extends the same OSV engine to a container image — and adds the
+part a standalone scanner can't: **correlation with your own workstation**.
+
+```sh
+opsforge scan node:16-alpine          # CVEs in the image
+opsforge scan my-ci-image --diff      # + how it drifts from your machine
+opsforge scan my-image --json         # machine-readable, non-zero on HIGH/CRITICAL
+```
+
+opsforge **doesn't re-implement image SBOM extraction** — that's syft/trivy's
+job, and importing them as libraries would bloat the binary for no gain. So it
+drives whichever is installed (the same way it delegates version pinning to
+mise/asdf), reads back the CycloneDX SBOM, and runs those components through
+opsforge's **own** OSV engine — the exact matcher `opsforge audit` uses on your
+machine, CVSS scoring and per-branch fix versions included.
+
+With **`--diff`** it answers a question trivy doesn't: *does a tool I run locally
+ship at a different version in this image?* It correlates the image's components
+against your installed toolbox and reports the version drift — the workstation↔CI
+skew that "works on my machine" hides. Like `audit`, it exits non-zero on a
+HIGH/CRITICAL CVE, so it drops into a pipeline as a gate.
+
+> Needs `syft` or `trivy` on PATH (`opsforge install syft`). opsforge adds the
+> correlation and the shared OSV verdict, not another image scanner.
+
 ### The notify digest
 
 opsforge doesn't wait for you to run `audit` — `opsforge notify` is **one
@@ -1063,6 +1091,17 @@ The parts worth pointing a reviewer to:
   and reports *version* drift — not just missing tools — in JSON and human
   output, non-zero on mismatch. `opsforge.yaml` declares *what*, `opsforge.lock`
   proves *which version* — and it degrades gracefully (no lock → old behavior).
+- **Image scanning by correlation, not reinvention.** `opsforge scan` drives an
+  installed syft/trivy for the image SBOM (importing them as libraries would
+  triple go.mod), then runs the components through opsforge's *own* OSV matcher
+  and — with `--diff` — correlates them against the workstation toolbox to
+  surface version drift a standalone scanner can't see. The reusable pieces
+  (`internal/imagescan`: a purl→OSV parser, the correlation) are unit-tested; the
+  external SBOM step is delegated, on purpose.
+- **OSV batch transport.** The audit finds every affected tool in one
+  `/v1/querybatch` call, then fetches each distinct CVE once — fewer requests on
+  the healthy path and OSV's rate-limit-friendly endpoint, with a per-tool
+  fallback if the batch is down. The CVSS/semver matching engine is unchanged.
 - **One cached digest, never blocking.** `opsforge notify` aggregates CVEs,
   available updates, leaked secrets and a newer opsforge into a single cached
   digest (`internal/notices`, `~/.cache/opsforge/`, 6h TTL). Both the shell (a
@@ -1091,12 +1130,13 @@ The parts worth pointing a reviewer to:
 ### Architecture
 
 ```
-cmd/                Cobra commands (install, status, audit, guard, sync, sbom, vex, mcp, snapshot, apply, self, doctor, shell, theme…)
+cmd/                Cobra commands (install, status, audit, guard, sync, sbom, vex, scan, mcp, snapshot, apply, self, doctor, shell, theme…)
 internal/catalog/   Embedded YAML catalog + brew/github validation + OSV ecosystem mappings
 internal/project/   opsforge.yaml manifest: resolve tools/profiles, drift plan, CVE gate (sync) + opsforge.lock (lock.go)
 internal/sbom/      CycloneDX 1.6 builder (components + PURLs + embedded CVE vulnerabilities)
 internal/vex/       OpenVEX v0.2.0 builder + CISA KEV fetch/cache (kev.go)
 internal/attest/    Key-based Sigstore signing of the SBOM/VEX (local ECDSA key → Sigstore bundle)
+internal/imagescan/ Container-image scan: syft/trivy SBOM → opsforge's OSV engine → workstation correlation
 internal/mcp/        Read-only MCP payload builders (pure functions over catalog/detect/audit/guard)
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify; self-update)
