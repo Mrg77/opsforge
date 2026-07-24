@@ -62,43 +62,64 @@ carries a vulnerability at that level.`,
 		plan := project.BuildPlan(proj, cat, statuses)
 
 		if syncCheck {
-			return syncReport(proj, cat, plan)
+			return syncReport(proj, cat, plan, path, statuses)
 		}
-		return syncApply(proj, cat, plan)
+		return syncApply(proj, cat, plan, path)
 	},
 }
 
 // syncReport is the CI path: it reports drift and CVE gate status without
-// installing anything, exiting non-zero on any drift or gate failure.
-func syncReport(proj *project.Project, cat *catalog.Catalog, plan project.Plan) error {
+// installing anything, exiting non-zero on any drift or gate failure. When
+// an opsforge.lock exists it also flags VERSION drift (a tool installed but
+// at a different version than the lock pinned).
+func syncReport(proj *project.Project, cat *catalog.Catalog, plan project.Plan, manifestPath string, statuses map[string]detect.Status) error {
 	gate := cveGate(proj, cat)
+
+	// Version drift against the lockfile (if one was committed).
+	var lockDrift []project.LockDrift
+	if l, ok, err := project.ReadLock(project.LockPath(manifestPath)); err != nil {
+		return err
+	} else if ok {
+		lockDrift = project.CheckLock(l, statuses)
+	}
+
+	compliant := len(plan.Install) == 0 && len(gate) == 0 && len(lockDrift) == 0
 
 	if output.JSON {
 		if err := output.Emit(struct {
-			Compliant  bool     `json:"compliant"`
-			Missing    []string `json:"missing"`
-			Present    []string `json:"present"`
-			Unknown    []string `json:"unknown"`
-			CVEBlocked []string `json:"cve_blocked"`
-			FailOn     string   `json:"fail_on,omitempty"`
+			Compliant    bool                `json:"compliant"`
+			Missing      []string            `json:"missing"`
+			Present      []string            `json:"present"`
+			Unknown      []string            `json:"unknown"`
+			CVEBlocked   []string            `json:"cve_blocked"`
+			VersionDrift []project.LockDrift `json:"version_drift"`
+			FailOn       string              `json:"fail_on,omitempty"`
 		}{
-			Compliant:  len(plan.Install) == 0 && len(gate) == 0,
-			Missing:    plan.Install,
-			Present:    plan.Present,
-			Unknown:    plan.Unknown,
-			CVEBlocked: gate,
-			FailOn:     proj.FailOn,
+			Compliant:    compliant,
+			Missing:      plan.Install,
+			Present:      plan.Present,
+			Unknown:      plan.Unknown,
+			CVEBlocked:   gate,
+			VersionDrift: lockDrift,
+			FailOn:       proj.FailOn,
 		}); err != nil {
 			return err
 		}
 	} else {
 		fmt.Println(ui.Header("opsforge sync --check", "does this machine match the project's opsforge.yaml?"))
 		fmt.Println()
-		if len(plan.Install) == 0 && len(gate) == 0 {
-			fmt.Println(ui.OKBold.Render("Compliant — every required tool is installed."))
+		if compliant {
+			fmt.Println(ui.OKBold.Render("Compliant — every required tool is installed at the locked version."))
 		} else {
 			for _, t := range plan.Install {
 				fmt.Printf("  %s %s\n", ui.ErrMark(), ui.Err.Render(t+" — missing"))
+			}
+			for _, d := range lockDrift {
+				if d.Got == "" {
+					continue // already reported as missing above
+				}
+				fmt.Printf("  %s %s\n", ui.ErrMark(),
+					ui.Err.Render(fmt.Sprintf("%s — locked %s, have %s", d.Name, d.Expected, d.Got)))
 			}
 			for _, g := range gate {
 				fmt.Printf("  %s %s\n", ui.ErrMark(), ui.Err.Render(g))
@@ -109,15 +130,17 @@ func syncReport(proj *project.Project, cat *catalog.Catalog, plan project.Plan) 
 		}
 	}
 
-	if len(plan.Install) > 0 || len(gate) > 0 {
-		return fmt.Errorf("project is not in sync (%d missing, %d CVE-blocked)", len(plan.Install), len(gate))
+	if !compliant {
+		return fmt.Errorf("project is not in sync (%d missing, %d version drift, %d CVE-blocked)",
+			len(plan.Install), len(lockDrift), len(gate))
 	}
 	return nil
 }
 
 // syncApply installs the missing tools (with confirmation unless --yes),
-// then enforces the CVE gate if the manifest sets one.
-func syncApply(proj *project.Project, cat *catalog.Catalog, plan project.Plan) error {
+// then enforces the CVE gate if the manifest sets one and writes an
+// opsforge.lock pinning the resolved versions.
+func syncApply(proj *project.Project, cat *catalog.Catalog, plan project.Plan, manifestPath string) error {
 	fmt.Println(ui.Header("opsforge sync", "reproducing this project's toolchain"))
 	fmt.Println()
 	for _, u := range plan.Unknown {
@@ -160,6 +183,19 @@ func syncApply(proj *project.Project, cat *catalog.Catalog, plan project.Plan) e
 		}
 		return fmt.Errorf("%d required tool(s) blocked by the fail_on: %s gate", len(gate), proj.FailOn)
 	}
+
+	// Pin the resolved versions so a reviewer reproduces the exact toolchain.
+	// Re-detect after installing so freshly-installed versions land in the
+	// lock (the plan's statuses predate the installs).
+	required := append(append([]string{}, plan.Present...), plan.Install...)
+	statuses := detect.All(cat.Tools())
+	lock := project.BuildLock(required, statuses)
+	if err := project.WriteLock(project.LockPath(manifestPath), lock); err != nil {
+		return fmt.Errorf("writing %s: %w", project.LockFileName, err)
+	}
+	fmt.Println()
+	fmt.Printf("%s %s\n", ui.OKMark(),
+		ui.Dim.Render(fmt.Sprintf("Pinned %d tool(s) to %s", len(lock.Tools), project.LockFileName)))
 	return nil
 }
 
