@@ -119,6 +119,33 @@ func TestCheckLockCleanWhenMachineMatches(t *testing.T) {
 	}
 }
 
+// TestLockFullCycle mirrors the real flow across two runs: `sync` builds a
+// lock from what's installed and writes it; a later `sync --check` reads it
+// back from disk and compares against a machine that has since drifted.
+func TestLockFullCycle(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, LockFileName)
+
+	// Run 1 — pin what's installed now.
+	atLock := statuses(map[string]string{"helm": "v3.14.0", "jq": "1.7.1"})
+	if err := WriteLock(path, BuildLock([]string{"helm", "jq"}, atLock)); err != nil {
+		t.Fatalf("WriteLock: %v", err)
+	}
+
+	// Run 2 — read the committed lock; helm has since been upgraded.
+	lock, ok, err := ReadLock(path)
+	if err != nil || !ok {
+		t.Fatalf("ReadLock: ok=%v err=%v", ok, err)
+	}
+	nowInstalled := statuses(map[string]string{"helm": "3.15.1", "jq": "1.7.1"})
+	drift := CheckLock(lock, nowInstalled)
+
+	if len(drift) != 1 || drift[0].Name != "helm" ||
+		drift[0].Expected != "3.14.0" || drift[0].Got != "3.15.1" {
+		t.Fatalf("expected exactly helm drift 3.14.0→3.15.1, got %+v", drift)
+	}
+}
+
 func TestLockPathSitsBesideManifest(t *testing.T) {
 	got := LockPath(filepath.Join("some", "dir", FileName))
 	want := filepath.Join("some", "dir", LockFileName)
