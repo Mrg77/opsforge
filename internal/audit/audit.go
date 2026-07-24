@@ -137,11 +137,26 @@ type ToolTarget struct {
 	Version   string // normalized semver
 }
 
-// ScanTools queries OSV concurrently for every target and returns one
-// Finding per tool (empty Vulns when clean; query errors yield an empty
-// result rather than failing the whole scan). Reused by the audit
-// command and the TUI security view.
+// ScanTools returns one Finding per tool (empty Vulns when clean; query
+// errors yield an empty result rather than failing the whole scan). Reused by
+// the audit command and the TUI security view.
+//
+// It uses OSV's batch endpoint (one request to find every affected tool, then
+// one detail fetch per distinct CVE) and falls back to the per-tool path if
+// the batch call fails, so a batch-endpoint outage never breaks a scan.
 func ScanTools(ctx context.Context, targets []ToolTarget) []Finding {
+	if len(targets) == 0 {
+		return nil
+	}
+	if findings, ok := scanBatch(ctx, targets, osvQueryBatch, osvVulnByID); ok {
+		return findings
+	}
+	return scanPerTool(ctx, targets)
+}
+
+// scanPerTool is the original one-/v1/query-per-tool fan-out, kept as a
+// resilient fallback when the batch endpoint is unavailable.
+func scanPerTool(ctx context.Context, targets []ToolTarget) []Finding {
 	findings := make([]Finding, len(targets))
 	done := make(chan int, len(targets))
 	// Bound concurrent OSV requests so a large toolbox doesn't fire a
