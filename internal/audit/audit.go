@@ -289,13 +289,27 @@ func hasOpenRange(events []struct {
 }
 
 // inRange reports introduced <= version < fixed using semver ordering.
+//
+// A `fixed` that was PROVIDED but can't be parsed as semver (e.g. a Debian
+// version like "1.6-2.1+deb11u2") must NOT be treated as an open range — doing
+// so reported every such CVE as affecting any installed version (a false
+// positive). When we can't compare against the stated fix, we don't report.
 func inRange(cv, introduced, fixed string) bool {
-	ci, cf := canonical(introduced), canonical(fixed)
-	if !semverGE(cv, ci) {
+	if !semverGE(cv, canonical(introduced)) {
 		return false
 	}
-	if cf == "" {
+	// No `fixed` at all → affected from `introduced` onwards.
+	if fixed == "" {
 		return true
+	}
+	// `fixed` was provided: compare against it. If it doesn't canonicalize to a
+	// real semver (e.g. a Debian "1.6-2.1+deb11u2"), we can't judge — so we do
+	// NOT report, rather than treating it as an open range (the jq false
+	// positive). canonical("") is "v0", which is why we key off cf being a
+	// *valid* semver, not off cf == "".
+	cf := canonical(fixed)
+	if !semver.IsValid(cf) || cf == "v0" {
+		return false
 	}
 	return semver.Compare(cv, cf) < 0
 }

@@ -679,7 +679,8 @@ categories:
         bin: nmap
         brew: nmap
         description: Network discovery and port scanning
-        osv: {ecosystem: Debian, name: nmap}
+        # No OSV mapping: same reason as jq — nmap is C upstream, and the Debian
+        # package versions don't match a Homebrew install (false-positive CVEs).
       - name: tcpdump
         bin: tcpdump
         brew: tcpdump
@@ -1315,7 +1316,9 @@ categories:
         bin: jq
         brew: jq
         description: JSON processor
-        osv: {ecosystem: Debian, name: jq}
+        # No OSV mapping: jq is C upstream (no source ecosystem in OSV), and the
+        # Debian package versions don't match a Homebrew/upstream install, which
+        # produced false-positive CVEs. Better unaudited than wrong.
       - name: yq
         bin: yq
         brew: yq
