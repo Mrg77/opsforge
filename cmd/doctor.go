@@ -272,12 +272,18 @@ func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 	}
 
 	// Hint on stderr that we're waiting on the network, then clear it so it
-	// leaves no residue before the result line prints on stdout.
-	fmt.Fprint(os.Stderr, ui.Dim.Render("  scanning OSV.dev for CVEs…"))
+	// leaves no residue. Skipped in --json mode: a machine consumer wants no
+	// terminal-control decoration, not even on stderr.
+	showProgress := !output.JSON
+	if showProgress {
+		fmt.Fprint(os.Stderr, ui.Dim.Render("  scanning OSV.dev for CVEs…"))
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	findings := audit.ScanTools(ctx, targets)
-	fmt.Fprint(os.Stderr, "\r\033[K")
+	if showProgress {
+		fmt.Fprint(os.Stderr, "\r\033[K")
+	}
 
 	// Collect the tools that actually carry vulnerabilities, most severe first.
 	var vuln []audit.Finding

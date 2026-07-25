@@ -39,9 +39,14 @@ Since the NVD stopped enriching most CVEs in 2026, prioritizing by
 references CISA's Known Exploited Vulnerabilities catalog and calls out the
 CVEs that are being actively exploited in the wild — the ones to fix first.
 
-  opsforge vex               # OpenVEX to stdout
-  opsforge vex --kev         # + highlight actively-exploited (CISA KEV) CVEs
-  opsforge vex > vex.json    # capture it (pairs with 'opsforge sbom')`,
+  opsforge vex                # OpenVEX JSON to stdout (the machine artifact)
+  opsforge vex > vex.json     # capture it (pairs with 'opsforge sbom')
+  opsforge vex --kev          # human triage view: the actively-exploited first
+  opsforge vex --kev --json   # the same, but as OpenVEX JSON for a pipeline
+
+By default 'vex' prints the OpenVEX document (JSON), like 'sbom'. Adding --kev
+switches to a human triage view highlighting the actively-exploited CVEs; add
+--json alongside it to get the machine document back.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {

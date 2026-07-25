@@ -60,10 +60,13 @@ Pass a family name, or any executable to filter by that single tool.`,
 		}
 
 		if output.JSON {
+			// distinct_commands = how many unique command lines are listed
+			// (deduped). Named explicitly so it isn't confused with the
+			// overview's total_runs (the sum of all executions).
 			return output.Emit(struct {
-				Family  string          `json:"family"`
-				Count   int             `json:"count"`
-				Entries []history.Entry `json:"entries"`
+				Family           string          `json:"family"`
+				DistinctCommands int             `json:"distinct_commands"`
+				Entries          []history.Entry `json:"entries"`
 			}{key, len(entries), entries})
 		}
 
@@ -91,10 +94,12 @@ Pass a family name, or any executable to filter by that single tool.`,
 // historyOverview lists the families with how many recent commands each
 // has, so `opsforge history` with no argument is a useful menu.
 func historyOverview(path string) error {
+	// total_runs = sum of every execution in the family (occurrences), unlike
+	// the per-family view's distinct_commands (unique command lines).
 	type row struct {
-		Key   string `json:"family"`
-		Label string `json:"label"`
-		Count int    `json:"count"`
+		Key       string `json:"family"`
+		Label     string `json:"label"`
+		TotalRuns int    `json:"total_runs"`
 	}
 	// One pass over the history file for all families (not one read each).
 	counts, err := history.CountByFamily(path, history.Families)
@@ -113,8 +118,8 @@ func historyOverview(path string) error {
 	fmt.Println(ui.Header("opsforge history", "your shell history, grouped by DevOps tool family"))
 	fmt.Println()
 	for _, r := range rows {
-		count := ui.Dim.Render(fmt.Sprintf("%d command(s)", r.Count))
-		if r.Count == 0 {
+		count := ui.Dim.Render(fmt.Sprintf("%d run(s)", r.TotalRuns))
+		if r.TotalRuns == 0 {
 			count = ui.Faint.Render("none yet")
 		}
 		fmt.Printf("  %s %s  %s\n", ui.OKMark(), ui.Label(r.Key, 9), count)

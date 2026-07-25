@@ -49,10 +49,12 @@ var profilesCmd = &cobra.Command{
 			fmt.Println(ui.Dim.Render("  Tip: in the picker, select tools and press s to save your own profile.\n"))
 		}
 
+		// Legend uses the SAME glyphs as the grid above (● / ↑ / ○), so it
+		// stays readable without relying on color alone.
 		fmt.Printf("  %s   %s   %s\n\n",
 			ui.OK.Render("● installed"),
-			ui.Warn.Render("● update available"),
-			ui.Dim.Render("● not installed"))
+			ui.Warn.Render("↑ update available"),
+			ui.Dim.Render("○ not installed"))
 		return nil
 	},
 }

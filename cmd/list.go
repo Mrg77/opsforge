@@ -181,7 +181,7 @@ func printListFooter(filter listFilter, shown, installed, outdated, total int) {
 	default:
 		fmt.Printf("%s   %s   %s\n",
 			ui.OK.Render(fmt.Sprintf("%s %d installed", ui.MarkOK, installed)),
-			ui.Warn.Render(fmt.Sprintf("%s %d to update", ui.MarkOK, outdated)),
+			ui.Warn.Render(fmt.Sprintf("%s %d to update", ui.MarkUpdate, outdated)),
 			ui.Dim.Render(fmt.Sprintf("%s %d total", ui.MarkMissing, total)))
 	}
 }

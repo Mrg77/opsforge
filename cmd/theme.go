@@ -11,12 +11,14 @@ import (
 var themeCmd = &cobra.Command{
 	Use:   "theme [name]",
 	Short: "List color themes, or preview one",
-	Long: `opsforge's visual identity is themeable. Set OPSFORGE_THEME (in your
-~/.zshrc) to any of the listed names, or "auto" to match your terminal
-background.
+	Long: `opsforge's visual identity is themeable. The simplest way to switch is
+'opsforge theme set <name>', which persists your choice (no reload needed). For
+a one-off or per-session override, set OPSFORGE_THEME=<name>. Use "auto" to
+match your terminal background. Precedence: $OPSFORGE_THEME › saved choice › auto.
 
   opsforge theme            # list all themes with a color preview
-  opsforge theme dracula    # preview a specific theme`,
+  opsforge theme dracula    # preview a specific theme (doesn't persist)
+  opsforge theme set nord   # persist it — every command follows`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 1 {
@@ -26,7 +28,9 @@ background.
 					ui.WarnMark(), args[0], ui.ThemeNames())
 			}
 			previewTheme(ui.Active.Name)
-			fmt.Printf("\nUse it: %s\n", ui.Accent.Render(fmt.Sprintf("export OPSFORGE_THEME=%s", ui.Active.Name)))
+			fmt.Printf("\nKeep it: %s %s\n",
+				ui.Accent.Render(fmt.Sprintf("opsforge theme set %s", ui.Active.Name)),
+				ui.Dim.Render(fmt.Sprintf("(persists · or OPSFORGE_THEME=%s for one session)", ui.Active.Name)))
 			return nil
 		}
 
@@ -52,8 +56,8 @@ background.
 
 		fmt.Println()
 		fmt.Println(ui.Dim.Render("  Preview:  ") + ui.Accent.Render("opsforge theme dracula"))
-		fmt.Println(ui.Dim.Render("  Apply:    ") + ui.Accent.Render("opsforge theme set dracula") +
-			ui.Dim.Render("  (persists — no reload, no env var)"))
+		fmt.Println(ui.Dim.Render("  Keep:     ") + ui.Accent.Render("opsforge theme set dracula") +
+			ui.Dim.Render("  (persists, no reload) · or OPSFORGE_THEME=dracula for one session"))
 		return nil
 	},
 }
