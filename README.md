@@ -28,7 +28,7 @@ server, no account, no lock-in.
 
 ![opsforge demo](demo/demo.gif)
 
-**[Try it](#try-it-in-a-sandbox) · [Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
+**[Try it](#try-it-in-a-sandbox) · [Install](#install) · [Tour](#a-quick-tour) · [Workflows](#common-workflows) · [Shell](#the-devops-shell-environment) · [Guards](#policy-as-code-guards) · [Project mode](#project-mode) · [SBOM & VEX](#sbom--supply-chain) · [Verify](#credential-hygiene-verify) · [AI agents (MCP)](#ai-agents-mcp) · [CI](#ci--integrations) · [Catalog](#the-catalog) · [Under the hood](#engineering-highlights)**
 
 </div>
 
@@ -125,6 +125,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
+<tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Credential-hygiene audit of the workstation — static keys, clear-text secrets, loose file perms, expiring certs · read-only, offline (see <a href="#credential-hygiene-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
@@ -831,6 +832,45 @@ your toolbox, you know, without running a thing.
 
 ---
 
+## Credential hygiene (`verify`)
+
+`opsforge audit` asks *are my tools vulnerable?* `opsforge verify` asks the other
+half: *are the credentials on this machine a liability?* A DevOps workstation
+accretes secrets — cloud keys, a kubeconfig, SSH keys, registry tokens, a pile of
+`~/.docker`/`~/.npmrc`/`~/.netrc` logins. `verify` inventories them and flags the
+hygiene risks, in one read-only pass:
+
+- **Long-lived static keys** that never expire — an AWS `AKIA` access key, a GCP
+  service-account JSON key, an SSH key with no passphrase, a legacy static kube
+  token. It tells apart a static key from a federated one (SSO, OIDC, `exec`,
+  assume-role) and only flags the former.
+- **Secrets in clear text** — the git credential store, `~/.netrc`, base64
+  `~/.docker`/`~/.npmrc` logins (base64 is *not* encryption), `gh`/`glab` tokens.
+- **Over-broad file permissions** — a credential file readable beyond its owner
+  (it should be `0600`).
+- **Expired or soon-to-expire** client certificates and tokens — read straight
+  from the local PEM/JWT.
+
+```sh
+opsforge verify            # human-readable report, most-severe first
+opsforge verify --json     # machine-readable, for scripts
+opsforge verify --strict   # exit non-zero on ANY finding (CI gate)
+```
+
+> **Read-only, offline, and honest.** `verify` **never runs an external tool** —
+> in particular it never calls `kubectl`, so inspecting an OIDC kubeconfig can't
+> trigger a login. It **never prints a secret's value** (only *where* it lives and
+> *why* it's risky), and it **never touches the network**. It reads an OIDC
+> kubeconfig by parsing YAML, a certificate's expiry from its PEM, a token's from
+> its JWT claim — all passively. It's a safety net, not a guarantee: some stores
+> (OS keychains) can't be read, and an absence of findings isn't proof of safety.
+
+Without `--strict` the exit code is non-zero only on HIGH/CRITICAL findings, so it
+gates CI without failing on every minor heads-up — the same convention as
+[`opsforge audit`](#ci--integrations).
+
+---
+
 ## AI agents (MCP)
 
 opsforge speaks the **[Model Context Protocol](https://modelcontextprotocol.io)**
@@ -1216,6 +1256,7 @@ internal/mcp/        Read-only MCP payload builders (pure functions over catalog
 internal/detect/    Concurrent PATH + version detection + brew-outdated
 internal/installer/ Backend router: Homebrew + GitHub-releases download (checksum.go: SHA-256 verify; self-update)
 internal/audit/     OSV.dev client + client-side version matching + CVSS v3.1 scoring
+internal/credscan/  Read-only credential-hygiene scanner (static keys, clear-text secrets, perms, cert/JWT expiry) — never runs an external tool
 internal/families/  Single source of truth for DevOps tool families (consumed by history + guard prefilter)
 internal/history/   Passive shell-history reader + DevOps tool-family grouping
 internal/secrets/   Leaked-credential scanner
@@ -1245,6 +1286,7 @@ upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
 
 **Recently shipped**
 
+- [x] `opsforge verify` — read-only [credential-hygiene](#credential-hygiene-verify) audit of the workstation
 - [x] `opsforge scan <image>` — image CVE scan correlated with your workstation
 - [x] `opsforge sbom/vex --sign` — key-based Sigstore signing of the artifacts
 - [x] One-command interactive [demo sandbox](#try-it-in-a-sandbox) (Docker + Codespaces)

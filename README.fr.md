@@ -30,7 +30,7 @@ vous enferme.
 
 ![opsforge demo](demo/demo.gif)
 
-**[Essayer](#essayer-dans-une-sandbox) · [Installation](#installation) · [Aperçu](#aperçu-rapide) · [Workflows](#workflows-courants) · [Shell](#lenvironnement-shell-devops) · [Guards](#guards-policy-as-code) · [Mode projet](#mode-projet) · [SBOM & VEX](#sbom--chaîne-dapprovisionnement) · [Agents IA (MCP)](#agents-ia-mcp) · [CI](#ci--intégrations) · [Catalogue](#le-catalogue) · [Sous le capot](#points-forts-dingénierie)**
+**[Essayer](#essayer-dans-une-sandbox) · [Installation](#installation) · [Aperçu](#aperçu-rapide) · [Workflows](#workflows-courants) · [Shell](#lenvironnement-shell-devops) · [Guards](#guards-policy-as-code) · [Mode projet](#mode-projet) · [SBOM & VEX](#sbom--chaîne-dapprovisionnement) · [Verify](#hygiène-des-credentials-verify) · [Agents IA (MCP)](#agents-ia-mcp) · [CI](#ci--intégrations) · [Catalogue](#le-catalogue) · [Sous le capot](#points-forts-dingénierie)**
 
 </div>
 
@@ -130,6 +130,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Installe toute une stack prédéfinie en une commande</td></tr>
 <tr><td><code>opsforge upgrade [-u] [outil…]</code></td><td>Met tout à jour, seulement l'obsolète (<code>-u</code>), ou les outils nommés</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>Scan CVE des outils installés · scan de secrets exposés en option · <code>--json</code> + code de sortie non nul pour verrouiller la CI</td></tr>
+<tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Audit d'hygiène des credentials du poste — clés statiques, secrets en clair, permissions trop larges, certs qui expirent · lecture seule, hors-ligne (voir <a href="#hygiène-des-credentials-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
@@ -878,6 +879,49 @@ tombe sur votre boîte à outils, vous le savez, sans avoir rien à lancer.
 
 ---
 
+## Hygiène des credentials (`verify`)
+
+`opsforge audit` demande *mes outils sont-ils vulnérables ?* `opsforge verify`
+répond à l'autre moitié : *les credentials de cette machine sont-ils un risque ?*
+Un poste DevOps accumule des secrets — clés cloud, un kubeconfig, des clés SSH,
+des tokens de registry, une pile de logins `~/.docker`/`~/.npmrc`/`~/.netrc`.
+`verify` en fait l'inventaire et signale les risques d'hygiène, en une passe en
+lecture seule :
+
+- **Clés statiques long-lived** qui n'expirent jamais — une clé d'accès AWS
+  `AKIA`, une clé JSON de compte de service GCP, une clé SSH sans passphrase, un
+  token kube statique legacy. Il distingue une clé statique d'une clé fédérée
+  (SSO, OIDC, `exec`, assume-role) et ne signale que la première.
+- **Secrets en clair** — le credential store de git, `~/.netrc`, les logins
+  base64 `~/.docker`/`~/.npmrc` (base64 n'est *pas* du chiffrement), les tokens
+  `gh`/`glab`.
+- **Permissions trop larges** — un fichier de credential lisible au-delà de son
+  propriétaire (il devrait être `0600`).
+- **Certificats et tokens expirés** ou proches de l'expiration — lus directement
+  depuis le PEM/JWT local.
+
+```sh
+opsforge verify            # rapport lisible, du plus grave au moins grave
+opsforge verify --json     # lisible par une machine, pour les scripts
+opsforge verify --strict   # code de sortie non nul sur TOUT finding (gate CI)
+```
+
+> **Lecture seule, hors-ligne, et honnête.** `verify` **n'exécute jamais d'outil
+> externe** — en particulier il n'appelle jamais `kubectl`, donc inspecter un
+> kubeconfig OIDC ne peut pas déclencher de login. Il **n'affiche jamais la valeur
+> d'un secret** (seulement *où* il vit et *pourquoi* c'est risqué), et il **ne
+> touche jamais au réseau**. Il lit un kubeconfig OIDC en parsant le YAML,
+> l'expiration d'un certificat depuis son PEM, celle d'un token depuis son claim
+> JWT — tout passivement. C'est un filet de sécurité, pas une garantie : certains
+> stockages (trousseaux de l'OS) sont illisibles, et l'absence de finding n'est pas
+> une preuve de sûreté.
+
+Sans `--strict`, le code de sortie n'est non nul que sur les findings HIGH/CRITICAL,
+pour verrouiller la CI sans échouer sur chaque avertissement mineur — la même
+convention qu'[`opsforge audit`](#ci--intégrations).
+
+---
+
 ## Agents IA (MCP)
 
 opsforge parle le **[Model Context Protocol](https://modelcontextprotocol.io)** —
@@ -1292,6 +1336,7 @@ internal/mcp/        Builders de payload MCP en lecture seule (fonctions pures s
 internal/detect/    Détection concurrente PATH + version + brew-outdated
 internal/installer/ Routeur de backend : Homebrew + téléchargement releases GitHub (checksum.go : vérif SHA-256 ; self-update)
 internal/audit/     Client OSV.dev + matching de version côté client + scoring CVSS v3.1
+internal/credscan/  Scanner d'hygiène des credentials en lecture seule (clés statiques, secrets en clair, permissions, expiration cert/JWT) — n'exécute jamais d'outil externe
 internal/families/  Source de vérité unique des familles d'outils DevOps (consommée par history + pré-filtre des guards)
 internal/history/   Lecteur passif d'historique shell + regroupement par famille d'outils DevOps
 internal/secrets/   Scanner d'identifiants exposés
@@ -1322,6 +1367,7 @@ GoReleaser sur tag.
 
 **Livré récemment**
 
+- [x] `opsforge verify` — audit d'[hygiène des credentials](#hygiène-des-credentials-verify) du poste, en lecture seule
 - [x] `opsforge scan <image>` — scan CVE d'image corrélé avec votre poste
 - [x] `opsforge sbom/vex --sign` — signature Sigstore par clé des artefacts
 - [x] [Sandbox de démo](#essayer-dans-une-sandbox) interactive en une commande (Docker + Codespaces)
