@@ -14,6 +14,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/guardlog"
 	forgemcp "github.com/Mrg77/opsforge/internal/mcp"
 	"github.com/Mrg77/opsforge/internal/sbom"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
@@ -235,7 +236,20 @@ func registerTools(server *sdk.Server) {
 		if context == "" {
 			context = shellcfg.CurrentContext()
 		}
-		return nil, forgemcp.BuildGuard(policy, in.Command, context), nil
+		res := forgemcp.BuildGuard(policy, in.Command, context)
+		// Record what the agent asked, tagged source "mcp", so `opsforge guard
+		// log --source mcp` can replay what an AI agent tried against prod.
+		// The agent never executes here — this is the intent it proposed.
+		guardlog.Append(guardlog.Entry{
+			Time:    time.Now().UTC(),
+			Command: res.Command,
+			Context: res.Context,
+			Action:  res.Action,
+			Rule:    res.MatchedRule,
+			Message: res.Message,
+			Source:  "mcp",
+		})
+		return nil, res, nil
 	})
 }
 

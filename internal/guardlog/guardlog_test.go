@@ -74,6 +74,35 @@ func TestReadFilters(t *testing.T) {
 	}
 }
 
+func TestReadSourceFilter(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	// One from the keyboard (explicit "shell"), one from an AI agent, one
+	// legacy entry with no source (must count as "shell").
+	Append(Entry{Action: "deny", Command: "a", Source: "shell"})
+	Append(Entry{Action: "confirm", Command: "b", Source: "mcp"})
+	Append(Entry{Action: "warn", Command: "c"}) // no source → treated as shell
+
+	cases := []struct {
+		name string
+		f    Filter
+		want int
+	}{
+		{"all sources", Filter{}, 3},
+		{"mcp only", Filter{SourceEqual: "mcp"}, 1},               // b
+		{"shell includes empty", Filter{SourceEqual: "shell"}, 2}, // a + c
+		{"source is case-insensitive", Filter{SourceEqual: "MCP"}, 1},
+	}
+	for _, c := range cases {
+		got, err := Read(c.f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != c.want {
+			t.Errorf("%s: got %d entries, want %d", c.name, len(got), c.want)
+		}
+	}
+}
+
 func TestReadMissingLogIsNotAnError(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	got, err := Read(Filter{})

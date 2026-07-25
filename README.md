@@ -864,6 +864,21 @@ This turns opsforge into a **grounded source of truth** an agent can lean on:
 instead of hallucinating your tool versions or guessing whether `terraform
 destroy` is safe here, it asks.
 
+**And you keep the receipts.** Every command an agent runs past
+`check_guard_policy` that trips a guard (warn/confirm/deny) is written to the
+same [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week) as your
+own — tagged `source: mcp`. So you can review, after the fact, exactly what your
+AI agents proposed against production:
+
+```sh
+opsforge guard log --source mcp          # what agents ran past the guard
+opsforge guard log --source mcp --prod   # …only on production-like contexts
+```
+
+The guard becomes a **safety net between your agents and prod**: the agent
+checks its intent before acting, and you get a reviewable record of every
+dangerous command it considered — not just the ones it went through with.
+
 ---
 
 ## CI & integrations

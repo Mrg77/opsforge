@@ -913,6 +913,22 @@ opsforge devient ainsi une **source de vérité ancrée** sur laquelle un agent 
 s'appuyer : au lieu d'halluciner vos versions d'outils ou de deviner si
 `terraform destroy` est sans risque ici, il pose la question.
 
+**Et vous gardez les traces.** Chaque commande qu'un agent passe à
+`check_guard_policy` et qui déclenche un guard (warn/confirm/deny) est écrite
+dans le même [journal d'audit](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-)
+que le vôtre — taguée `source: mcp`. Vous pouvez donc revoir, après coup,
+exactement ce que vos agents IA ont proposé contre la production :
+
+```sh
+opsforge guard log --source mcp          # ce que les agents ont passé au guard
+opsforge guard log --source mcp --prod   # …seulement sur les contextes prod-like
+```
+
+Le guard devient un **filet de sécurité entre vos agents et la prod** : l'agent
+vérifie son intention avant d'agir, et vous obtenez une trace consultable de
+chaque commande dangereuse qu'il a envisagée — pas seulement celles qu'il a
+menées à bout.
+
 ---
 
 ## CI & intégrations

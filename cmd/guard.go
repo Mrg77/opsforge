@@ -76,6 +76,7 @@ var guardCheckCmd = &cobra.Command{
 			Action:  string(d.Action),
 			Rule:    d.Rule,
 			Message: d.Message,
+			Source:  "shell",
 		})
 
 		if d.Message != "" {
@@ -405,6 +406,7 @@ var (
 	guardLogContext string
 	guardLogSince   string
 	guardLogAction  string
+	guardLogSource  string
 )
 
 var guardLogCmd = &cobra.Command{
@@ -419,16 +421,22 @@ guard let it through.
   opsforge guard log --prod          # only production-like contexts
   opsforge guard log --since 7d      # the last week
   opsforge guard log --action deny   # only what was blocked
+  opsforge guard log --source mcp    # only what an AI agent proposed (via MCP)
   opsforge guard log --json          # machine-readable
 
 The trail is local only (` + "`~/.local/state/opsforge/guard-audit.jsonl`" + `),
 never leaves your machine, and only records guarded commands (not your whole
-history — that's what ` + "`opsforge history`" + ` is for).`,
+history — that's what ` + "`opsforge history`" + ` is for).
+
+The source column tells you who asked: ` + "`shell`" + ` is you at the keyboard,
+` + "`mcp`" + ` is an AI agent that ran a command past the guard over the MCP server
+(` + "`opsforge mcp`" + `) — so you can see what your agents tried against prod.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		f := guardlog.Filter{
 			ProdOnly:    guardLogProd,
 			ContextSub:  guardLogContext,
 			ActionEqual: guardLogAction,
+			SourceEqual: guardLogSource,
 		}
 		if guardLogSince != "" {
 			d, err := parseSince(guardLogSince)
@@ -465,10 +473,16 @@ history — that's what ` + "`opsforge history`" + ` is for).`,
 			if ctx == "" {
 				ctx = "(no context)"
 			}
-			fmt.Printf("           %s\n", ui.Faint.Render("context: "+ctx))
+			meta := "context: " + ctx
+			// Call out AI-agent-proposed commands explicitly; a keyboard entry
+			// (source "shell" or empty) needs no annotation.
+			if strings.EqualFold(e.Source, "mcp") {
+				meta += "  ·  via AI agent (MCP)"
+			}
+			fmt.Printf("           %s\n", ui.Faint.Render(meta))
 		}
 		fmt.Println()
-		fmt.Println(ui.Faint.Render(fmt.Sprintf("  %d entr(y/ies) · filter with --prod / --since 7d / --action deny", len(entries))))
+		fmt.Println(ui.Faint.Render(fmt.Sprintf("  %d entr(y/ies) · filter with --prod / --since 7d / --action deny / --source mcp", len(entries))))
 		return nil
 	},
 }
@@ -504,6 +518,8 @@ func init() {
 		"only entries newer than a duration (7d, 24h, 30m)")
 	guardLogCmd.Flags().StringVar(&guardLogAction, "action", "",
 		"only this action (warn, confirm, deny)")
+	guardLogCmd.Flags().StringVar(&guardLogSource, "source", "",
+		"only this source: shell (you) or mcp (an AI agent)")
 	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardLintCmd, guardInitCmd, guardPrefilterCmd, guardLogCmd)
 	rootCmd.AddCommand(guardCmd)
 }

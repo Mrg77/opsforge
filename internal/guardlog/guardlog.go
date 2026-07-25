@@ -30,6 +30,7 @@ type Entry struct {
 	Action    string    `json:"action"`              // warn | confirm | deny
 	Rule      string    `json:"rule,omitempty"`      // matching rule name
 	Message   string    `json:"message,omitempty"`   // the guard message shown
+	Source    string    `json:"source,omitempty"`    // who asked: "shell" (you at the keyboard) | "mcp" (an AI agent) — empty = shell
 	Confirmed *bool     `json:"confirmed,omitempty"` // for confirm: did the user type yes? (nil if unknown)
 }
 
@@ -80,6 +81,7 @@ type Filter struct {
 	ContextSub  string    // case-insensitive substring the context must contain ("" = any)
 	ProdOnly    bool      // only entries whose context looks like production
 	ActionEqual string    // only this action ("" = any)
+	SourceEqual string    // only this source, "shell" | "mcp" ("" = any; empty entries count as "shell")
 }
 
 // Read returns the logged entries matching the filter, oldest first. A missing
@@ -127,10 +129,22 @@ func (f Filter) matches(e Entry) bool {
 	if f.ContextSub != "" && !strings.Contains(strings.ToLower(e.Context), strings.ToLower(f.ContextSub)) {
 		return false
 	}
+	if f.SourceEqual != "" && sourceOf(e) != strings.ToLower(f.SourceEqual) {
+		return false
+	}
 	if f.ProdOnly && !looksProd(e.Context) {
 		return false
 	}
 	return true
+}
+
+// sourceOf normalizes an entry's source: an empty source means the shell
+// hook wrote it (entries predating the field, or a plain `guard check`).
+func sourceOf(e Entry) string {
+	if e.Source == "" {
+		return "shell"
+	}
+	return strings.ToLower(e.Source)
 }
 
 // looksProd mirrors the default policy's fail-safe view: any context
