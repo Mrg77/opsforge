@@ -6,6 +6,7 @@ import (
 	"encoding/pem"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -87,7 +88,7 @@ func sshKeyFindings(displayPath, full string, b []byte) []Finding {
 		detail := "Prefer Ed25519: `ssh-keygen -t ed25519`."
 		title := kind + " key is weak"
 		if bits > 0 {
-			title = kind + " key is only " + itoa(bits) + " bits"
+			title = kind + " key is only " + strconv.Itoa(bits) + " bits"
 		}
 		out = append(out, mkFinding("SSH", "weak key", displayPath, SevMedium, title, detail))
 	}
@@ -149,19 +150,4 @@ func keyStrength(b []byte) (kind string, bits int, weak bool) {
 		// Ed25519 and others: not weak.
 		return "", 0, false
 	}
-}
-
-// itoa avoids pulling strconv for a single small int-to-string.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	var buf [20]byte
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + n%10)
-		n /= 10
-	}
-	return string(buf[i:])
 }

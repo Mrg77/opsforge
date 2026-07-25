@@ -61,19 +61,7 @@ func scanKube(now time.Time) []Finding {
 // a readable expiry, a legacy token has none, and an OIDC auth-provider's risk
 // is the long-lived refresh-token/client-secret — never the id-token, which is
 // expected to be expired at rest.
-func kubeUserFindings(path, name string, u struct {
-	ClientCertData string `yaml:"client-certificate-data"`
-	ClientKeyData  string `yaml:"client-key-data"`
-	Token          string `yaml:"token"`
-	TokenFile      string `yaml:"tokenFile"`
-	Exec           *struct {
-		Command string `yaml:"command"`
-	} `yaml:"exec"`
-	AuthProvider *struct {
-		Name   string            `yaml:"name"`
-		Config map[string]string `yaml:"config"`
-	} `yaml:"auth-provider"`
-}, now time.Time) []Finding {
+func kubeUserFindings(path, name string, u kubeUser, now time.Time) []Finding {
 	who := "user \"" + name + "\""
 
 	// exec plugin: the token is minted on demand by an external command; there
@@ -171,6 +159,7 @@ func envPath(name string) string {
 	if p == "" {
 		return ""
 	}
+	p = expand(p) // a ~ in the env value should resolve like everywhere else
 	if _, err := os.Stat(p); err != nil {
 		return ""
 	}

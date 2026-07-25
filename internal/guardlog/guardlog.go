@@ -23,15 +23,19 @@ import (
 )
 
 // Entry is one recorded guard decision.
+//
+// We log the guard's *decision*, made before the user answers a confirm
+// prompt (the shell asks y/n after `guard check` returns), so an entry records
+// what the guard required, not whether a confirm was ultimately accepted —
+// that outcome isn't known at record time.
 type Entry struct {
-	Time      time.Time `json:"time"`
-	Command   string    `json:"command"`
-	Context   string    `json:"context"`             // the kube/cloud/tf context at the time
-	Action    string    `json:"action"`              // warn | confirm | deny
-	Rule      string    `json:"rule,omitempty"`      // matching rule name
-	Message   string    `json:"message,omitempty"`   // the guard message shown
-	Source    string    `json:"source,omitempty"`    // who asked: "shell" (you at the keyboard) | "mcp" (an AI agent) — empty = shell
-	Confirmed *bool     `json:"confirmed,omitempty"` // for confirm: did the user type yes? (nil if unknown)
+	Time    time.Time `json:"time"`
+	Command string    `json:"command"`
+	Context string    `json:"context"`           // the kube/cloud/tf context at the time
+	Action  string    `json:"action"`            // warn | confirm | deny
+	Rule    string    `json:"rule,omitempty"`    // matching rule name
+	Message string    `json:"message,omitempty"` // the guard message shown
+	Source  string    `json:"source,omitempty"`  // who asked: "shell" (you at the keyboard) | "mcp" (an AI agent) — empty = shell
 }
 
 // Path returns the audit log file location: $XDG_STATE_HOME/opsforge/

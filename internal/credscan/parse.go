@@ -61,10 +61,8 @@ func parseTime(s string) (time.Time, bool) {
 	}
 	for _, l := range layouts {
 		if t, err := time.Parse(l, s); err == nil {
-			// The Python-datetime shapes carry no zone; treat them as UTC.
-			if t.Location() == time.UTC || !strings.ContainsAny(s, "Zz+") {
-				return t.UTC(), true
-			}
+			// The Python-datetime shapes carry no zone; .UTC() normalizes both
+			// them and the RFC3339 forms to a single comparable clock.
 			return t.UTC(), true
 		}
 	}
