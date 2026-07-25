@@ -2,20 +2,23 @@
 
 # opsforge 🔥
 
-**Votre poste de travail DevOps, forgé en quelques minutes.**
+**Une couche de sécurité policy-as-code pour votre poste de travail DevOps.**
 
-Choisissez vos CLI depuis une interface terminal interactive, installez-les d'un
-seul coup, et transformez votre shell (zsh, fish ou bash) en un environnement
-DevOps qui connaît votre contexte — complétion en direct, un prompt qui vous
-alerte quand vous passez en prod, et des **guards policy-as-code** qui vous
-empêchent de flinguer le mauvais cluster.
+opsforge transforme votre shell (zsh, fish ou bash) en un environnement qui
+connaît votre contexte, avec des **guards policy-as-code** qui arrêtent un
+`kubectl delete` ou `terraform destroy` étourdi sur le mauvais cluster — les
+mêmes règles vous protégeant au clavier *et* [tout agent IA](#agents-ia-mcp)
+qui pilote votre machine — plus un [**audit d'hygiène des credentials**](#hygiène-des-credentials-verify)
+en lecture seule de tous les secrets du poste. Il garde un [journal
+d'audit](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-) append-only
+de ce qui a déclenché un guard sur prod, et complète le tout par un SBOM corrélé
+aux CVE + **OpenVEX** priorisé par le catalogue des vulnérabilités activement
+exploitées de la CISA.
 
-opsforge, c'est la **couche supply-chain + policy de votre poste de travail** :
-il installe vos outils, encadre la façon dont *vous* les utilisez, et vous remet
-un SBOM corrélé aux CVE ainsi qu'un document **OpenVEX** de l'ensemble — priorisé
-par le catalogue des vulnérabilités activement exploitées de la CISA. Un outil
-perso, pas une plateforme d'équipe — pas de serveur, pas de compte, rien qui
-vous enferme.
+Et parce qu'une couche de sécurité ne sert à rien sur une machine vide, il
+**installe et maintient aussi votre boîte à outils** — un sélecteur interactif
+parmi 287 CLI triés sur le volet, dans un seul binaire. Un outil perso, pas une
+plateforme d'équipe — pas de serveur, pas de compte, rien qui vous enferme.
 
 [English](README.md) · **Français**
 
@@ -38,32 +41,34 @@ vous enferme.
 
 ## Ce que c'est
 
-opsforge, c'est **trois outils dans un seul binaire** :
+Le différenciateur d'abord, la plomberie en dernier :
 
 | | | |
 |:--:|---|---|
-| 📦 | **Installeur d'outils** | Un sélecteur interactif parmi **287 CLI triés sur le volet, couvrant tous les métiers de l'IT** — dont une nouvelle catégorie **AI & LLM**. Il détecte ce que vous avez déjà et ce qui a vieilli, puis installe le reste via Homebrew *ou* directement depuis les binaires de release GitHub — même sur une machine Linux nue, sans gestionnaire de paquets. |
-| 🐚 | **Shell DevOps** | Une seule commande transforme votre **zsh, fish ou bash** en une expérience façon Warp/Fish : complétion en direct, aide inline via `?`, un prompt qui vous signale la prod, et des [**guards policy-as-code**](#guards-policy-as-code) sur les commandes destructrices. On ne remplace pas votre shell, on ne vous enferme nulle part. |
-| 📸 | **Poste de travail & projet as-code** | `opsforge snapshot` exporte toute votre config — outils, profils, shell, thème *et* politique de guards — dans un seul YAML ; un [`opsforge.yaml`](#mode-projet) committé déclare la boîte à outils d'un dépôt et `opsforge sync` la reproduit (avec un gate CVE). `apply --check` / `sync --check` vérifient une machine en CI, et [`opsforge sbom`](#sbom--chaîne-dapprovisionnement) en tire un SBOM corrélé aux CVE. |
+| 🛡️ | **Les guards — le moat** | Une seule commande transforme votre **zsh, fish ou bash** en un shell qui connaît votre contexte, où des [**guards policy-as-code**](#guards-policy-as-code) interceptent les commandes destructrices selon le contexte kube/cloud/tf actif. Les mêmes règles, testables et versionnables, vous protègent au clavier *et* [tout agent IA](#agents-ia-mcp) qui pilote la machine — avec un [journal d'audit](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-) append-only de ce qui s'est déclenché sur prod. |
+| 🔐 | **La sécurité du poste** | [`opsforge verify`](#hygiène-des-credentials-verify) audite les **credentials de votre machine** (clés statiques, secrets en clair, permissions trop larges, certs qui expirent) en lecture seule et hors-ligne ; [`opsforge audit`](#ci--intégrations)/[`sbom`](#sbom--chaîne-dapprovisionnement)/[`vex`](#sbom--chaîne-dapprovisionnement) couvrent les **CVE de vos outils** — un SBOM signé + OpenVEX, priorisé par le catalogue CISA KEV. |
+| 📦 | **La boîte à outils (la commodité)** | Un sélecteur interactif parmi **287 CLI triés sur le volet** — détecte ce que vous avez et ce qui a vieilli, installe le reste via Homebrew *ou* directement depuis les binaires GitHub (même sur une machine Linux nue). Plus le [poste- & projet-as-code](#mode-projet) : `snapshot`/`apply`/`sync` reproduisent une machine ou la boîte à outils d'un dépôt, avec un gate CVE. |
 
 ### Pourquoi ça existe
 
-Trois frictions récurrentes sur une machine DevOps, chacune résolue d'ordinaire
-par un outil différent — ou à la main :
+Une machine DevOps a un problème de sécurité que l'outillage habituel ignore :
 
-- **Reconstruire un poste**, c'est installer une vingtaine de CLI, puis brancher
-  pour chacun les complétions, les alias et un prompt qui tient la route, sur
-  chaque machine.
 - **Un `kubectl delete` étourdi sur le mauvais contexte** n'a aucune ceinture de
-  sécurité : les outils l'exécutent qu'on soit sur staging ou sur prod.
-- **Personne ne sait vraiment ce qu'il y a sur la machine** — quelles versions,
-  quelles CVE, lesquelles sont activement exploitées.
+  sécurité — les outils l'exécutent qu'on soit sur staging ou sur prod. Et
+  maintenant un **agent IA** peut le lancer *à votre place*, plus vite, sans que
+  personne ne regarde.
+- **Personne ne sait ce qui est un risque sur la machine** — quels credentials
+  n'expirent jamais, lesquels sont en clair, quels outils portent une CVE
+  activement exploitée.
+- **Reconstruire un poste**, c'est installer une vingtaine de CLI et brancher un
+  shell utilisable pour chacun — la base, mais toujours une journée perdue.
 
 opsforge réunit tout ça dans un seul binaire parce que ces problèmes partagent
-la même donnée (la boîte à outils détectée) et le même lieu (votre shell). C'est
+le même lieu (votre shell) et la même donnée (la boîte à outils détectée). C'est
 délibérément un **outil perso, pas une plateforme d'équipe** — pas de serveur,
 pas de compte, rien qui vous enferme — pour que ça reste quelque chose que vous
-lancez, pas quelque chose que vous opérez.
+lancez, pas quelque chose que vous opérez. (Passer à une flotte ? Voir
+[Les guards à l'échelle d'une équipe](#les-guards-à-léchelle-dune-équipe).)
 
 ---
 
@@ -617,6 +622,30 @@ un `warn` affiche son message et s'exécute quand même.
 
 Désactivez tout le temps d'une session avec `OPSFORGE_GUARDS=0`.
 
+### Les guards à l'échelle d'une équipe
+
+opsforge est un outil perso par conception — pas de serveur, pas de console de
+flotte. Mais les deux pièces qu'une équipe a réellement besoin de standardiser
+*sont déjà des fichiers*, ce qui est tout l'intérêt du policy-as-code :
+
+- **Une seule politique, partagée comme du code.** `guards.yaml` est un simple
+  fichier versionnable. Committez-le dans un dépôt partagé, embarquez-le dans vos
+  dotfiles ou une golden image, et chaque ingénieur exécute les mêmes règles —
+  relues en PR, testées en CI avec `opsforge guard lint` / `guard test --json`.
+  Personne ne bricole un flocon de neige dans son coin.
+- **Un seul journal d'audit, exportable là où votre équipe regarde déjà.** Le
+  journal des guards est du JSON ligne-par-ligne à un chemin connu
+  (`~/.local/state/opsforge/guard-audit.jsonl`) — `opsforge guard log --json`
+  émet la même chose. Un tail Promtail/Vector/Fluent Bit l'expédie vers Loki ou
+  votre SIEM, si bien que « qu'a lancé qui (ou quel [agent IA](#agents-ia-mcp))
+  contre un guard prod cette semaine » devient une requête à l'échelle de la
+  flotte, pas machine par machine.
+
+Le chemin de *mon poste* vers *celui de l'équipe* est délibérément une histoire
+de config et de logs, pas une plateforme à opérer — vous adoptez les morceaux
+dont vous avez besoin sans qu'opsforge ne devienne jamais une dépendance au
+milieu.
+
 ---
 
 ## Mode projet
@@ -972,6 +1001,29 @@ Le guard devient un **filet de sécurité entre vos agents et la prod** : l'agen
 vérifie son intention avant d'agir, et vous obtenez une trace consultable de
 chaque commande dangereuse qu'il a envisagée — pas seulement celles qu'il a
 menées à bout.
+
+#### En 30 secondes
+
+Un agent connecté via MCP propose une commande destructrice ; le guard l'évalue
+contre le contexte *actuel* et refuse — **sans jamais l'exécuter** — et la
+tentative atterrit dans votre journal d'audit :
+
+```console
+# L'agent appelle l'outil MCP check_guard_policy au lieu de lancer la commande :
+  → check_guard_policy(command="kubectl delete namespace payments",
+                       context="gke_prod-eu")
+  ← { "action": "confirm",
+      "matched_rule": "confirm destructive kubectl on prod",
+      "message": "This changes Kubernetes resources on a production-like context." }
+  # L'agent voit "confirm", s'arrête, et vous demande d'abord. Rien n'a été supprimé.
+
+$ opsforge guard log --source mcp --prod
+  2026-07-25 17:01  confirm  kubectl delete namespace payments
+           context: gke_prod-eu  ·  via AI agent (MCP)
+```
+
+La même politique, le même journal, que la commande à risque vienne de vos
+doigts ou de votre agent — c'est le différenciateur en un seul écran.
 
 ---
 

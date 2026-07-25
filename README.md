@@ -2,18 +2,21 @@
 
 # opsforge 🔥
 
-**Your DevOps workstation, forged in minutes.**
+**A policy-as-code safety layer for your DevOps workstation.**
 
-Pick your CLIs from an interactive terminal UI, install them in one go, and turn
-your shell (zsh, fish or bash) into a context-aware DevOps environment — live
-completion, a prod-aware prompt, and **policy-as-code guards** that stop you from
-nuking the wrong cluster.
+opsforge turns your shell (zsh, fish or bash) into a context-aware environment
+with **policy-as-code guards** that stop a distracted `kubectl delete` or
+`terraform destroy` on the wrong cluster — the same rules protecting you at the
+keyboard *and* [any AI agent](#ai-agents-mcp) driving your machine — plus a
+read-only [**credential-hygiene audit**](#credential-hygiene-verify) of every
+secret on the box. It keeps an append-only [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week)
+of what tripped a guard on prod, and rounds it out with a CVE-correlated SBOM +
+**OpenVEX** prioritized by CISA's Known-Exploited catalog.
 
-opsforge is the **supply-chain + policy layer for your own workstation**: it
-installs your toolbox, guards how *you* use it, and hands you a CVE-correlated
-SBOM plus an **OpenVEX** document of the whole thing — prioritized by CISA's
-Known-Exploited catalog. It's a personal power tool, not a team platform — no
-server, no account, no lock-in.
+And because a safety layer is worthless on an empty machine, it also **installs
+and maintains your toolbox** — an interactive picker over 287 curated CLIs, in
+one binary. It's a personal power tool, not a team platform — no server, no
+account, no lock-in.
 
 **English** · [Français](README.fr.md)
 
@@ -36,30 +39,31 @@ server, no account, no lock-in.
 
 ## What it is
 
-opsforge is **three tools in one binary**:
+The differentiator first, the plumbing last:
 
 | | | |
 |:--:|---|---|
-| 📦 | **Tool installer** | An interactive picker over **287 curated CLIs across every IT discipline** — including a new **AI & LLM** category. Detects what you have and what's outdated, then installs the rest via Homebrew *or* direct GitHub-release binaries — works on a bare Linux box with no package manager. |
-| 🐚 | **DevOps shell** | One command turns your own **zsh, fish or bash** into a Warp/Fish-like experience: live completion, inline `?` help, a prod-aware prompt, and [**policy-as-code guards**](#policy-as-code-guards) on destructive commands. No shell replacement, no lock-in. |
-| 📸 | **Workstation- & project-as-code** | `opsforge snapshot` exports your whole setup — tools, profiles, shell, theme *and* guard policy — to one YAML; a committed [`opsforge.yaml`](#project-mode) declares a repo's toolchain and `opsforge sync` reproduces it (with a CVE gate). `apply --check` / `sync --check` verify a machine in CI, and [`opsforge sbom`](#sbom--supply-chain) emits a CVE-correlated SBOM of it. |
+| 🛡️ | **Guards — the moat** | One command turns your **zsh, fish or bash** into a context-aware shell where [**policy-as-code guards**](#policy-as-code-guards) intercept destructive commands by the active kube/cloud/tf context. The same testable, versionable rules protect you at the keyboard *and* [any AI agent](#ai-agents-mcp) driving your box — with an append-only [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week) of what tripped on prod. |
+| 🔐 | **Security of the box** | [`opsforge verify`](#credential-hygiene-verify) audits the **credentials on your machine** (static keys, clear-text secrets, loose perms, expiring certs) read-only and offline; [`opsforge audit`](#ci--integrations)/[`sbom`](#sbom--supply-chain)/[`vex`](#sbom--supply-chain) cover the **CVEs on your tools** — a signed SBOM + OpenVEX, prioritized by CISA KEV. |
+| 📦 | **Toolbox (the commodity)** | An interactive picker over **287 curated CLIs** — detects what you have and what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries (even on a bare Linux box). Plus [workstation- & project-as-code](#project-mode): `snapshot`/`apply`/`sync` reproduce a machine or a repo's toolchain, with a CVE gate. |
 
 ### Why this exists
 
-Three recurring frictions on a DevOps machine, each usually solved by a
-different tool — or by hand:
+A DevOps machine has a safety problem the usual tooling ignores:
 
-- **Rebuilding a workstation** means installing 20+ CLIs, then wiring
-  completions, aliases and a useful prompt for each, on every machine.
-- **A distracted `kubectl delete` on the wrong context** has no seatbelt: the
-  tools happily run it whether you're on staging or prod.
-- **Nobody knows what's actually on the box** — which versions, which CVEs,
-  which of them are being exploited.
+- **A distracted `kubectl delete` on the wrong context** has no seatbelt — the
+  tools happily run it whether you're on staging or prod. And now an **AI agent**
+  can run it *for* you, faster, with no one watching.
+- **Nobody knows what's a liability on the box** — which credentials never
+  expire, which sit in clear text, which tools carry a CVE that's being exploited.
+- **Rebuilding a workstation** means installing 20+ CLIs and wiring a usable
+  shell for each — table stakes, but still a day lost.
 
-opsforge folds those into one binary because they share the same data (the
-detected toolbox) and the same home (your shell). It's deliberately a
-**personal power tool, not a team platform** — no server, no account, no
-lock-in — so it stays something you run, not something you operate.
+opsforge folds those into one binary because they share the same home (your
+shell) and the same data (the detected toolbox). It's deliberately a **personal
+power tool, not a team platform** — no server, no account, no lock-in — so it
+stays something you run, not something you operate. (Scaling to a fleet? See
+[Guards at team scale](#guards-at-team-scale).)
 
 ---
 
@@ -578,6 +582,27 @@ A `deny` prints a red **✗ Blocked by opsforge guard** and clears the line; a
 
 Disable everything for one session with `OPSFORGE_GUARDS=0`.
 
+### Guards at team scale
+
+opsforge is a personal tool by design — no server, no fleet console. But the two
+pieces a team actually needs to standardize *are already files*, which is the
+whole point of policy-as-code:
+
+- **One policy, shared like any code.** `guards.yaml` is a plain, versionable
+  file. Commit it to a shared repo, ship it in your dotfiles or a golden image,
+  and every engineer runs the same rules — reviewed in a PR, tested in CI with
+  `opsforge guard lint` / `guard test --json`. No one hand-tweaks a snowflake.
+- **One audit trail, exportable to where your team already looks.** The guard
+  log is newline-delimited JSON at a known path
+  (`~/.local/state/opsforge/guard-audit.jsonl`) — `opsforge guard log --json`
+  emits the same. A Promtail/Vector/Fluent Bit tail ships it to Loki or your SIEM,
+  so "what did anyone (or any [AI agent](#ai-agents-mcp)) run past a prod guard
+  this week" becomes a fleet-wide query, not a per-laptop one.
+
+The path from *my workstation* to *the team's* is deliberately a config-and-log
+story, not a platform you have to run — you adopt the parts you need without
+opsforge ever becoming a dependency in the middle.
+
 ---
 
 ## Project mode
@@ -918,6 +943,29 @@ opsforge guard log --source mcp --prod   # …only on production-like contexts
 The guard becomes a **safety net between your agents and prod**: the agent
 checks its intent before acting, and you get a reviewable record of every
 dangerous command it considered — not just the ones it went through with.
+
+#### See it in 30 seconds
+
+An agent connected over MCP proposes a destructive command; the guard evaluates
+it against the *current* context and refuses — **without ever executing it** —
+and the attempt lands in your audit trail:
+
+```console
+# The agent calls the check_guard_policy MCP tool instead of running the command:
+  → check_guard_policy(command="kubectl delete namespace payments",
+                       context="gke_prod-eu")
+  ← { "action": "confirm",
+      "matched_rule": "confirm destructive kubectl on prod",
+      "message": "This changes Kubernetes resources on a production-like context." }
+  # The agent sees "confirm", stops, and asks you first. Nothing was deleted.
+
+$ opsforge guard log --source mcp --prod
+  2026-07-25 17:01  confirm  kubectl delete namespace payments
+           context: gke_prod-eu  ·  via AI agent (MCP)
+```
+
+Same policy, same log, whether the risky command came from your fingers or your
+agent — that's the differentiator in one screen.
 
 ---
 
