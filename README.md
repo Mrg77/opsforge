@@ -77,10 +77,14 @@ prod context**, with no-op `kubectl`/`terraform`/`helm` stubs:
 docker run --rm -it ghcr.io/mrg77/opsforge-demo
 ```
 
-It opens a short guided tour (status → guards → SBOM), then drops you into the
-shell so you can type `kubectl delete namespace payments` yourself and watch the
-prod guard intercept it. Nothing there can reach a real cluster — the "prod"
-context is a one-line fake kubeconfig, read passively, and the tools are stubs.
+It opens a short guided tour — status → **guards** → the guard **audit trail** →
+credential-hygiene **`verify`** → SBOM — then drops you into the shell so you can
+type `kubectl delete namespace payments` yourself and watch the prod guard
+intercept it. Nothing there can reach a real cluster: the "prod" context is a
+one-line fake kubeconfig, read passively, the tools are stubs, and the
+credentials `verify` flags are **fake** ones seeded into the image (an AWS key, a
+passphrase-less SSH key, a base64 docker login) — so you can see the whole
+security layer without any real secret involved.
 
 Prefer the browser? Open it in a Codespace — same image, zero local install:
 
