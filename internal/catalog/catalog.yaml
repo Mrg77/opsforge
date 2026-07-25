@@ -273,7 +273,11 @@ categories:
         bin: ansible
         brew: ansible
         description: Agentless configuration management
-        osv: {ecosystem: PyPI, name: ansible}
+        # ansible-core, NOT the "ansible" meta-package: `ansible --version`
+        # reports the core version (e.g. 2.19.x), while the PyPI "ansible"
+        # package uses collection numbering (3.x–12.x), which produced
+        # bogus cross-version CVEs.
+        osv: {ecosystem: PyPI, name: ansible-core}
       - name: pulumi
         bin: pulumi
         brew: pulumi

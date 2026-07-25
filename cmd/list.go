@@ -192,7 +192,7 @@ var listCmd = &cobra.Command{
 	Long: `With no arguments, lists the catalog tools you have installed.
 
   opsforge list              # what you have
-  opsforge list all          # the entire catalog (249 tools)
+  opsforge list all          # the entire catalog
   opsforge list -u           # only installed tools with an update
   opsforge list dns          # search the whole catalog by name/description
   opsforge list all -s kube  # same as 'list kube' (searches everything)
@@ -229,7 +229,8 @@ var listAllCmd = &cobra.Command{
 }
 
 func init() {
-	listCmd.Flags().BoolVarP(&listOutdatedOnly, "outdated", "u", false,
+	// Persistent so `list all -u` works too (both share the outdated filter).
+	listCmd.PersistentFlags().BoolVarP(&listOutdatedOnly, "outdated", "u", false,
 		"show only installed tools with an update available")
 	listCmd.PersistentFlags().StringVarP(&listSearch, "search", "s", "",
 		"filter by name, description or category (searches the full catalog)")

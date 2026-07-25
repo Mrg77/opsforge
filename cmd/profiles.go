@@ -8,6 +8,7 @@ import (
 
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
 )
@@ -26,6 +27,10 @@ var profilesCmd = &cobra.Command{
 		}
 		statuses := detect.AllWithOutdated(cat.Tools())
 		userps, _ := userprofiles.Load()
+
+		if output.JSON {
+			return emitProfilesJSON(cat.Profiles, userps, statuses)
+		}
 
 		fmt.Println(ui.Header("opsforge profiles", "install a whole stack with `opsforge install --profile <name>`"))
 		fmt.Println()
@@ -97,6 +102,43 @@ func renderCell(name string, s detect.Status) string {
 		cell += strings.Repeat(" ", pad)
 	}
 	return style.Render(cell)
+}
+
+// emitProfilesJSON renders the profiles as structured JSON for scripts/CI,
+// so `opsforge profiles --json` is machine-readable like the other commands.
+func emitProfilesJSON(builtin []catalog.Profile, userps []catalog.Profile, statuses map[string]detect.Status) error {
+	type profileJSON struct {
+		Name        string   `json:"name"`
+		Description string   `json:"description"`
+		Builtin     bool     `json:"builtin"`
+		Tools       []string `json:"tools"`
+		Installed   int      `json:"installed"`
+		Total       int      `json:"total"`
+	}
+	shape := func(p catalog.Profile, builtin bool) profileJSON {
+		installed := 0
+		for _, name := range p.Tools {
+			if statuses[name].Installed {
+				installed++
+			}
+		}
+		desc := p.Description
+		if !builtin {
+			desc = "your saved stack"
+		}
+		return profileJSON{
+			Name: p.Name, Description: desc, Builtin: builtin,
+			Tools: p.Tools, Installed: installed, Total: len(p.Tools),
+		}
+	}
+	out := []profileJSON{}
+	for _, p := range builtin {
+		out = append(out, shape(p, true))
+	}
+	for _, p := range userps {
+		out = append(out, shape(p, false))
+	}
+	return output.Emit(out)
 }
 
 func init() {

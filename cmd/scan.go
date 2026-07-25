@@ -69,7 +69,7 @@ that ships at a different version in the image.
 		}
 
 		if output.JSON {
-			if err := emitScanJSON(image, backend.Bin, comps, findings, drift); err != nil {
+			if err := emitScanJSON(image, backend.Bin, comps, findings, drift, scanDiff); err != nil {
 				return err
 			}
 		} else {
@@ -107,28 +107,64 @@ func workstationTools(cat *catalog.Catalog) []imagescan.WorkstationTool {
 	return out
 }
 
-func emitScanJSON(image, backend string, comps []imagescan.Component, findings []imagescan.ImageFinding, drift []imagescan.Drift) error {
+func emitScanJSON(image, backend string, comps []imagescan.Component, findings []imagescan.ImageFinding, drift []imagescan.Drift, showDrift bool) error {
+	// Re-shape findings so CVE keys match `opsforge audit --json` exactly
+	// (snake_case, severity as a string) — a scan and an audit must expose the
+	// same schema for the same data.
+	type vulnJSON struct {
+		ID       string `json:"id"`
+		Severity string `json:"severity"`
+		Summary  string `json:"summary"`
+		FixedIn  string `json:"fixed_in,omitempty"`
+	}
+	type findingJSON struct {
+		Name        string     `json:"name"`
+		Ecosystem   string     `json:"ecosystem"`
+		Version     string     `json:"version"`
+		PURL        string     `json:"purl"`
+		TopSeverity string     `json:"top_severity"`
+		Vulns       []vulnJSON `json:"vulnerabilities"`
+	}
+	fs := make([]findingJSON, 0, len(findings))
 	highOrCritical := 0
 	for _, f := range findings {
 		if f.TopSeverity == audit.SevHigh.String() || f.TopSeverity == audit.SevCritical.String() {
 			highOrCritical++
 		}
+		vs := make([]vulnJSON, 0, len(f.Vulns))
+		for _, v := range f.Vulns {
+			vs = append(vs, vulnJSON{ID: v.ID, Severity: v.Severity.String(), Summary: v.Summary, FixedIn: v.FixedIn})
+		}
+		fs = append(fs, findingJSON{
+			Name: f.Name, Ecosystem: f.Ecosystem, Version: f.Version,
+			PURL: f.PURL, TopSeverity: f.TopSeverity, Vulns: vs,
+		})
 	}
-	return output.Emit(struct {
-		Image           string                   `json:"image"`
-		Backend         string                   `json:"backend"`
-		ComponentsTotal int                      `json:"components_scanned"`
-		HighOrCritical  int                      `json:"high_or_critical"`
-		Findings        []imagescan.ImageFinding `json:"findings"`
-		Drift           []imagescan.Drift        `json:"workstation_drift,omitempty"`
+
+	out := struct {
+		Image           string             `json:"image"`
+		Backend         string             `json:"backend"`
+		ComponentsTotal int                `json:"components_scanned"`
+		HighOrCritical  int                `json:"high_or_critical"`
+		Findings        []findingJSON      `json:"findings"`
+		Drift           *[]imagescan.Drift `json:"workstation_drift,omitempty"`
 	}{
 		Image:           image,
 		Backend:         backend,
 		ComponentsTotal: len(comps),
 		HighOrCritical:  highOrCritical,
-		Findings:        findings,
-		Drift:           drift,
-	})
+		Findings:        fs,
+	}
+	// With --diff, always include the correlation array (even when empty) so a
+	// pipeline can tell "correlation ran, no drift" from "not requested". A
+	// nil-but-non-empty slice still marshals as [] once assigned.
+	if showDrift {
+		if drift == nil {
+			drift = []imagescan.Drift{}
+		}
+		out.Drift = &drift
+	}
+	return output.Emit(out)
 }
 
 func printScanHuman(image, backend string, comps []imagescan.Component, findings []imagescan.ImageFinding, drift []imagescan.Drift, showDrift bool) {

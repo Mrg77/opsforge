@@ -92,16 +92,28 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 			for _, p := range userps {
 				names = append(names, p.Name)
 			}
+			// Security summary from the cached CVE scan, so the --json output
+			// carries the same security info the human view shows (parity).
+			type securityJSON struct {
+				Scanned        bool `json:"scanned"`
+				Vulnerable     int  `json:"vulnerable"`
+				HighOrCritical int  `json:"high_or_critical"`
+			}
+			sec := securityJSON{}
+			if s, ok := cve.Load(); ok {
+				sec = securityJSON{Scanned: true, Vulnerable: s.Vulnerable, HighOrCritical: s.HighOrCritical}
+			}
 			return output.Emit(struct {
-				ToolsInstalled int      `json:"tools_installed"`
-				ToolsTotal     int      `json:"tools_total"`
-				UpdatesPending int      `json:"updates_pending"`
-				ShellLayer     bool     `json:"shell_layer"`
-				VersionManager string   `json:"version_manager,omitempty"`
-				Backend        string   `json:"backend"`
-				Theme          string   `json:"theme"`
-				Profiles       []string `json:"profiles"`
-			}{installed, total, outdated, shellOn, vm, backend, ui.Active.Name, names})
+				ToolsInstalled int          `json:"tools_installed"`
+				ToolsTotal     int          `json:"tools_total"`
+				UpdatesPending int          `json:"updates_pending"`
+				Security       securityJSON `json:"security"`
+				ShellLayer     bool         `json:"shell_layer"`
+				VersionManager string       `json:"version_manager,omitempty"`
+				Backend        string       `json:"backend"`
+				Theme          string       `json:"theme"`
+				Profiles       []string     `json:"profiles"`
+			}{installed, total, outdated, sec, shellOn, vm, backend, ui.Active.Name, names})
 		}
 
 		fmt.Println(ui.Header("opsforge", "your DevOps workstation at a glance"))

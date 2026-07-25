@@ -211,19 +211,19 @@ func DefaultPolicy() *GuardPolicy {
 				Name:    "confirm destructive kubectl on prod",
 				Match:   GuardMatch{Command: `kubectl (delete|drain|cordon|apply|replace)`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This changes PRODUCTION Kubernetes resources.",
+				Message: "This changes Kubernetes resources on a production-like context.",
 			},
 			{
 				Name:    "confirm helm changes on prod",
 				Match:   GuardMatch{Command: `helm (uninstall|delete|rollback)`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This changes a PRODUCTION helm release.",
+				Message: "This changes a helm release on a production-like context.",
 			},
 			{
 				Name:    "confirm terraform destroy/apply on prod (by context)",
 				Match:   GuardMatch{Command: `(terraform|tofu|terragrunt) (destroy|apply)`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This changes PRODUCTION infrastructure (prod context detected).",
+				Message: "This changes infrastructure on a production-like context.",
 			},
 			{
 				// Context detection (the tf workspace) misses the common
@@ -236,7 +236,7 @@ func DefaultPolicy() *GuardPolicy {
 				Name:    "confirm terraform destroy/apply targeting prod (by command)",
 				Match:   GuardMatch{Command: `(terraform|tofu|terragrunt).*((destroy|apply).*(-var-?file[= ]\S*prod|environments?/prod|prod\.tfvars|workspace\s+select\s+prod)|(-var-?file[= ]\S*prod|environments?/prod|prod\.tfvars|workspace\s+select\s+prod).*(destroy|apply))`},
 				Action:  ActionConfirm,
-				Message: "This terraform command targets PRODUCTION (prod var-file / directory / workspace).",
+				Message: "This terraform command targets a production-like environment (prod var-file / directory / workspace).",
 			},
 			{
 				// Force-pushing or hard-resetting main/master rewrites shared
@@ -261,7 +261,7 @@ func DefaultPolicy() *GuardPolicy {
 				Name:    "confirm destructive gcloud/az command",
 				Match:   GuardMatch{Command: `(gcloud .*(delete|destroy)|az .*(delete|purge))`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This deletes cloud resources on a PRODUCTION account.",
+				Message: "This deletes cloud resources on a production-like account.",
 			},
 			{
 				// Docker/podman wipes: system prune -a drops all unused images,
@@ -276,7 +276,7 @@ func DefaultPolicy() *GuardPolicy {
 				Name:    "confirm database data-loss command",
 				Match:   GuardMatch{Command: `(flushall|flushdb|drop\s+(database|table)|truncate\s+table)`, Context: `prod|production`},
 				Action:  ActionConfirm,
-				Message: "This drops or flushes PRODUCTION database data.",
+				Message: "This drops or flushes database data on a production-like context.",
 			},
 		},
 	}
