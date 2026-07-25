@@ -30,9 +30,10 @@ var upgradeCmd = &cobra.Command{
   opsforge upgrade -u           # upgrade only tools with an update available
   opsforge upgrade jq yq gh     # upgrade just these`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		if !installer.Available() {
-			return fmt.Errorf("homebrew is required (https://brew.sh)")
-		}
+		// Don't gate on Homebrew up front: tools with a `github:` release are
+		// upgradeable without brew. A tool that genuinely has no usable backend
+		// surfaces a per-tool error below, so a brew-less box can still upgrade
+		// its GitHub-release tools.
 		cat, err := catalog.Load()
 		if err != nil {
 			return err

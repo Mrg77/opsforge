@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Mrg77/opsforge/internal/audit"
@@ -111,5 +112,35 @@ func TestNoDebianEcosystemMappings(t *testing.T) {
 		if tl.OSV != nil && tl.OSV.Ecosystem == "Debian" {
 			t.Errorf("%s maps to the Debian ecosystem — remove it (false positives)", tl.Name)
 		}
+	}
+}
+
+// TestBinDirPrependedToPath guards the fix where tools opsforge installed into
+// ~/.local/bin weren't detected (empty opsforge.lock right after install)
+// because that dir wasn't on the process PATH.
+func TestBinDirPrependedToPath(t *testing.T) {
+	t.Setenv("OPSFORGE_BIN_DIR", t.TempDir())
+	t.Setenv("PATH", "/usr/bin:/bin")
+	ensureBinDirOnPath()
+	dir := os.Getenv("OPSFORGE_BIN_DIR")
+	found := false
+	for _, p := range filepath.SplitList(os.Getenv("PATH")) {
+		if p == dir {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("BinDir %q not prepended to PATH %q", dir, os.Getenv("PATH"))
+	}
+	// Idempotent: a second call must not duplicate it.
+	ensureBinDirOnPath()
+	n := 0
+	for _, p := range filepath.SplitList(os.Getenv("PATH")) {
+		if p == dir {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("BinDir appears %d times in PATH, want 1", n)
 	}
 }

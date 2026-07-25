@@ -3,11 +3,13 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
+	"github.com/Mrg77/opsforge/internal/installer"
 )
 
 // version is injected at build time by GoReleaser via ldflags.
@@ -42,8 +44,28 @@ Run with no arguments to open the interactive picker.`,
 
 // Execute runs the root command. It is the single entry point used by main.
 func Execute() {
+	ensureBinDirOnPath()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+// ensureBinDirOnPath prepends opsforge's install dir (~/.local/bin) to the
+// process PATH so detection sees tools opsforge itself installed there, even
+// when the user's shell hasn't been reloaded to pick up the new PATH. Without
+// this, `sync`/`install` could install a tool via a GitHub release and then
+// fail to detect it (e.g. an empty opsforge.lock right after install).
+func ensureBinDirOnPath() {
+	dir := installer.BinDir()
+	if dir == "" {
+		return
+	}
+	path := os.Getenv("PATH")
+	for _, p := range strings.Split(path, string(os.PathListSeparator)) {
+		if p == dir {
+			return // already present
+		}
+	}
+	os.Setenv("PATH", dir+string(os.PathListSeparator)+path)
 }
