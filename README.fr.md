@@ -130,7 +130,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Installe toute une stack prédéfinie en une commande</td></tr>
 <tr><td><code>opsforge upgrade [-u] [outil…]</code></td><td>Met tout à jour, seulement l'obsolète (<code>-u</code>), ou les outils nommés</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>Scan CVE des outils installés · scan de secrets exposés en option · <code>--json</code> + code de sortie non nul pour verrouiller la CI</td></tr>
-<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
+<tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE · <code>--sign</code> ajoute un bundle Sigstore (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
@@ -535,6 +535,28 @@ dotfiles et le faire respecter en CI :
 Les guards s'appliquent sur votre propre shell, et la politique qui les pilote
 est **testable et versionnable** comme le reste de votre config — au lieu d'être
 bricolée à la main, différente sur chaque machine.
+
+### Un journal d'audit : qu'ai-je lancé sur prod cette semaine ?
+
+Chaque fois qu'un guard se déclenche — warn, confirm ou deny — opsforge le
+consigne dans un journal local, append-only. `opsforge guard log` le rejoue, et
+répond à la seule chose que votre historique shell ne peut pas dire : *qu'ai-je
+lancé sur un contexte de production, et le guard l'a-t-il laissé passer ?*
+
+```sh
+opsforge guard log               # tout ce que le guard a signalé, du plus ancien
+opsforge guard log --prod        # seulement les contextes production-like
+opsforge guard log --since 7d    # la dernière semaine
+opsforge guard log --action deny # seulement ce qui a été bloqué
+opsforge guard log --json        # lisible par une machine
+```
+
+Votre historique dit *ce que* vous avez tapé ; ceci dit *ce qui était dangereux,
+dans quel contexte, et comment ça a été traité* — avec l'horodatage. C'est stocké
+uniquement dans `~/.local/state/opsforge/guard-audit.jsonl` (mode 0600), ne quitte
+jamais votre machine, et ne consigne que les commandes guardées — pas tout votre
+historique (c'est le rôle d'[`opsforge history`](#history)). Best-effort : un
+accroc de journalisation ne bloque jamais le shell.
 
 ### Comment opsforge sait que vous êtes en prod
 
@@ -1262,6 +1284,7 @@ internal/output/    Émetteur JSON lisible par une machine pour le flag --json
 internal/snapshot/  Capture / apply / rapport d'écart --check du poste de travail
 internal/tui/       Sélecteur Bubble Tea avec onglets (stylé par le thème)
 internal/shellcfg/  Modules d'environnement zsh + fish + bash (modules/, modules/fish/, modules/bash/) + install par shell (shell.go) + moteur de politique des guards (policy.go)
+internal/guardlog/  Journal d'audit local append-only des décisions guard (`opsforge guard log`)
 internal/ui/        Identité visuelle partagée + thèmes
 ```
 

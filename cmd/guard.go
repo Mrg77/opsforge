@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Mrg77/opsforge/internal/guardlog"
 	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/ui"
@@ -63,6 +65,19 @@ var guardCheckCmd = &cobra.Command{
 			context = shellcfg.CurrentContext()
 		}
 		d := policy.Evaluate(args[0], context)
+
+		// Record every non-allow decision to the local audit trail — the thing
+		// a raw shell history can't answer ("what did I run on prod, and did the
+		// guard let it through?"). Best-effort: never blocks the shell.
+		guardlog.Append(guardlog.Entry{
+			Time:    time.Now().UTC(),
+			Command: args[0],
+			Context: context,
+			Action:  string(d.Action),
+			Rule:    d.Rule,
+			Message: d.Message,
+		})
+
 		if d.Message != "" {
 			fmt.Fprintf(cmd.OutOrStdout(), "%s|%s\n", d.Action, d.Message)
 		} else {
@@ -385,11 +400,110 @@ rules:
   #   message: "Deleting a prod namespace is forbidden by policy."
 `
 
+var (
+	guardLogProd    bool
+	guardLogContext string
+	guardLogSince   string
+	guardLogAction  string
+)
+
+var guardLogCmd = &cobra.Command{
+	Use:   "log",
+	Short: "Replay the guard's audit trail — what you ran on prod, and what it caught",
+	Long: `Every time a guard fires (warn/confirm/deny), opsforge records it to a local,
+append-only audit trail. This replays it — the one thing your shell history
+can't tell you: what you ran against a production context, and whether the
+guard let it through.
+
+  opsforge guard log                 # everything the guard has flagged
+  opsforge guard log --prod          # only production-like contexts
+  opsforge guard log --since 7d      # the last week
+  opsforge guard log --action deny   # only what was blocked
+  opsforge guard log --json          # machine-readable
+
+The trail is local only (` + "`~/.local/state/opsforge/guard-audit.jsonl`" + `),
+never leaves your machine, and only records guarded commands (not your whole
+history — that's what ` + "`opsforge history`" + ` is for).`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		f := guardlog.Filter{
+			ProdOnly:    guardLogProd,
+			ContextSub:  guardLogContext,
+			ActionEqual: guardLogAction,
+		}
+		if guardLogSince != "" {
+			d, err := parseSince(guardLogSince)
+			if err != nil {
+				return err
+			}
+			f.Since = time.Now().Add(-d)
+		}
+		entries, err := guardlog.Read(f)
+		if err != nil {
+			return err
+		}
+
+		if output.JSON {
+			return output.Emit(entries)
+		}
+
+		fmt.Println(ui.Header("opsforge guard log", "commands the guard flagged, oldest first"))
+		fmt.Println()
+		if len(entries) == 0 {
+			fmt.Println(ui.Dim.Render("  Nothing recorded yet — the guard logs a line each time it warns, confirms or denies."))
+			return nil
+		}
+		for _, e := range entries {
+			style := ui.Warn
+			if e.Action == string(shellcfg.ActionDeny) {
+				style = ui.Err
+			}
+			fmt.Printf("  %s  %s  %s\n",
+				ui.Dim.Render(e.Time.Local().Format("2006-01-02 15:04")),
+				style.Render(fmt.Sprintf("%-7s", e.Action)),
+				e.Command)
+			ctx := e.Context
+			if ctx == "" {
+				ctx = "(no context)"
+			}
+			fmt.Printf("           %s\n", ui.Faint.Render("context: "+ctx))
+		}
+		fmt.Println()
+		fmt.Println(ui.Faint.Render(fmt.Sprintf("  %d entr(y/ies) · filter with --prod / --since 7d / --action deny", len(entries))))
+		return nil
+	},
+}
+
+// parseSince accepts a simple duration like "7d", "24h", "30m". Go's
+// time.ParseDuration doesn't know "d", so we handle days ourselves.
+func parseSince(s string) (time.Duration, error) {
+	s = strings.TrimSpace(s)
+	if strings.HasSuffix(s, "d") {
+		var days int
+		if _, err := fmt.Sscanf(s, "%dd", &days); err != nil || days < 0 {
+			return 0, fmt.Errorf("invalid --since %q (try 7d, 24h, 30m)", s)
+		}
+		return time.Duration(days) * 24 * time.Hour, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, fmt.Errorf("invalid --since %q (try 7d, 24h, 30m)", s)
+	}
+	return d, nil
+}
+
 func init() {
 	guardTestCmd.Flags().StringVar(&guardTestContext, "context", "",
 		"context to simulate against (defaults to the current context)")
 	guardInitCmd.Flags().BoolVar(&guardInitForce, "force", false,
 		"overwrite an existing guards.yaml")
-	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardLintCmd, guardInitCmd, guardPrefilterCmd)
+	guardLogCmd.Flags().BoolVar(&guardLogProd, "prod", false,
+		"only production-like contexts")
+	guardLogCmd.Flags().StringVar(&guardLogContext, "context", "",
+		"only entries whose context contains this substring")
+	guardLogCmd.Flags().StringVar(&guardLogSince, "since", "",
+		"only entries newer than a duration (7d, 24h, 30m)")
+	guardLogCmd.Flags().StringVar(&guardLogAction, "action", "",
+		"only this action (warn, confirm, deny)")
+	guardCmd.AddCommand(guardCheckCmd, guardListCmd, guardTestCmd, guardLintCmd, guardInitCmd, guardPrefilterCmd, guardLogCmd)
 	rootCmd.AddCommand(guardCmd)
 }

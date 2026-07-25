@@ -125,7 +125,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>
 <tr><td><code>opsforge upgrade [-u] [tool…]</code></td><td>Upgrade all, only outdated (<code>-u</code>), or named tools</td></tr>
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
-<tr><td><code>opsforge guard [init|list|test|lint]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
+<tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs · <code>--sign</code> adds a Sigstore bundle (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
@@ -501,6 +501,28 @@ pipeline:
 The guards apply on your own shell, and the policy that drives them is
 **testable and versionable** like the rest of your setup — not a per-machine
 snowflake you tweak by hand.
+
+### An audit trail: what did I run on prod this week?
+
+Every time a guard fires — warn, confirm, or deny — opsforge records it to a
+local, append-only trail. `opsforge guard log` replays it, answering the one
+thing your shell history can't: *what did I run against a production context,
+and did the guard let it through?*
+
+```sh
+opsforge guard log               # everything the guard flagged, oldest first
+opsforge guard log --prod        # only production-like contexts
+opsforge guard log --since 7d    # the last week
+opsforge guard log --action deny # only what was blocked
+opsforge guard log --json        # machine-readable
+```
+
+Your shell history says *what* you typed; this says *what was dangerous, in
+which context, and how it was handled* — with the timestamp. It's stored only
+under `~/.local/state/opsforge/guard-audit.jsonl` (mode 0600), never leaves your
+machine, and logs only guarded commands — not your whole history (that's what
+[`opsforge history`](#history) is for). Best-effort: a logging hiccup never
+blocks the shell.
 
 ### How opsforge knows you're on prod
 
@@ -1187,6 +1209,7 @@ internal/output/    Machine-readable JSON emitter for the --json flag
 internal/snapshot/  Workstation capture / apply / --check drift report
 internal/tui/       Bubble Tea picker with tabs (theme-bound styling)
 internal/shellcfg/  zsh + fish + bash environment modules (modules/, modules/fish/, modules/bash/) + per-shell install (shell.go) + guard policy engine (policy.go)
+internal/guardlog/  Append-only local audit trail of guard decisions (`opsforge guard log`)
 internal/ui/        Shared visual identity + themes
 ```
 
