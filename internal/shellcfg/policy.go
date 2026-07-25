@@ -46,11 +46,11 @@ var validActions = map[Action]bool{
 	ActionDeny:    true,
 }
 
-// GuardMatch is the predicate part of a rule. An empty field matches
-// anything. `command` is matched as a substring by default, or as a regex
-// when it fails to appear literally is NOT how it works — see Rule.compile:
-// both are regexes, but a plain string like "kubectl delete" is a valid
-// regex that behaves like a substring match, which keeps the YAML simple.
+// GuardMatch is the predicate part of a rule. An empty field matches anything.
+// Both Command and Context are RE2 regexes (compiled in Rule.compile). A plain
+// string like "kubectl delete" is itself a valid regex that behaves like a
+// substring match, so simple rules stay simple in the YAML while power users
+// can write full patterns.
 type GuardMatch struct {
 	Command string `yaml:"command"`
 	Context string `yaml:"context"`
