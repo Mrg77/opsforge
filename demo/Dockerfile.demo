@@ -34,7 +34,7 @@ LABEL org.opencontainers.image.title="opsforge-demo" \
 # zsh for the shell layer; jq/git for the tour; ca-certificates so the online
 # CVE audit works if the sandbox has network (it degrades gracefully offline).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends zsh jq git ca-certificates bat \
+ && apt-get install -y --no-install-recommends zsh jq git ca-certificates bat openssh-client \
  && rm -rf /var/lib/apt/lists/* \
  && useradd -m -s /usr/bin/zsh demo
 
@@ -53,12 +53,32 @@ COPY --chown=demo:demo demo/rootfs/kube/config /home/demo/.kube/config
 # AWS_PROFILE adds the cloud segment to the prompt (env-only, never probed).
 ENV AWS_PROFILE=prod-admin
 
+# Seed THROWAWAY, obviously-fake credentials so `opsforge verify` has something
+# to flag in the demo. None of these are real: the AWS key is the canonical
+# AWS-docs example id, the SSH key is generated here with no passphrase, and the
+# docker login is base64("demo:demo"). This is a sandbox — nothing to leak.
+# Keep the seeded set small and legible so `verify` renders on one screen: an
+# AWS static key, a passphrase-less SSH key, and a base64 docker login. We tidy
+# the surrounding dir perms so the demo shows the interesting findings, not noise.
+RUN set -eux; \
+    mkdir -p ~/.aws ~/.ssh ~/.docker; chmod 700 ~/.ssh; \
+    printf '[default]\naws_access_key_id = AKIAIOSFODNN7EXAMPLE\naws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n' > ~/.aws/credentials; \
+    chmod 600 ~/.aws/credentials; \
+    ssh-keygen -t ed25519 -N '' -C 'demo@sandbox' -f ~/.ssh/id_ed25519 >/dev/null; \
+    chmod 600 ~/.ssh/id_ed25519; \
+    printf '{"auths":{"registry.example.com":{"auth":"ZGVtbzpkZW1v"}}}\n' > ~/.docker/config.json; \
+    chmod 600 ~/.docker/config.json ~/.kube/config
+
 # Forge the shell layer and write the default guard policy at build time, so
 # the container starts fully set up with no first-run network calls.
 # --no-plugins keeps the build hermetic (no git-clone of zsh plugins); the
 # guards, prompt, aliases and completions are all still installed.
 RUN opsforge shell install --no-plugins \
- && opsforge guard init
+ && opsforge guard init \
+ # Seed a couple of guard-log entries so `opsforge guard log` has a story to
+ # tell in the demo — a confirm and a deny against the fake prod context.
+ && opsforge guard check 'kubectl delete namespace payments' prod >/dev/null \
+ && opsforge guard check 'terraform destroy' prod >/dev/null
 
 COPY --chown=demo:demo demo/demo-tour.sh /home/demo/demo-tour.sh
 RUN chmod +x /home/demo/demo-tour.sh
