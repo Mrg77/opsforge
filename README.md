@@ -2,21 +2,21 @@
 
 # opsforge 🔥
 
-**A policy-as-code safety layer for your DevOps workstation.**
+**A safety layer for your DevOps workstation — so a distracted command (or an AI agent) can't nuke the wrong cluster.**
 
-opsforge turns your shell (zsh, fish or bash) into a context-aware environment
-with **policy-as-code guards** that stop a distracted `kubectl delete` or
-`terraform destroy` on the wrong cluster — the same rules protecting you at the
-keyboard *and* [any AI agent](#ai-agents-mcp) driving your machine — plus a
-read-only [**credential-hygiene audit**](#credential-hygiene-verify) of every
-secret on the box. It keeps an append-only [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week)
-of what tripped a guard on prod, and rounds it out with a CVE-correlated SBOM +
-**OpenVEX** prioritized by CISA's Known-Exploited catalog.
+You know the feeling: you meant to run that `kubectl delete` on staging, but your
+shell was pointed at prod. opsforge is the seatbelt for that moment. It turns your
+shell (zsh, fish or bash) into one that knows which cluster you're on, and stops a
+destructive command before it lands — using rules *you* wrote, in a file. The same
+rules apply whether it's you at the keyboard or [an AI agent](#ai-agents-mcp)
+working on your machine.
 
-And because a safety layer is worthless on an empty machine, it also **installs
-and maintains your toolbox** — an interactive picker over 287 curated CLIs, in
-one binary. It's a personal power tool, not a team platform — no server, no
-account, no lock-in.
+That's the heart of it. Around it, opsforge also keeps the machine honest — it
+audits [the credentials](#credential-hygiene-verify) sitting on your disk and the
+[known holes](#sbom--supply-chain) in your tools — and, since none of that helps on
+an empty machine, it installs and maintains your DevOps toolbox too. All in one
+binary. It's a personal tool, not a team platform: no server, no account, nothing
+to lock you in.
 
 **English** · [Français](README.fr.md)
 
@@ -39,54 +39,59 @@ account, no lock-in.
 
 ## What it is
 
-The differentiator first, the plumbing last:
+Think of opsforge as three tools that happen to share one binary. Here they are,
+most interesting first:
 
 | | | |
 |:--:|---|---|
-| 🛡️ | **Guards — the moat** | One command turns your **zsh, fish or bash** into a context-aware shell where [**policy-as-code guards**](#policy-as-code-guards) intercept destructive commands by the active kube/cloud/tf context. The same testable, versionable rules protect you at the keyboard *and* [any AI agent](#ai-agents-mcp) driving your box — with an append-only [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week) of what tripped on prod. |
-| 🔐 | **Security of the box** | [`opsforge verify`](#credential-hygiene-verify) audits the **credentials on your machine** (static keys, clear-text secrets, loose perms, expiring certs) read-only and offline; [`opsforge audit`](#ci--integrations)/[`sbom`](#sbom--supply-chain)/[`vex`](#sbom--supply-chain) cover the **CVEs on your tools** — a signed SBOM + OpenVEX, prioritized by CISA KEV. |
-| 📦 | **Toolbox (the commodity)** | An interactive picker over **287 curated CLIs** — detects what you have and what's outdated, installs the rest via Homebrew *or* direct GitHub-release binaries (even on a bare Linux box). Plus [workstation- & project-as-code](#project-mode): `snapshot`/`apply`/`sync` reproduce a machine or a repo's toolchain, with a CVE gate. |
+| 🛡️ | **The guards — the real point** | One command turns your shell (zsh, fish or bash) into one that *knows where it is*. When you type `kubectl delete` or `terraform destroy` on a production cluster, it stops you and asks first. The rules are yours, written in a file — and they protect you at the keyboard *and* [any AI agent](#ai-agents-mcp) working on your machine. Everything that trips a guard on prod is [written down](#an-audit-trail-what-did-i-run-on-prod-this-week), so you can look back later. |
+| 🔐 | **Keeping the machine honest** | Two questions, answered. *Are the credentials on my machine a liability?* — [`opsforge verify`](#credential-hygiene-verify) finds keys that never expire, secrets in clear text, files anyone can read. *Do my tools have known holes?* — [`opsforge audit`](#ci--integrations) and friends produce a signed inventory ([SBOM](#sbom--supply-chain) + [VEX](#sbom--supply-chain)) of every CVE, and flag the ones attackers are *actually* exploiting. All read-only, no cloud. |
+| 📦 | **Setting up the toolbox** | And because a safety layer is no use on an empty machine, opsforge also installs and keeps your DevOps tools current — a searchable picker over **287 curated CLIs**, in one binary, on macOS or a bare Linux box. Plus [reproducible setups](#project-mode): describe a machine (or a repo's toolchain) in a file and rebuild it anywhere. |
 
-### Why this exists
+### Why it exists
 
-A DevOps machine has a safety problem the usual tooling ignores:
+A DevOps machine has a safety problem that the usual tools just… ignore.
 
-- **A distracted `kubectl delete` on the wrong context** has no seatbelt — the
-  tools happily run it whether you're on staging or prod. And now an **AI agent**
-  can run it *for* you, faster, with no one watching.
-- **Nobody knows what's a liability on the box** — which credentials never
-  expire, which sit in clear text, which tools carry a CVE that's being exploited.
-- **Rebuilding a workstation** means installing 20+ CLIs and wiring a usable
-  shell for each — table stakes, but still a day lost.
+- **A distracted `kubectl delete` on the wrong cluster** has no seatbelt. The tool
+  runs it whether you're on staging or prod — it can't tell the difference, and it
+  won't ask. Worse: an **AI agent** can now run it *for* you, faster, with nobody
+  watching.
+- **Nobody really knows what's risky on the box.** Which credentials never expire?
+  Which sit in plain text? Which tool carries a hole someone is exploiting right
+  now? You'd have to check by hand, tool by tool.
+- **Rebuilding a workstation is a lost day.** Install twenty-something CLIs, then
+  wire up completions, aliases and a decent prompt for each — every time.
 
-opsforge folds those into one binary because they share the same home (your
-shell) and the same data (the detected toolbox). It's deliberately a **personal
-power tool, not a team platform** — no server, no account, no lock-in — so it
-stays something you run, not something you operate. (Scaling to a fleet? See
-[Guards at team scale](#guards-at-team-scale).)
+opsforge rolls those into one binary because they share the same home (your shell)
+and the same data (the tools it detects). It's deliberately a **personal tool, not
+a team platform** — no server, no account, nothing to lock you in — so it stays
+something you *run*, not something you have to *operate*. (Wondering about a whole
+fleet? See [Guards at team scale](#guards-at-team-scale).)
 
 ---
 
 ## Try it in a sandbox
 
 Want to see the guards fire without installing anything or touching real infra?
-Run the throwaway demo image — a forged zsh shell already sitting in a **fake
-prod context**, with no-op `kubectl`/`terraform`/`helm` stubs:
+There's a throwaway demo image for exactly that. It's a forged zsh shell already
+sitting in a **fake prod context**, with no-op `kubectl`/`terraform`/`helm`
+stubs standing in for the real tools:
 
 ```sh
 docker run --rm -it ghcr.io/mrg77/opsforge-demo
 ```
 
-It opens a short guided tour — status → **guards** → the guard **audit trail** →
-credential-hygiene **`verify`** → SBOM — then drops you into the shell so you can
-type `kubectl delete namespace payments` yourself and watch the prod guard
-intercept it. Nothing there can reach a real cluster: the "prod" context is a
-one-line fake kubeconfig, read passively, the tools are stubs, and the
+It opens a short guided tour (status, then the **guards**, the guard **audit
+trail**, credential-hygiene **`verify`**, and the SBOM) and then drops you into
+the shell. Try typing `kubectl delete namespace payments` yourself and watch the
+prod guard step in. Nothing here can reach a real cluster. The "prod" context is
+a one-line fake kubeconfig that opsforge only reads, the tools are stubs, and the
 credentials `verify` flags are **fake** ones seeded into the image (an AWS key, a
-passphrase-less SSH key, a base64 docker login) — so you can see the whole
-security layer without any real secret involved.
+passphrase-less SSH key, a base64 docker login). So you get to see the whole
+security layer at work without a single real secret in play.
 
-Prefer the browser? Open it in a Codespace — same image, zero local install:
+Prefer the browser? Open it in a Codespace — same image, nothing to install
+locally:
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/Mrg77/opsforge?quickstart=1)
 
@@ -98,17 +103,18 @@ Prefer the browser? Open it in a Codespace — same image, zero local install:
 curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
-Downloads the right binary for your OS/arch into `~/.local/bin` (override with
-`OPSFORGE_INSTALL_DIR`, pin with `OPSFORGE_VERSION=v1.2.3`). From source:
+That grabs the right binary for your OS and architecture and drops it in
+`~/.local/bin` (override the location with `OPSFORGE_INSTALL_DIR`, or pin a
+version with `OPSFORGE_VERSION=v1.2.3`). Prefer building from source?
 `go install github.com/Mrg77/opsforge@latest`.
 
-Keep it current with `opsforge self update` — it downloads the latest release,
-**verifies its published SHA-256 before swapping the binary in place**, and
-no-ops when you're already up to date (`--check` for cron/CI).
+To stay current, run `opsforge self update`. It downloads the latest release,
+**checks its published SHA-256 before swapping the binary in place**, and does
+nothing when you're already up to date (add `--check` for cron or CI).
 
-> **Windows:** use WSL — the installer backend is Homebrew and the shell layer
-> targets zsh, fish and bash. Native winget/scoop + PowerShell support is on the
-> roadmap.
+> **Windows:** use WSL for now. The installer leans on Homebrew and the shell
+> layer targets zsh, fish and bash. Native winget/scoop and PowerShell support
+> are on the roadmap.
 
 ---
 
@@ -155,12 +161,14 @@ opsforge self update  # self-update, checksum-verified before the swap
 </table>
 
 > **Machine-readable everywhere.** A global `--json` flag makes `list`, `status`,
-> `doctor` and `audit` emit structured JSON instead of the TUI — see
+> `doctor` and `audit` print structured JSON instead of the TUI, so the same
+> commands feed a script just as happily. See
 > [CI & integrations](#ci--integrations).
 
 ### The picker
 
-Launch the bare binary to browse by category and install what you check.
+Launch the bare binary and you get an interactive picker. Browse by category and
+install whatever you check off.
 
 - **Tabs (k9s-style):** `1` Tools · `2` Updates (only outdated) · `3` Security
   (live CVE scan of installed tools)
@@ -173,12 +181,12 @@ Launch the bare binary to browse by category and install what you check.
 
 ## Common workflows
 
-Three paths that show how the pieces fit together.
+Three everyday paths that show how the pieces fit together.
 
 ### Set up a new machine
 
-Switching laptops? Rebuild your full workstation from one file instead of a day
-of manual setup.
+Switching laptops? Rebuild your whole workstation from a single file instead of
+losing a day to manual setup.
 
 ```sh
 opsforge snapshot -o my-setup.yaml         # on your current machine: tools + shell + theme + guards → one YAML
@@ -188,19 +196,20 @@ opsforge shell install && exec zsh         # light up the DevOps shell
 
 ### Gate your CI on CVEs & secrets
 
-Turn the same binary you use interactively into a one-line security gate.
+The same binary you use interactively doubles as a one-line security gate in a
+pipeline.
 
 ```sh
 opsforge audit --json | tee cve-report.json   # non-zero exit on any HIGH/CRITICAL CVE — fails the job on its own
 opsforge audit --secrets --json               # also fails on a leaked credential
 ```
 
-Drop-in workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
+There's a drop-in workflow ready to copy: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml).
 
 ### Version & validate your prod-guard policy
 
-Version your own prod-safety rules in one file and keep them honest in the
-pipeline — the same way you'd version the rest of your dotfiles.
+Your prod-safety rules live in one file, so you can version them and keep them
+honest in the pipeline, the same way you'd version the rest of your dotfiles.
 
 ```sh
 opsforge guard init                                            # write a starter guards.yaml, then commit it
@@ -214,21 +223,24 @@ opsforge guard test "terraform destroy" --context prod --json  # assert in CI th
 
 ### Stack profiles
 
-Install a whole stack in one command — or save your own:
+A profile is just a named bundle of tools. Install a whole stack in one command,
+or save your own:
 
 ```sh
 opsforge install --profile aws-k8s   # aws, eksctl, kubectl, helm, k9s, terraform…
 opsforge profiles                    # list all with install status
 ```
 
-Built-in: `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`, `sysadmin`, `netsec`, `secrets`, `ai`. In the picker, select your tools and press `s` to save a personal
-profile to `~/.config/opsforge/profiles.yaml` — then
+The built-in ones are `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`,
+`observability`, `security`, `sysadmin`, `netsec`, `secrets` and `ai`. Want your
+own? In the picker, select your tools and press `s` to save a personal profile to
+`~/.config/opsforge/profiles.yaml`. From then on,
 `opsforge install --profile my-stack` reproduces it anywhere.
 
 ### Workstation as code
 
-Your machine setup shouldn't be a snowflake you rebuild by hand:
+Your machine setup shouldn't be a one-off snowflake you rebuild by hand every
+time:
 
 ```sh
 opsforge snapshot -o my-setup.yaml    # tools + profiles + shell + theme + guards + version manager → one file
@@ -236,27 +248,28 @@ opsforge apply <file-or-url>          # rebuild it on any machine
 opsforge apply --check <file-or-url>  # verify a machine against it, without changing a thing
 ```
 
-A snapshot captures the **whole** managed workstation — installed tools, your
+A snapshot captures the **whole** managed workstation: installed tools, your
 custom profiles, the shell-environment state, the active **theme**, your **guard
-policy** (the raw `guards.yaml`), and the detected **version manager**. `apply`
-shows the full plan and asks before changing anything (`--yes` for scripts),
-restoring the theme and guard rules alongside the tools.
+policy** (the raw `guards.yaml`), and the detected **version manager**. When you
+`apply` it, opsforge shows you the full plan and asks before changing anything
+(`--yes` skips the prompt for scripts), then restores the theme and guard rules
+right alongside the tools.
 
 **Check a machine against a known-good snapshot.** `apply --check` compares this
-machine to a snapshot **you froze earlier**, **without modifying anything**,
-exiting **non-zero on drift** — a missing tool, or a
-theme/guards/shell/version-manager that differs. With `--json` it emits a
-structured report — `{compliant, missing_tools, drift}` — so a CI job can assert
-that your laptop, or a build image, still matches your reference setup:
+machine to a snapshot **you froze earlier**, touching nothing, and exits
+**non-zero on drift** (a missing tool, or a theme/guards/shell/version-manager
+that no longer matches). Add `--json` and you get a structured report,
+`{compliant, missing_tools, drift}`, so a CI job can assert that your laptop, or
+a build image, still lines up with your reference setup:
 
 ```sh
 opsforge apply --check my-setup.yaml            # fails the job on any drift
 opsforge apply --check my-setup.yaml --json | jq '.compliant'
 ```
 
-Snapshots are **forward-compatible**: the format grew from v1 (tools, profiles,
-shell) to v2 (adds theme, guards, version manager), and older v1 files still
-load — the new fields simply stay unset.
+Snapshots are **forward-compatible**. The format grew from v1 (tools, profiles,
+shell) to v2 (which adds theme, guards and version manager), and older v1 files
+still load fine. The newer fields simply stay unset.
 
 ### Security audit
 
@@ -265,8 +278,9 @@ opsforge audit             # CVEs in your installed tools
 opsforge audit --secrets   # + credentials leaking in history / rc / .env
 ```
 
-Cross-references installed versions against [OSV.dev](https://osv.dev), sorted by
-severity, with the fix version:
+It checks your installed versions against [OSV.dev](https://osv.dev) (the open
+vulnerability database), sorts by severity, and tells you the version that fixes
+each one:
 
 ```
 ⚠ argocd         2.11.0
@@ -275,10 +289,11 @@ severity, with the fix version:
 ✓ helm           4.2.3 — no known vulnerabilities
 ```
 
-Matching is client-side against OSV's affected ranges, so a CVE fixed before your
-version (or only in a future major) isn't reported. `--secrets` scans shell
-history, rc files and local `.env`s for AWS/GitHub/GitLab/Slack tokens, private
-keys, `--from-literal`, `docker login -p`… with values always masked.
+The matching happens on your machine against OSV's affected ranges, so a CVE that
+was fixed before your version (or only lands in a future major) won't nag you.
+The `--secrets` flag scans your shell history, rc files and local `.env`s for the
+usual leaks (AWS/GitHub/GitLab/Slack tokens, private keys, `--from-literal`,
+`docker login -p` and the like) and always masks the values it finds.
 
 ### Pinning tool versions
 
@@ -287,7 +302,8 @@ opsforge install mise
 opsforge use terraform@1.5   # pins it in this directory
 ```
 
-Delegates to **mise** (preferred) or **asdf** — no version-manager reinvention.
+This just hands off to **mise** (preferred) or **asdf**. There's no point
+reinventing a version manager that already works.
 
 ---
 
@@ -299,32 +315,36 @@ opsforge shell install && exec fish   # fish (auto-detected from $SHELL)
 opsforge shell install && exec bash   # bash
 ```
 
-Turns your **own zsh, fish or bash** into a DevOps-aware environment (`shell
-install` auto-detects your shell from `$SHELL`, or pass `--shell zsh|fish|bash`;
-`shell uninstall` restores everything).
+This takes your **own zsh, fish or bash** and makes it DevOps-aware. It doesn't
+replace your shell, it enhances the one you already use. (`shell install`
+auto-detects your shell from `$SHELL`, or you can force it with
+`--shell zsh|fish|bash`; `shell uninstall` puts everything back the way it was.)
 
 > **zsh · fish · bash.** The prod-aware prompt, the `?` inline help and the
-> DevOps aliases work in all three. Two caveats worth stating plainly:
+> DevOps aliases work in all three. Two caveats are worth stating plainly:
 > - The interactive niceties below (inline suggestions, syntax highlighting,
 >   prefix history search) are **built into fish**, so opsforge just adds the
->   guards and prompt there; on **zsh** it installs the plugins that provide
->   them; **bash** has no standard equivalent, so it uses plain readline.
+>   guards and prompt there. On **zsh** it installs the plugins that provide
+>   them. **bash** has no standard equivalent, so it falls back to plain
+>   readline.
 > - The **blocking guard** is fully reliable on **zsh and fish** (both can
->   cancel a command before it runs). **bash cannot** do that cleanly, so its
->   guard is *best-effort* — it confirms/warns, but backgrounding and some
->   multi-line constructs behave differently. For a hard block, use zsh or fish.
->   (Guards are a safety net, not a security boundary, in any shell.)
+>   cancel a command before it runs). **bash can't** do that cleanly, so its
+>   guard is *best-effort*: it confirms and warns, but backgrounding and some
+>   multi-line constructs behave differently. If you want a hard block, use zsh
+>   or fish. (Guards are a safety net, not a security boundary, in any shell.)
 >
-> The description below details the zsh experience.
+> The walkthrough below describes the zsh experience.
 
-Turns your **own zsh** into a DevOps-aware environment (modules under
-`~/.config/opsforge/shell/`, `shell uninstall` restores everything):
+The details, then. opsforge turns your **own zsh** into a DevOps-aware
+environment (its modules live under `~/.config/opsforge/shell/`, and `shell
+uninstall` restores everything):
 
-- **Calm, on-demand editing** — nothing pops open as you type: just a grey inline
-  suggestion from your history. `↑`/`↓` search history by the **whole-line
-  prefix** you've typed, `→` accepts the whole suggestion, `Tab` accepts it one
-  word at a time, and the line is syntax-colored as you go. Even terraform (which
-  ships no zsh completion) and opsforge itself are covered.
+- **Calm, on-demand editing.** Nothing pops open in your face as you type, just a
+  grey inline suggestion pulled from your history. `↑`/`↓` search history by the
+  **whole-line prefix** you've typed, `→` accepts the whole suggestion, `Tab`
+  takes it one word at a time, and the line is syntax-colored as you go. Even
+  terraform (which ships no zsh completion of its own) and opsforge itself are
+  covered.
 
   <table>
   <tr><th align="left">Key</th><th align="left">What it does</th></tr>
@@ -335,44 +355,49 @@ Turns your **own zsh** into a DevOps-aware environment (modules under
   <tr><td><code>Ctrl-R</code></td><td>Search your whole history</td></tr>
   </table>
 
-  Prefer the old always-open live menu (zsh-autocomplete)? Set
-  `OPSFORGE_AUTOMENU=1`. Disable the whole layer with `OPSFORGE_INTERACTIVE=0`.
-- **`?` help** — press `?` on an empty line for a themed cheat-sheet; type
-  `kubectl get ?` for that command's help, rendered under a framed header with
-  `bat`-colored man syntax; type `??` to have an AI explain your last failure.
-- **Context prompt** — the right prompt shows the kube `cluster:namespace` and
-  turns **red the moment the context looks like prod** — a passive *visual* alarm
-  you see **before you even start typing**, alongside the cloud account and
-  terraform workspace (each shown only when relevant). Plus a clean left prompt:
-  repo-relative dir, git branch with dirty/ahead/behind markers, last-command
-  duration, and a `❯` that reddens on failure. Everything is read locally — never
-  a cloud or cluster contacted.
-- **Policy-as-code guards** — before a destructive command (`kubectl delete`,
+  Miss the old always-open live menu (zsh-autocomplete)? Set
+  `OPSFORGE_AUTOMENU=1`. Or turn the whole layer off with
+  `OPSFORGE_INTERACTIVE=0`.
+- **`?` help.** Press `?` on an empty line for a themed cheat-sheet. Type
+  `kubectl get ?` and you get that command's help, rendered under a framed header
+  with `bat`-colored man syntax. Type `??` to have an AI explain your last
+  failure.
+- **A prompt that knows where it is.** The right-hand prompt shows the kube
+  `cluster:namespace` and turns **red the moment the context looks like prod**.
+  That's a passive *visual* alarm you notice **before you even start typing**,
+  next to the cloud account and terraform workspace (each shown only when it's
+  relevant). The left prompt stays clean: repo-relative dir, git branch with
+  dirty/ahead/behind markers, how long the last command took, and a `❯` that
+  goes red on failure. Everything is read locally. No cloud or cluster is ever
+  contacted.
+- **Policy-as-code guards.** Before a destructive command (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) on a production context, opsforge can
-  confirm, warn, or block — driven by [declarative rules](#policy-as-code-guards),
-  not hard-coded checks. `OPSFORGE_GUARDS=0` to disable.
-- **Aliases & helpers** — `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
-  context/namespace (fzf picker when available). The `history` builtin is widened
-  to show the last **200** lines (`history 1` for everything), and `hg <term>`
-  greps your whole history — while [`opsforge history`](#history) groups it by
-  DevOps tool family.
-- **Proactive heads-up** — once per session, opsforge prints a compact one-liner
-  in your own shell when something on your machine needs attention: a CVE just
-  hit an installed tool, updates are waiting, a secret is leaking, or a newer
-  opsforge is out. It reads a local cache (`~/.cache/opsforge/`, 6h TTL) and
-  refreshes a stale one in the background, so the prompt never blocks on the
-  network. Run [`opsforge notify`](#the-notify-digest) for the full breakdown;
-  silence the heads-up with `OPSFORGE_NOTIFY=0`.
-- **Integrations** — `fzf`, `zoxide`, `atuin` wired up when present.
+  confirm, warn, or block. It's driven by [rules you write in a
+  file](#policy-as-code-guards), not by checks hard-coded into the tool. Set
+  `OPSFORGE_GUARDS=0` to disable.
+- **Aliases & helpers.** `k`, `tf`, `dc`, plus `kx`/`kn` to switch kube
+  context and namespace (with an fzf picker when it's available). The `history`
+  builtin is widened to show the last **200** lines (`history 1` for the lot),
+  and `hg <term>` greps your whole history, while
+  [`opsforge history`](#history) groups it by DevOps tool family.
+- **A proactive heads-up.** Once per session, opsforge prints a compact one-liner
+  in your own shell when something needs attention: a CVE just hit an installed
+  tool, updates are waiting, a secret is leaking, or a newer opsforge is out. It
+  reads a local cache (`~/.cache/opsforge/`, 6h TTL) and refreshes a stale one in
+  the background, so your prompt never blocks on the network. Run
+  [`opsforge notify`](#the-notify-digest) for the full breakdown, or silence the
+  heads-up with `OPSFORGE_NOTIFY=0`.
+- **Integrations.** `fzf`, `zoxide` and `atuin` are wired up automatically when
+  they're present.
 
-**Three layers, three jobs:** the **prompt** is a *passive* alarm — it reddens so
-you **see** you're on prod; the [**guards**](#policy-as-code-guards) are an
-*active* barrier — they **stop** a destructive command; the
-[**notify** heads-up](#the-notify-digest) is *proactive* watch — it **tells** you
-when a CVE, update or leak lands on your machine.
+**Three layers, three different jobs.** The **prompt** is a *passive* alarm: it
+reddens so you **see** you're on prod. The [**guards**](#policy-as-code-guards)
+are an *active* barrier: they **stop** a destructive command. And the
+[**notify** heads-up](#the-notify-digest) is a *proactive* watch: it **tells**
+you when a CVE, update or leak lands on your machine.
 
-Every module is validated with `zsh -n` in CI, so a broken script can never
-reach your shell.
+Every module is checked with `zsh -n` in CI, so a broken script can never make it
+into your shell.
 
 <table>
 <tr><th align="left">Shell command</th><th align="left">What it does</th></tr>
@@ -396,9 +421,10 @@ opsforge history git -n 50    # more results (0 = no cap)
 opsforge history kube --json  # machine-readable
 ```
 
-Built-in families group the tools you think of together — and deliberately mirror
-the domains used by [guards](#policy-as-code-guards) and profiles, so `kube`,
-`tf`, `cloud`… mean the same thing across the product:
+The built-in families group the tools you already think of together, and they
+deliberately mirror the domains used by [guards](#policy-as-code-guards) and
+profiles. So `kube`, `tf`, `cloud` and the rest mean the same thing everywhere in
+the product:
 
 <table>
 <tr><th align="left">Family</th><th align="left">Tools</th></tr>
@@ -410,10 +436,11 @@ the domains used by [guards](#policy-as-code-guards) and profiles, so `kube`,
 <tr><td><code>ansible</code></td><td>ansible, ansible-playbook, ansible-galaxy, ansible-vault</td></tr>
 </table>
 
-Pass a family name, or any executable to filter by that single tool. Results are
-distinct commands, most-recent first, with a `×N` run count; `--limit/-n` caps
-them (default 20, `0` = all) and `--json` emits them for scripts. History is
-parsed **passively** — opsforge reads the file, never executes anything.
+Pass a family name, or any executable to filter down to that single tool. You get
+distinct commands, most-recent first, with a `×N` run count. `--limit/-n` caps
+the list (default 20, `0` for all) and `--json` emits it for scripts. The history
+is parsed **passively**: opsforge reads the file and never runs anything from
+it.
 
 ---
 
@@ -425,19 +452,19 @@ parsed **passively** — opsforge reads the file, never executes anything.
 
 </div>
 
-Tools like Homebrew Bundle, mise, chezmoi and aqua install your CLIs; opsforge
-adds a layer on top of that — it **guards how you use them**. It turns the
-prod-safety layer of the shell into a small policy engine: a declarative set of
-rules that decides whether a destructive command should run, warn, confirm, or be
-refused — based on the context you're actually in.
+Tools like Homebrew Bundle, mise, chezmoi and aqua install your CLIs. opsforge
+adds a layer on top of that: it **guards how you use them**. The prod-safety
+layer of the shell is really a small policy engine, a declarative set of rules
+that decides whether a destructive command should run, warn, confirm, or be
+refused, based on the context you're actually in.
 
 ### The one rule to understand
 
 A guard fires only when **two things line up at once**: a **destructive command**
-*and* a **production marker**. Miss either one and the command runs untouched —
-so read-only commands never nag you, and destructive commands on staging or dev
-stay out of your way. It's a safety net for the distracted gesture, not a wall in
-front of every command.
+*and* a **production marker**. Miss either one and the command runs untouched.
+That's why read-only commands never nag you, and why destructive commands on
+staging or dev stay out of your way. It's a safety net for the distracted
+gesture, not a wall in front of every command you type.
 
 | Command | Context | Decision | Why |
 |:--|:--|:--:|:--|
@@ -450,17 +477,19 @@ front of every command.
 | `helm uninstall app` | `prod` | ⚠️ confirm | destructive + prod |
 | `ls` · `git status` · `cat` | `prod` | ✓ allow | nothing destructive |
 
-Simulate any of these yourself with `opsforge guard test "<cmd>" --context <ctx>`.
+You can simulate any of these yourself with
+`opsforge guard test "<cmd>" --context <ctx>`.
 
-The built-in policy reaches past Kubernetes and Terraform: it also catches a
-**`git push --force` / `reset --hard` on `main`**, destructive **cloud** calls
+The built-in policy reaches well past Kubernetes and Terraform. It also catches a
+**`git push --force` or `reset --hard` on `main`**, destructive **cloud** calls
 (`aws s3 rm --recursive`, `ec2 terminate`, `eks/rds/cloudformation delete`,
 `gcloud`/`az … delete` on prod), **container** footguns (`docker system prune`,
 `volume rm`, `rm -f`) and **database** wipes (`FLUSHALL`, `DROP DATABASE` on
-prod) — the everyday commands worth a second look, not just the obvious ones.
+prod). In other words, the everyday commands worth a second look, not just the
+obvious ones.
 
 Rules live in a single file, `~/.config/opsforge/guards.yaml`. Each rule matches a
-**command** regex and a **context** regex, and picks an action:
+**command** regex against a **context** regex, and picks an action:
 
 | Action | Effect |
 |:--|:--|
@@ -498,7 +527,7 @@ opsforge guard test "kubectl delete ns" --context prod --json  # {command, conte
 
 **Policy you can version and validate in CI.** Because the rules live in one file,
 you can commit `guards.yaml` alongside your dotfiles and keep it honest in the
-pipeline:
+pipeline. Two commands make that possible:
 
 - `opsforge guard lint` validates the active policy and **exits non-zero** when
   it's broken — a bad regex, unknown action, or wrong version fails the job
@@ -508,16 +537,16 @@ pipeline:
   **assert** that, say, `terraform destroy` is `deny`ed on prod — the same
   `Evaluate` call the shell uses, so the test can't diverge from real behavior.
 
-The guards apply on your own shell, and the policy that drives them is
-**testable and versionable** like the rest of your setup — not a per-machine
-snowflake you tweak by hand.
+The guards run in your own shell, and the policy behind them is **testable and
+versionable** like the rest of your setup, rather than a per-machine snowflake you
+tweak by hand.
 
 ### An audit trail: what did I run on prod this week?
 
-Every time a guard fires — warn, confirm, or deny — opsforge records it to a
-local, append-only trail. `opsforge guard log` replays it, answering the one
-thing your shell history can't: *what did I run against a production context,
-and did the guard let it through?*
+Every time a guard fires (warn, confirm, or deny), opsforge writes it to a local,
+append-only trail. `opsforge guard log` replays it, answering the one thing your
+shell history can't: *what did I run against a production context, and did the
+guard let it through?*
 
 ```sh
 opsforge guard log               # everything the guard flagged, oldest first
@@ -527,36 +556,37 @@ opsforge guard log --action deny # only what was blocked
 opsforge guard log --json        # machine-readable
 ```
 
-Your shell history says *what* you typed; this says *what was dangerous, in
-which context, and how it was handled* — with the timestamp. It's stored only
-under `~/.local/state/opsforge/guard-audit.jsonl` (mode 0600), never leaves your
-machine, and logs only guarded commands — not your whole history (that's what
-[`opsforge history`](#history) is for). Best-effort: a logging hiccup never
-blocks the shell.
+Your shell history says *what* you typed. This says *what was dangerous, in
+which context, and how it was handled*, timestamp included. It lives only in
+`~/.local/state/opsforge/guard-audit.jsonl` (mode 0600), never leaves your
+machine, and logs only guarded commands, not your whole history (that's what
+[`opsforge history`](#history) is for). It's best-effort, so a logging hiccup
+never blocks the shell.
 
 ### How opsforge knows you're on prod
 
 The "context" a rule matches against comes from **two places**, and opsforge is
-deliberately honest about the trade-offs of each:
+deliberately upfront about the trade-offs of each:
 
-- **Read passively from your environment** — never running a single command.
-  opsforge scrapes the kubeconfig `current-context`, `AWS_PROFILE`/`AWS_VAULT`
+- **Read passively from your environment**, without running a single command.
+  opsforge reads the kubeconfig `current-context`, `AWS_PROFILE`/`AWS_VAULT`
   (or `CLOUDSDK_ACTIVE_CONFIG_NAME`), and the terraform workspace
   (`.terraform/environment`). It **never runs `kubectl` or `gcloud`** to figure
   out where you are, so evaluating a rule can't trigger an OIDC browser login or
   hang on a wrapper CLI.
-- **Read from the command itself** — because in 2026 teams target prod far more
-  often with `-var-file=prod.tfvars` or an `environments/prod/` directory than
-  with a terraform *workspace*. The default policy therefore also matches those
-  markers **in the command line** for `terraform`/`tofu`/`terragrunt`, so
-  `terraform destroy -var-file=prod.tfvars` confirms even with no workspace set.
-  `terraform plan …` stays allowed — it's read-only.
+- **Read from the command itself.** In 2026, teams target prod far more often with
+  `-var-file=prod.tfvars` or an `environments/prod/` directory than with a
+  terraform *workspace*. So the default policy also looks for those markers **in
+  the command line** for `terraform`/`tofu`/`terragrunt`. That way
+  `terraform destroy -var-file=prod.tfvars` prompts for confirmation even with no
+  workspace set, while `terraform plan …` stays allowed because it's read-only.
 
 > **Be clear-eyed about what this is.** Guards are a **safety net against the
-> distracted gesture** — they catch you when you switch env without noticing,
-> not a determined mistake. They are **not** a security boundary. Real prod
-> protection stays where it belongs: `prevent_destroy`, separate cloud accounts,
-> and CI approvals. opsforge **complements** that layer, it doesn't replace it.
+> distracted gesture**. They catch you when you switch env without noticing, not
+> when you're determined to do something. They are **not** a security boundary.
+> Real prod protection stays where it belongs: `prevent_destroy`, separate cloud
+> accounts, and CI approvals. opsforge **complements** that layer, it doesn't
+> replace it.
 
 ### What you see when a guard fires
 
@@ -570,43 +600,44 @@ On a `confirm`, the command is held at the prompt until you type `yes`:
 Type 'yes' to run this: ▏
 ```
 
-A `deny` prints a red **✗ Blocked by opsforge guard** and clears the line; a
+A `deny` prints a red **✗ Blocked by opsforge guard** and clears the line. A
 `warn` prints its message and runs anyway.
 
 ### Everything is configurable in one file
 
 - **Zero-config by default.** With no `guards.yaml`, the built-in policy above
-  reproduces the old prod-confirm behavior exactly — upgrading changes nothing
-  until you opt into custom rules. Start customizing with `opsforge guard init`,
-  which drops a fully commented `guards.yaml` you can edit.
+  reproduces the old prod-confirm behavior exactly, so upgrading changes nothing
+  until you opt into custom rules. When you're ready to customize, run
+  `opsforge guard init`, which drops a fully commented `guards.yaml` you can
+  edit.
 - **Fast on the hot path.** The shell pre-filters cheaply and only calls the
-  engine (`opsforge guard check`, used internally) on commands that look
+  engine (`opsforge guard check`, used internally) on commands that actually look
   destructive, so your prompt stays instant.
-- **Fails open, loudly.** A broken `guards.yaml` can never wedge your shell: the
-  command runs, and the parse error is printed to stderr so you can fix your YAML.
+- **Fails open, loudly.** A broken `guards.yaml` can never wedge your shell. The
+  command runs, and the parse error goes to stderr so you can fix your YAML.
 
-Disable everything for one session with `OPSFORGE_GUARDS=0`.
+You can disable everything for one session with `OPSFORGE_GUARDS=0`.
 
 ### Guards at team scale
 
-opsforge is a personal tool by design — no server, no fleet console. But the two
-pieces a team actually needs to standardize *are already files*, which is the
+opsforge is a personal tool by design: no server, no fleet console. But the two
+pieces a team actually needs to standardize *are already just files*, which is the
 whole point of policy-as-code:
 
 - **One policy, shared like any code.** `guards.yaml` is a plain, versionable
   file. Commit it to a shared repo, ship it in your dotfiles or a golden image,
-  and every engineer runs the same rules — reviewed in a PR, tested in CI with
-  `opsforge guard lint` / `guard test --json`. No one hand-tweaks a snowflake.
+  and every engineer runs the same rules, reviewed in a PR and tested in CI with
+  `opsforge guard lint` / `guard test --json`. Nobody hand-tweaks a snowflake.
 - **One audit trail, exportable to where your team already looks.** The guard
   log is newline-delimited JSON at a known path
-  (`~/.local/state/opsforge/guard-audit.jsonl`) — `opsforge guard log --json`
-  emits the same. A Promtail/Vector/Fluent Bit tail ships it to Loki or your SIEM,
-  so "what did anyone (or any [AI agent](#ai-agents-mcp)) run past a prod guard
-  this week" becomes a fleet-wide query, not a per-laptop one.
+  (`~/.local/state/opsforge/guard-audit.jsonl`), and `opsforge guard log --json`
+  emits the same. Tail it with Promtail/Vector/Fluent Bit into Loki or your SIEM,
+  and "what did anyone (or any [AI agent](#ai-agents-mcp)) run past a prod guard
+  this week" becomes a fleet-wide query instead of a per-laptop one.
 
 The path from *my workstation* to *the team's* is deliberately a config-and-log
-story, not a platform you have to run — you adopt the parts you need without
-opsforge ever becoming a dependency in the middle.
+story, not a platform you have to run. You adopt the parts you need, and opsforge
+never becomes a dependency sitting in the middle.
 
 ---
 
@@ -618,10 +649,10 @@ opsforge ever becoming a dependency in the middle.
 
 </div>
 
-A workstation snapshot pins a whole *machine*. A **project** often needs less —
-just the toolchain *this repo* depends on. Commit an `opsforge.yaml` at its root
-and anyone reproduces it with one command — the same reproducibility mise and
-devbox give you, with a CVE gate added on top.
+A workstation snapshot pins a whole *machine*. A **project** usually needs less
+than that: just the toolchain *this repo* depends on. Commit an `opsforge.yaml`
+at its root and anyone can reproduce it with one command. It's the same
+reproducibility mise and devbox give you, with a CVE gate added on top.
 
 ```yaml
 # opsforge.yaml — commit at the repo root
@@ -641,18 +672,18 @@ opsforge sync --check   # report drift, exit non-zero if a required tool is miss
 opsforge sync --init    # write a starter opsforge.yaml here
 ```
 
-`sync` walks up from the working directory to the nearest `opsforge.yaml`, so it
-works from any subdirectory. It resolves `tools` + `profiles` into one
+`sync` walks up from your working directory to the nearest `opsforge.yaml`, so it
+works from any subdirectory. It resolves `tools` and `profiles` into one
 de-duplicated list, installs only what's missing (via Homebrew or a GitHub
-release, per tool), and skips anything not in the catalog with a warning.
+release, chosen per tool), and skips anything not in the catalog with a warning.
 
-**A CVE gate in the same file.** Set `fail_on: high` (or
-`critical`) and `sync` audits *just the tools this project requires* against
-[OSV.dev](https://osv.dev) and **fails** when one carries a CVE at that level —
-so a single committed file gives you both a **reproducible environment** *and* a
-**supply-chain gate** in one place. With `--json`, `sync
---check` emits `{compliant, missing, present, unknown, cve_blocked, fail_on}` for
-a pipeline to assert on:
+**A CVE gate in the same file.** Set `fail_on: high` (or `critical`) and `sync`
+audits *just the tools this project requires* against
+[OSV.dev](https://osv.dev), then **fails** when one carries a CVE at that level.
+So a single committed file gives you both a **reproducible environment** *and* a
+**supply-chain gate** in one place. With `--json`, `sync --check` emits
+`{compliant, missing, present, unknown, cve_blocked, fail_on}` for a pipeline to
+assert on:
 
 ```sh
 opsforge sync --check --json | jq '.compliant'   # fails the job on drift or a blocked CVE
@@ -660,8 +691,8 @@ opsforge sync --check --json | jq '.compliant'   # fails the job on drift or a b
 
 **A lockfile for verifiable reproducibility.** `opsforge sync` also writes an
 **`opsforge.lock`** next to the manifest, pinning each installed tool to its
-exact resolved version — the same idea as `package-lock.json` or `mise.lock`.
-Commit it, and `sync --check` no longer just verifies a tool is *present* — it
+exact resolved version. It's the same idea as `package-lock.json` or `mise.lock`.
+Commit it, and `sync --check` no longer just verifies a tool is *present*: it
 verifies it's the *pinned version*, flagging **version drift** in both the human
 and JSON output:
 
@@ -680,10 +711,11 @@ opsforge sync --check --json | jq '.version_drift'
 # [{"name":"helm","expected":"3.14.0","got":"3.15.1"}]  → non-zero exit
 ```
 
-It's non-breaking: with no lockfile, `--check` behaves exactly as before; a tool
-pinned with an unknown version is never flagged. That's what turns
-"workstation-as-code" from a wish into reproducibility a reviewer can trust —
-`opsforge.yaml` declares *what*, `opsforge.lock` proves *which exact version*.
+It's non-breaking. With no lockfile, `--check` behaves exactly as before, and a
+tool pinned with an unknown version is never flagged. That's what turns
+"workstation-as-code" from a wish into reproducibility a reviewer can trust:
+`opsforge.yaml` declares *what*, and `opsforge.lock` proves *which exact
+version*.
 
 ---
 
@@ -695,8 +727,10 @@ pinned with an unknown version is never flagged. That's what turns
 
 </div>
 
-opsforge emits a **CVE-correlated SBOM of your workstation** — a supply-chain
-artifact consumable by grype, `trivy sbom`, or a compliance pipeline.
+An SBOM is the list of ingredients for your machine: every tool, its version, and
+where it came from. opsforge emits a **CVE-correlated SBOM of your workstation**,
+a supply-chain artifact that grype, `trivy sbom` or a compliance pipeline can
+read straight away.
 
 ```sh
 opsforge sbom                # CycloneDX 1.6 JSON of your installed tools → stdout
@@ -704,28 +738,29 @@ opsforge sbom --audit > bom.json   # + embedded CVE findings, captured to a file
 ```
 
 - **`opsforge sbom`** builds a **CycloneDX 1.6** document where each installed
-  tool is a component with its detected **version** and — when the catalog maps
-  it to a package ecosystem — a **PURL**.
+  tool is a component with its detected **version** and, when the catalog maps it
+  to a package ecosystem, a **PURL** (a package URL that names it unambiguously).
 - **`opsforge sbom --audit`** cross-references OSV.dev and embeds the known CVEs
   as CycloneDX **vulnerabilities**, each linked to its component with a severity
   and the recommended fix version. The SBOM ships CVE-corrected out of the box.
 
-The document goes to stdout (a short summary to stderr), so
-`opsforge sbom > bom.json` gives you a clean file plus feedback — a signed
-inventory of your toolbox *with* its vulnerabilities, ready to feed a scanner or
-a compliance gate.
+The document goes to stdout and a short summary to stderr, so
+`opsforge sbom > bom.json` gives you a clean file plus feedback on screen: a
+signed inventory of your toolbox *with* its vulnerabilities, ready to feed a
+scanner or a compliance gate.
 
-That's the full supply-chain chain in one binary: a **checksum** proves each
+That's the whole supply-chain story in one binary. A **checksum** proves each
 download is intact, a **cosign signature** proves the release is authentic (see
-[the catalog](#the-catalog)), and the **SBOM** proves what you ended up with —
-CVEs included.
+[the catalog](#the-catalog)), and the **SBOM** proves what you actually ended up
+with, CVEs and all.
 
 ### VEX & CISA KEV
 
 A raw CVE list tells you a vulnerability *exists*. It doesn't tell you which of
-the dozens to fix **first** — and since the NVD stopped enriching most CVEs in
-2026, the CVSS score you'd sort by is often missing or stale. `opsforge vex`
-answers both questions.
+the dozens to fix **first**, and since the NVD stopped enriching most CVEs in
+2026, the CVSS score you'd normally sort by is often missing or stale. VEX (a
+"vulnerability exploitability exchange" document) is the artifact that carries
+that verdict, and `opsforge vex` produces it.
 
 ```sh
 opsforge vex                 # OpenVEX document → stdout (pairs with `opsforge sbom`)
@@ -735,26 +770,27 @@ opsforge vex > vex.json      # capture the machine artifact
 
 - **`opsforge vex`** turns the audit into an **[OpenVEX](https://openvex.dev)
   v0.2.0** document: one machine-readable statement per (component, CVE) with a
-  status (`affected`) and an **action** — upgrade to the fixed version, or
+  status (`affected`) and an **action**, either upgrade to the fixed version or
   monitor the advisory when none exists yet. Each component is identified by the
   **same PURL the SBOM uses**, so a downstream scanner or auditor correlates the
-  two out of the box. Output is deterministically sorted, so it diffs and signs
-  cleanly.
+  two out of the box. The output is deterministically sorted, so it diffs and
+  signs cleanly.
 - **`opsforge vex --kev`** cross-references **CISA's Known Exploited
-  Vulnerabilities** catalog and calls out the CVEs being **exploited in the
-  wild** — the handful to fix *now*, ahead of the long tail. The catalog is
-  fetched once and cached (`~/.cache/opsforge/kev.json`, 24h TTL); it's
-  best-effort, so a network hiccup degrades to "no KEV data", never a failed
-  command.
+  Vulnerabilities** catalog (the CVEs attackers are actually using) and calls out
+  the ones being **exploited in the wild**: the handful to fix *now*, ahead of
+  the long tail. The catalog is fetched once and cached
+  (`~/.cache/opsforge/kev.json`, 24h TTL). It's best-effort, so a network hiccup
+  degrades to "no KEV data" rather than a failed command.
 
-Prioritizing by **exploitability** instead of by a score that may not exist is a
-sensible way to triage in 2026 — and VEX is the artifact that carries that
-verdict to whatever consumes it next.
+Prioritizing by **exploitability** instead of by a score that may not even exist
+is a sensible way to triage in 2026, and VEX is what carries that verdict to
+whatever consumes it next.
 
 ### Signing the artifacts
 
 Both the SBOM and the VEX document can be signed into a self-contained
-**[Sigstore](https://www.sigstore.dev) bundle** you can hand to anyone:
+**[Sigstore](https://www.sigstore.dev) bundle** you can hand to anyone (Sigstore
+is the standard tooling for signing and verifying software artifacts):
 
 ```sh
 opsforge sbom --sign > bom.json      # + a bom.sigstore.json bundle
@@ -764,26 +800,26 @@ cosign verify-blob --key ~/.config/opsforge/signing.pub \
 ```
 
 `--sign` signs the document **key-based** with a persistent local opsforge key
-(an ECDSA P-256 key generated on first use under `~/.config/opsforge/`) and
-writes a Sigstore bundle that `cosign verify-blob` — or any Sigstore verifier —
-accepts. It's fully **offline**: no OIDC login, no certificate, no entry in a
-public transparency log.
+(an ECDSA P-256 key generated the first time you use it, under
+`~/.config/opsforge/`) and writes a Sigstore bundle that `cosign verify-blob`, or
+any Sigstore verifier, accepts. It's fully **offline**: no OIDC login, no
+certificate, no entry in a public transparency log.
 
-That last part is deliberate, and worth being precise about:
+That last part is deliberate, and worth spelling out:
 
 - **Local signing is key-based, on purpose.** Keyless Sigstore signing would
-  publish the signer's OIDC identity (your email) in Rekor — a public, immutable
-  log — on *every* signature, and it would prove nothing about supply-chain
-  *provenance* for a document generated by hand on a laptop. So opsforge signs
-  with a local key instead.
-- **Be clear about what it proves.** A key-based signature proves the
-  document's **integrity** and **attribution to your key** — not that it was
-  built by a trusted pipeline. Provenance is a CI property: opsforge's own
-  *releases* are the ones signed **keyless with SLSA provenance** (see
+  publish the signer's OIDC identity (your email) in Rekor, a public and
+  immutable log, on *every* signature. And it would prove nothing about
+  supply-chain *provenance* for a document you generated by hand on a laptop. So
+  opsforge signs with a local key instead.
+- **Be clear about what it proves.** A key-based signature proves the document's
+  **integrity** and **attribution to your key**, not that it was built by a
+  trusted pipeline. Provenance is a CI property, so opsforge's own *releases* are
+  the ones signed **keyless with SLSA provenance** (see
   [the catalog](#the-catalog)), because there the identity *is* the pipeline.
 
-Same primitives, right tool for each job — local integrity for the artifacts you
-generate, keyless provenance for the binaries you ship.
+Same primitives, the right tool for each job: local integrity for the artifacts
+you generate, keyless provenance for the binaries you ship.
 
 ### Scanning a container image
 
@@ -793,8 +829,8 @@ generate, keyless provenance for the binaries you ship.
 
 </div>
 
-`opsforge scan` extends the same OSV engine to a container image — and adds the
-part a standalone scanner can't: **correlation with your own workstation**.
+`opsforge scan` points the same OSV engine at a container image, and adds the one
+thing a standalone scanner can't: **correlation with your own workstation**.
 
 ```sh
 opsforge scan node:16-alpine          # CVEs in the image
@@ -802,26 +838,26 @@ opsforge scan my-ci-image --diff      # + how it drifts from your machine
 opsforge scan my-image --json         # machine-readable, non-zero on HIGH/CRITICAL
 ```
 
-opsforge **doesn't re-implement image SBOM extraction** — that's syft/trivy's
-job, and importing them as libraries would bloat the binary for no gain. So it
-drives whichever is installed (the same way it delegates version pinning to
+opsforge **doesn't re-implement image SBOM extraction**. That's syft and trivy's
+job, and importing them as libraries would bloat the binary for no gain. Instead
+it drives whichever one is installed (the same way it hands version pinning off to
 mise/asdf), reads back the CycloneDX SBOM, and runs those components through
-opsforge's **own** OSV engine — the exact matcher `opsforge audit` uses on your
+opsforge's **own** OSV engine, the exact matcher `opsforge audit` uses on your
 machine, CVSS scoring and per-branch fix versions included.
 
-With **`--diff`** it answers a question trivy doesn't: *does a tool I run locally
-ship at a different version in this image?* It correlates the image's components
-against your installed toolbox and reports the version drift — the workstation↔CI
-skew that "works on my machine" hides. Like `audit`, it exits non-zero on a
-HIGH/CRITICAL CVE, so it drops into a pipeline as a gate.
+Add **`--diff`** and it answers a question trivy doesn't: *does a tool I run
+locally ship at a different version inside this image?* It lines the image's
+components up against your installed toolbox and reports the version drift, the
+workstation-vs-CI skew that "works on my machine" tends to hide. Like `audit`, it
+exits non-zero on a HIGH/CRITICAL CVE, so it drops into a pipeline as a gate.
 
-> Needs `syft` or `trivy` on PATH (`opsforge install syft`). opsforge adds the
-> correlation and the shared OSV verdict, not another image scanner.
+> Needs `syft` or `trivy` on PATH (`opsforge install syft`). opsforge brings the
+> correlation and the shared OSV verdict, not yet another image scanner.
 
 ### The notify digest
 
-opsforge doesn't wait for you to run `audit` — `opsforge notify` is **one
-digest of everything on *your* machine that needs attention**, in a single
+opsforge doesn't wait for you to run `audit`. `opsforge notify` is **one digest
+of everything on *your* machine that needs attention**, gathered in a single
 place:
 
 - installed tools carrying a **known CVE** (HIGH/CRITICAL called out in red),
@@ -846,39 +882,39 @@ opsforge notify --quiet    # just the compact one-liner (used by the shell)
 
 **A heads-up in your shell, once per session.** When something needs your
 attention, the [DevOps shell](#the-devops-shell-environment) prints a compact
-one-liner on startup — e.g. *"opsforge: 1 tool with a HIGH/CRITICAL CVE · 3
-tools can be updated — run `opsforge notify`"* — then you run `opsforge notify`
+one-liner on startup, e.g. *"opsforge: 1 tool with a HIGH/CRITICAL CVE · 3
+tools can be updated — run `opsforge notify`"*, and then you run `opsforge notify`
 for the breakdown. Silence it with `OPSFORGE_NOTIFY=0`.
 
 **Cached, instant, never blocking.** `notify` reads a local cache under
-`~/.cache/opsforge/` (6h TTL) and only ever *reads* it — a stale cache is
+`~/.cache/opsforge/` (6h TTL) and only ever *reads* it. A stale cache is
 refreshed in the background (or on demand with `--refresh`), so neither the
 digest nor the shell heads-up ever waits on the network. The same finding also
 surfaces at a glance in [`opsforge status`](#a-quick-tour).
 
 It folds CVEs, updates, leaked secrets *and* its own self-update into one digest
-and surfaces it, proactively, in your shell — so the moment an advisory lands on
-your toolbox, you know, without running a thing.
+and surfaces it, proactively, in your shell. So the moment an advisory lands on
+your toolbox, you know, without having to run a thing.
 
 ---
 
 ## Credential hygiene (`verify`)
 
 `opsforge audit` asks *are my tools vulnerable?* `opsforge verify` asks the other
-half: *are the credentials on this machine a liability?* A DevOps workstation
-accretes secrets — cloud keys, a kubeconfig, SSH keys, registry tokens, a pile of
-`~/.docker`/`~/.npmrc`/`~/.netrc` logins. `verify` inventories them and flags the
-hygiene risks, in one read-only pass:
+half: *are the credentials sitting on this machine a liability?* A DevOps
+workstation piles up secrets over time (cloud keys, a kubeconfig, SSH keys,
+registry tokens, a heap of `~/.docker`/`~/.npmrc`/`~/.netrc` logins). `verify`
+inventories them and flags the hygiene risks, in one read-only pass:
 
-- **Long-lived static keys** that never expire — an AWS `AKIA` access key, a GCP
+- **Long-lived static keys** that never expire: an AWS `AKIA` access key, a GCP
   service-account JSON key, an SSH key with no passphrase, a legacy static kube
-  token. It tells apart a static key from a federated one (SSO, OIDC, `exec`,
-  assume-role) and only flags the former.
-- **Secrets in clear text** — the git credential store, `~/.netrc`, base64
+  token. It tells a static key apart from a federated one (SSO, OIDC, `exec`,
+  assume-role) and only flags the static ones.
+- **Secrets in clear text**: the git credential store, `~/.netrc`, base64
   `~/.docker`/`~/.npmrc` logins (base64 is *not* encryption), `gh`/`glab` tokens.
-- **Over-broad file permissions** — a credential file readable beyond its owner
-  (it should be `0600`).
-- **Expired or soon-to-expire** client certificates and tokens — read straight
+- **Over-broad file permissions**: a credential file readable by more than its
+  owner, when it should be `0600`.
+- **Expired or soon-to-expire** client certificates and tokens, read straight
   from the local PEM/JWT.
 
 ```sh
@@ -887,26 +923,26 @@ opsforge verify --json     # machine-readable, for scripts
 opsforge verify --strict   # exit non-zero on ANY finding (CI gate)
 ```
 
-> **Read-only, offline, and honest.** `verify` **never runs an external tool** —
-> in particular it never calls `kubectl`, so inspecting an OIDC kubeconfig can't
-> trigger a login. It **never prints a secret's value** (only *where* it lives and
-> *why* it's risky), and it **never touches the network**. It reads an OIDC
+> **Read-only, offline, and honest.** `verify` **never runs an external tool**.
+> In particular it never calls `kubectl`, so inspecting an OIDC kubeconfig can't
+> trigger a login. It **never prints a secret's value** (only *where* it lives
+> and *why* it's risky), and it **never touches the network**. It reads an OIDC
 > kubeconfig by parsing YAML, a certificate's expiry from its PEM, a token's from
-> its JWT claim — all passively. It's a safety net, not a guarantee: some stores
-> (OS keychains) can't be read, and an absence of findings isn't proof of safety.
+> its JWT claim, all passively. It's a safety net, not a guarantee: some stores
+> (OS keychains) can't be read, and no findings isn't proof of safety.
 
-Without `--strict` the exit code is non-zero only on HIGH/CRITICAL findings, so it
-gates CI without failing on every minor heads-up — the same convention as
-[`opsforge audit`](#ci--integrations).
+Without `--strict`, the exit code is non-zero only on HIGH/CRITICAL findings, so
+it gates CI without failing on every minor heads-up. That's the same convention
+as [`opsforge audit`](#ci--integrations).
 
 ---
 
 ## AI agents (MCP)
 
-opsforge speaks the **[Model Context Protocol](https://modelcontextprotocol.io)**
-— so an AI agent (Claude Code, Cursor, any MCP client) can *ask about your
-workstation* through the same data the CLI computes, with no scraping and no
-guessing.
+opsforge speaks the **[Model Context Protocol](https://modelcontextprotocol.io)**,
+MCP for short, the standard way an AI agent talks to a tool. So an agent (Claude
+Code, Cursor, any MCP client) can *ask about your workstation* through the same
+data the CLI computes, with no scraping and no guessing.
 
 ```sh
 claude mcp add opsforge -- opsforge mcp   # register the stdio server once
@@ -922,38 +958,38 @@ claude mcp add opsforge -- opsforge mcp   # register the stdio server once
 | `workstation_status` | one-glance summary: installed/outdated counts, shell state, kube/cloud/tf context |
 | `check_guard_policy` | evaluate a command against your guard policy — `allow`/`warn`/`confirm`/`deny` — *before* the agent suggests running it |
 
-> **Read-only by design.** Every tool is derived from read-only sources —
-> **nothing over MCP installs, upgrades, or changes the machine**. That's a
+> **Read-only by design.** Every tool is derived from read-only sources.
+> **Nothing over MCP installs, upgrades, or changes the machine.** That's a
 > deliberate boundary: an agent can *inspect* your workstation and *reason*
 > about it (what's outdated, what carries a CVE, whether a command would trip a
 > prod guard), but the mutating actions stay behind the interactive CLI, where
-> *you* confirm them. `check_guard_policy` never runs the command, and — like
-> the shell — reading the context never invokes `kubectl`/`gcloud`.
+> *you* confirm them. `check_guard_policy` never runs the command, and, like the
+> shell, reading the context never invokes `kubectl`/`gcloud`.
 
-This turns opsforge into a **grounded source of truth** an agent can lean on:
-instead of hallucinating your tool versions or guessing whether `terraform
-destroy` is safe here, it asks.
+This turns opsforge into a **grounded source of truth** an agent can lean on.
+Instead of hallucinating your tool versions or guessing whether `terraform
+destroy` is safe here, it just asks.
 
 **And you keep the receipts.** Every command an agent runs past
 `check_guard_policy` that trips a guard (warn/confirm/deny) is written to the
 same [audit trail](#an-audit-trail-what-did-i-run-on-prod-this-week) as your
-own — tagged `source: mcp`. So you can review, after the fact, exactly what your
-AI agents proposed against production:
+own, tagged `source: mcp`. So you can go back later and see exactly what your AI
+agents proposed against production:
 
 ```sh
 opsforge guard log --source mcp          # what agents ran past the guard
 opsforge guard log --source mcp --prod   # …only on production-like contexts
 ```
 
-The guard becomes a **safety net between your agents and prod**: the agent
-checks its intent before acting, and you get a reviewable record of every
-dangerous command it considered — not just the ones it went through with.
+The guard becomes a **safety net between your agents and prod**. The agent checks
+its intent before acting, and you get a reviewable record of every dangerous
+command it considered, not just the ones it went through with.
 
 #### See it in 30 seconds
 
-An agent connected over MCP proposes a destructive command; the guard evaluates
-it against the *current* context and refuses — **without ever executing it** —
-and the attempt lands in your audit trail:
+An agent connected over MCP proposes a destructive command. The guard evaluates
+it against the *current* context and refuses, **without ever executing it**, and
+the attempt lands in your audit trail:
 
 ```console
 # The agent calls the check_guard_policy MCP tool instead of running the command:
@@ -970,15 +1006,15 @@ $ opsforge guard log --source mcp --prod
 ```
 
 Same policy, same log, whether the risky command came from your fingers or your
-agent — that's the differentiator in one screen.
+agent. That's the whole differentiator in one screen.
 
 ---
 
 ## CI & integrations
 
-opsforge isn't just a pretty TUI — a global `--json` flag makes `list`, `status`,
-`doctor` and `audit` emit structured JSON, so the same binary you use interactively
-also drives scripts and pipelines.
+opsforge isn't just a pretty TUI. A global `--json` flag makes `list`, `status`,
+`doctor` and `audit` print structured JSON, so the same binary you use
+interactively also drives scripts and pipelines.
 
 ```sh
 opsforge audit --json | jq '.tools[] | select(.vulnerable)'   # only the affected tools
@@ -986,18 +1022,19 @@ opsforge doctor --json | jq '.status'                         # "healthy" | "war
 opsforge list all --json | jq '.[] | select(.outdated).name'  # tools with an update
 ```
 
-The security commands also set **meaningful exit codes**, which is what turns
+The security commands also set **meaningful exit codes**, and that's what turns
 opsforge into a one-line gate:
 
 - `opsforge audit` (and `--json`) exits **non-zero on any HIGH/CRITICAL CVE**.
-- `opsforge audit --secrets` adds leaked credentials to the report; a **critical
-  leak** exits non-zero too.
+- `opsforge audit --secrets` adds leaked credentials to the report, and a
+  **critical leak** exits non-zero too.
 - `opsforge doctor --json` returns `{status, passed, warnings, failed, checks[]}`
   and fails when a check fails.
 
-Ready-to-use GitHub Actions workflow: [`examples/ci-security-gate.yml`](examples/ci-security-gate.yml)
-— it installs opsforge and fails the pipeline on any HIGH/CRITICAL CVE or leaked
-credential, uploading the JSON reports as artifacts.
+There's a ready-to-use GitHub Actions workflow at
+[`examples/ci-security-gate.yml`](examples/ci-security-gate.yml). It installs
+opsforge, fails the pipeline on any HIGH/CRITICAL CVE or leaked credential, and
+uploads the JSON reports as artifacts.
 
 ```yaml
 # excerpt — audit exits non-zero on HIGH/CRITICAL, failing the job on its own
@@ -1007,8 +1044,9 @@ credential, uploading the JSON reports as artifacts.
 
 ### Official GitHub Action
 
-Skip the install boilerplate — the composite action does it, then runs whichever
-gates you switch on (`audit`, `secrets`, `guard-lint`, `sbom`, `baseline`):
+Skip the install boilerplate. The composite action handles it, then runs
+whichever gates you switch on (`audit`, `secrets`, `guard-lint`, `sbom`,
+`baseline`):
 
 ```yaml
 - uses: Mrg77/opsforge@v1
@@ -1025,20 +1063,20 @@ Full example: [`examples/github-action-usage.yml`](examples/github-action-usage.
 
 ### Docker image
 
-A distroless image (~20–30 MB, no package manager) ships the static binary — run
-any command against a build image that has your CLIs:
+A distroless image (~20–30 MB, no package manager) ships the static binary, so
+you can run any command against a build image that already has your CLIs:
 
 ```sh
 docker run --rm ghcr.io/mrg77/opsforge audit --json
 ```
 
-This is the production image — minimal, non-interactive. For a *playground* with
-a shell and the guards wired up, see [Try it in a sandbox](#try-it-in-a-sandbox)
-(`ghcr.io/mrg77/opsforge-demo`).
+This is the production image: minimal and non-interactive. If you want a
+*playground* with a shell and the guards wired up instead, see
+[Try it in a sandbox](#try-it-in-a-sandbox) (`ghcr.io/mrg77/opsforge-demo`).
 
 ### pre-commit hooks
 
-Gate commits with the same policy engine, straight from
+Gate your commits with the same policy engine, straight from
 [`.pre-commit-hooks.yaml`](.pre-commit-hooks.yaml):
 
 ```yaml
@@ -1055,12 +1093,12 @@ repos:
 
 ## The catalog
 
-**287 tools across 16 categories** — Kubernetes, Infrastructure as Code, Cloud
+**287 tools across 16 categories**: Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, **System & SysAdmin**, Databases, Security & Compliance, Secrets & Identity,
 Serverless & PaaS, Runtime & Versions, Utilities, and a new **AI & LLM** category.
-The catalog now spans **every IT job** — not just Kubernetes and cloud, but
-development, DevOps, systems, networking, security, databases and AI — so a dev, a
+The catalog now spans **every IT job**, not just Kubernetes and cloud but
+development, DevOps, systems, networking, security, databases and AI. So a dev, a
 DevOps engineer, a sysadmin, a network engineer, a DevSecOps or an AI engineer all
 find their toolbox here:
 
@@ -1073,36 +1111,36 @@ find their toolbox here:
 - **AI & LLM** — `ollama`, `llm`, `aichat`, `mods`, `aider`, `fabric`,
   `gemini-cli`, `promptfoo`, `codex`…
 
-It's a single embedded [YAML file](internal/catalog/catalog.yaml) — adding a tool
-is a five-line PR.
+The whole thing is a single embedded [YAML file](internal/catalog/catalog.yaml),
+so adding a tool is a five-line PR.
 
 **Two install backends, picked per tool at runtime:**
 
-- **Homebrew** (when on PATH) — always the latest release; `opsforge upgrade`
+- **Homebrew** (when it's on PATH), always the latest release. `opsforge upgrade`
   refreshes the whole toolbox.
-- **GitHub releases** — for hosts without Homebrew (bare Linux, CI images), tools
+- **GitHub releases**, for hosts without Homebrew (bare Linux, CI images). Tools
   with a `github:` block are installed by downloading their release binary into
   `~/.local/bin`. No package manager required.
 
-Force one with `OPSFORGE_BACKEND=brew|github`; set the target dir with
+Force one with `OPSFORGE_BACKEND=brew|github`, and set the target dir with
 `OPSFORGE_BIN_DIR`.
 
 **Supply-chain: checksum verification.** Before a GitHub-release binary is made
-executable, opsforge verifies its **SHA-256 against a published checksum** —
-`checksums.txt`, `<asset>.sha256`, or a template declared per tool via the
-catalog's `checksum:` field. A mismatch **refuses the install**; a release that
-publishes no checksum is a warning, not a failure (best-effort, so the ~85% of
-projects that ship none still install).
+executable, opsforge checks its **SHA-256 against a published checksum**, whether
+that's `checksums.txt`, `<asset>.sha256`, or a template declared per tool via the
+catalog's `checksum:` field. A mismatch **refuses the install**. A release that
+publishes no checksum is a warning, not a failure (it's best-effort, so the ~85%
+of projects that ship none still install).
 
 **Supply-chain: signed provenance.** opsforge's own releases are **signed
-keyless with [cosign](https://github.com/sigstore/cosign) (Sigstore)** — no
-long-lived key, the certificate is bound to the release workflow's GitHub OIDC
-identity — plus a native GitHub **SLSA build-provenance attestation**. The
-release publishes `checksums.txt.sig` + `checksums.txt.pem` alongside
-`checksums.txt`. On **self-update**, if `cosign` is installed locally, opsforge
-verifies that signature against the expected identity and prints *"signature
-verified (cosign, keyless)"* — a valid checksum whose signature does **not**
-verify is refused like a mismatch. Verify it yourself:
+keyless with [cosign](https://github.com/sigstore/cosign) (Sigstore)**. There's
+no long-lived key; the certificate is bound to the release workflow's GitHub OIDC
+identity, plus a native GitHub **SLSA build-provenance attestation**. The release
+publishes `checksums.txt.sig` and `checksums.txt.pem` alongside `checksums.txt`.
+On **self-update**, if `cosign` is installed locally, opsforge verifies that
+signature against the expected identity and prints *"signature verified (cosign,
+keyless)"*. A valid checksum whose signature does **not** verify is refused like a
+mismatch. Want to check it yourself?
 
 ```sh
 cosign verify-blob \
@@ -1116,15 +1154,15 @@ cosign verify-blob \
 ### Add your own tools
 
 The catalog isn't a closed list. Point opsforge at an **overlay** and your own
-tools — internal or private CLIs — show up in the picker, profiles and every
-command, **no PR required**. Two ways to load one:
+tools (internal or private CLIs) show up in the picker, in profiles and in every
+command, **no PR required**. There are two ways to load one:
 
 - Drop one or more files in `~/.config/opsforge/catalog.d/*.yaml` (merged in
   alphabetical order).
 - Or set `OPSFORGE_CATALOG=/path/to/my-catalog.yaml`.
 
-The format is exactly the catalog's — `categories:` with `tools:` (`name`, `bin`,
-`brew`, `description`), and optional `profiles:`:
+The format is exactly the catalog's own: `categories:` with `tools:` (`name`,
+`bin`, `brew`, `description`), plus optional `profiles:`:
 
 ```yaml
 # ~/.config/opsforge/catalog.d/internal.yaml
@@ -1137,17 +1175,17 @@ categories:
         description: ACME Corp internal deploy CLI
 ```
 
-Merge semantics are predictable:
+The merge rules are predictable:
 
 - A tool with a **new name** is **added** to the catalog.
-- A tool with an **existing name** **overrides** the built-in one — pin an
-  internal formula, swap a source, tweak a description.
-- A profile with an existing name is likewise **replaced**.
+- A tool with an **existing name** **overrides** the built-in one, so you can pin
+  an internal formula, swap a source, or tweak a description.
+- A profile with an existing name is **replaced** the same way.
 - **Unknown YAML fields are rejected**, so a typo fails loudly instead of being
   silently ignored.
 
-This is how you fold your own internal or private CLIs into opsforge: keep an
-overlay next to your dotfiles and your in-house tooling installs the same way as
+That's how you fold your own internal or private CLIs into opsforge: keep an
+overlay next to your dotfiles, and your in-house tooling installs the same way as
 the public catalog.
 
 ---
@@ -1162,137 +1200,137 @@ opsforge theme dracula      # preview one
 opsforge theme set dracula  # persist it — every command follows, no reload
 ```
 
-Themes: `forge` (default), `nord`, `dracula`, `gruvbox`, `light`, `mono`, `auto`.
-`auto` matches your terminal background; `mono` is color-free for logs/CI. The
-theme drives **every command *and* the interactive picker** — one palette, no
-stray default colors anywhere. Precedence: `$OPSFORGE_THEME` › saved (`theme
-set`) › auto.
+The themes are `forge` (the default), `nord`, `dracula`, `gruvbox`, `light`,
+`mono` and `auto`. `auto` matches your terminal background, and `mono` is
+color-free for logs and CI. Whichever you pick drives **every command *and* the
+interactive picker**: one palette, no stray default colors anywhere. Precedence
+runs `$OPSFORGE_THEME` › saved (`theme set`) › auto.
 
 ---
 
 ## Engineering highlights
 
-The parts worth pointing a reviewer to:
+If you're reviewing the code, these are the parts worth a closer look:
 
-- **Policy engine for the shell.** Prod guards aren't hard-coded `if`s — they're a
+- **Policy engine for the shell.** Prod guards aren't hard-coded `if`s. They're a
   declarative policy (regex × context → allow/warn/confirm/deny), first-match-wins,
   validated on load, with a behavior-preserving built-in default. Context is read
   passively (kubeconfig / env / tf workspace) so evaluation never triggers an OIDC
   login, and the shell only calls the engine on commands that look destructive.
-- **One policy, three shells.** The guard/prompt logic lives in Go and is
+- **One policy, three shells.** The guard and prompt logic lives in Go and is
   exposed as plain text commands (`guard check`, `guard prefilter`), so porting
-  from zsh to **fish** and **bash** was a matter of the hook, not the logic: the
+  from zsh to **fish** and **bash** came down to the hook, not the logic: the
   zsh `accept-line` ZLE widget maps to fish's `bind enter` + `commandline -f
   execute`, and to bash's `bind -x` on Enter. A small `Shell` abstraction
-  (`internal/shellcfg/shell.go`) parameterizes install/env/modules per shell;
+  (`internal/shellcfg/shell.go`) parameterizes install/env/modules per shell, and
   every module is parse-checked in CI (`zsh -n`, `fish --no-execute`, `bash -n`).
   The write-up is honest about the limit: zsh and fish can cancel a command
-  before it runs; **bash can't** cleanly, so its blocking guard is best-effort —
-  a real trade-off, documented rather than hidden.
-- **CVE audit with real version matching.** Queries OSV.dev per tool, filters
+  before it runs, but **bash can't** cleanly, so its blocking guard is
+  best-effort. That's a real trade-off, documented rather than hidden.
+- **CVE audit with real version matching.** It queries OSV.dev per tool, filters
   vulnerabilities *client-side* against OSV's affected ranges (semver
-  `introduced`/`fixed`) and dedupes CVEs listed under multiple advisory IDs — so
-  it reports only what affects the version you run, with the fix on your branch.
-  Severity comes from a real **CVSS v3.1 base-score computation** off the OSV
-  vector, so a critical CVE is never mis-ranked or missed.
+  `introduced`/`fixed`) and dedupes CVEs listed under multiple advisory IDs, so it
+  reports only what affects the version you actually run, with the fix on your
+  branch. Severity comes from a real **CVSS v3.1 base-score computation** off the
+  OSV vector, so a critical CVE is never mis-ranked or missed.
 - **Supply-chain checksum verification.** GitHub-release binaries are SHA-256
   checked against a published checksum (`checksums.txt`, `<asset>.sha256`, or a
-  catalog `checksum:` template) *before* they're made executable — a mismatch
-  refuses the install; a release with no checksum degrades to a warning.
-- **A self-update that verifies its own integrity — and provenance.**
+  catalog `checksum:` template) *before* they're made executable. A mismatch
+  refuses the install, and a release with no checksum degrades to a warning.
+- **A self-update that verifies its own integrity, and its provenance.**
   `opsforge self update` fetches the latest release, checks its published
-  SHA-256, and only then replaces the running binary — atomically. The same
+  SHA-256, and only then replaces the running binary, atomically. The same
   supply-chain guarantee the installer gives your tools, opsforge applies to
   itself: a tampered asset is never made executable. Because our releases are
-  **cosign-signed keyless**, self-update also **verifies that signature**
-  (when cosign is installed) against the release-workflow OIDC identity — a
+  **cosign-signed keyless**, self-update also **verifies that signature** (when
+  cosign is installed) against the release-workflow OIDC identity, and a
   published-but-invalid signature is refused like a mismatch. `--check` reports
   availability with an exit code for cron/CI, and a dev build (no release tag to
-  compare) is a safe no-op.
+  compare against) is a safe no-op.
 - **Keyless-signed releases with SLSA provenance.** Releases are signed with
-  **cosign keyless (Sigstore/Fulcio)** off the GitHub Actions OIDC identity —
-  no key to store — and carry a native GitHub **SLSA build-provenance
-  attestation**. `checksums.txt.sig` + `checksums.txt.pem` ship on every
-  release; anyone can `cosign verify-blob` them against the workflow identity.
+  **cosign keyless (Sigstore/Fulcio)** off the GitHub Actions OIDC identity, so
+  there's no key to store, and they carry a native GitHub **SLSA build-provenance
+  attestation**. `checksums.txt.sig` and `checksums.txt.pem` ship on every
+  release, and anyone can `cosign verify-blob` them against the workflow identity.
 - **One source of truth for tool families.** The DevOps "families" (`kube`,
   `tf`, `cloud`…) that `history` filters by and that the guard prefilter derives
-  from now live in a single package (`internal/families`) — the taxonomy that
-  was once hard-coded in three diverging places. Adding a tool to a family, or a
-  new danger verb, is a one-line change consumed everywhere at once.
+  from now live in a single package (`internal/families`), the taxonomy that was
+  once hard-coded in three diverging places. Adding a tool to a family, or a new
+  danger verb, is a one-line change consumed everywhere at once.
 - **Machine-readable, with exit codes that mean something.** A global `--json`
-  flag renders `list`/`status`/`doctor`/`audit` as structured JSON; `audit` exits
-  non-zero on HIGH/CRITICAL CVEs (and critical secret leaks with `--secrets`), so
-  it drops into CI as a security gate with no wrapper script.
+  flag renders `list`/`status`/`doctor`/`audit` as structured JSON, and `audit`
+  exits non-zero on HIGH/CRITICAL CVEs (plus critical secret leaks with
+  `--secrets`), so it drops into CI as a security gate with no wrapper script.
 - **A CVE-correlated SBOM of your workstation.** `opsforge sbom` builds a
-  CycloneDX 1.6 document from the *detected* tools — each a component with its
-  version and, when mapped, a PURL — and `--audit` embeds the OSV.dev CVEs as
-  linked CycloneDX vulnerabilities — a signed inventory of your toolbox *with*
-  its vulnerabilities, feedable to grype/trivy or a compliance gate.
+  CycloneDX 1.6 document from the *detected* tools (each a component with its
+  version and, when mapped, a PURL), and `--audit` embeds the OSV.dev CVEs as
+  linked CycloneDX vulnerabilities: a signed inventory of your toolbox *with* its
+  vulnerabilities, feedable to grype/trivy or a compliance gate.
 - **OpenVEX + exploitability triage.** `opsforge vex` re-uses the audit to emit
-  an OpenVEX v0.2.0 document — one `affected` statement per (PURL, CVE) with an
-  action — sharing the *exact* PURL the SBOM uses, so the two correlate. `--kev`
+  an OpenVEX v0.2.0 document (one `affected` statement per (PURL, CVE) with an
+  action), sharing the *exact* PURL the SBOM uses so the two correlate. `--kev`
   cross-references CISA's Known-Exploited catalog (cached, 24h TTL, best-effort)
-  to surface what's exploited *in the wild* — a sensible way to prioritize now
-  that CVSS enrichment is unreliable. The builder is pure (id/timestamp
-  injected) and deterministically sorted, so the document diffs and signs.
+  to surface what's exploited *in the wild*, a sensible way to prioritize now
+  that CVSS enrichment is unreliable. The builder is pure (id/timestamp injected)
+  and deterministically sorted, so the document diffs and signs.
 - **Key-based Sigstore signing, chosen deliberately.** `sbom --sign` / `vex
   --sign` produce a self-contained Sigstore bundle via `sigstore-go` (a light
-  dep — not cosign-as-a-library, which would bloat go.mod), implementing the
+  dep, not cosign-as-a-library, which would bloat go.mod), implementing the
   `Keypair` interface over a persistent local ECDSA P-256 key so signing is
-  fully offline and the public key is stable across signatures. It's key-based,
-  not keyless, on purpose: keyless would publish the signer's identity in a
-  public Rekor log and prove nothing about provenance for a hand-generated
-  document — so local signing proves integrity + key attribution, and keyless
-  provenance stays on the CI-signed releases. Verifiable with `cosign
-  verify-blob`; the bytes signed are exactly the bytes written, so verification
-  matches the file.
+  fully offline and the public key stays stable across signatures. It's key-based
+  rather than keyless on purpose: keyless would publish the signer's identity in
+  a public Rekor log and prove nothing about provenance for a hand-generated
+  document. So local signing proves integrity plus key attribution, and keyless
+  provenance stays on the CI-signed releases. It's verifiable with `cosign
+  verify-blob`, and the bytes signed are exactly the bytes written, so
+  verification matches the file.
 - **A read-only MCP server.** `opsforge mcp` exposes the workstation to AI agents
   over the Model Context Protocol via five tools (installed tools, CVE audit,
   SBOM, status, guard-policy check). The payload builders are pure functions over
-  data opsforge already computes, unit-tested without a live client; every tool
-  is `ReadOnlyHint` and derived from read-only sources — the mutating commands
-  stay behind the interactive CLI by design, so an agent can inspect but never
-  change the machine.
+  data opsforge already computes, unit-tested without a live client. Every tool
+  is `ReadOnlyHint` and derived from read-only sources: the mutating commands stay
+  behind the interactive CLI by design, so an agent can inspect but never change
+  the machine.
 - **A lockfile for verifiable reproducibility.** `opsforge sync` writes an
   `opsforge.lock` pinning each tool's exact resolved version (normalized,
-  name-sorted for clean diffs); `sync --check` compares the machine against it
-  and reports *version* drift — not just missing tools — in JSON and human
+  name-sorted for clean diffs). `sync --check` compares the machine against it
+  and reports *version* drift, not just missing tools, in both JSON and human
   output, non-zero on mismatch. `opsforge.yaml` declares *what*, `opsforge.lock`
-  proves *which version* — and it degrades gracefully (no lock → old behavior).
+  proves *which version*, and it degrades gracefully (no lock means old behavior).
 - **Image scanning by correlation, not reinvention.** `opsforge scan` drives an
   installed syft/trivy for the image SBOM (importing them as libraries would
   triple go.mod), then runs the components through opsforge's *own* OSV matcher
-  and — with `--diff` — correlates them against the workstation toolbox to
-  surface version drift a standalone scanner can't see. The reusable pieces
-  (`internal/imagescan`: a purl→OSV parser, the correlation) are unit-tested; the
-  external SBOM step is delegated, on purpose.
+  and, with `--diff`, correlates them against the workstation toolbox to surface
+  version drift a standalone scanner can't see. The reusable pieces
+  (`internal/imagescan`: a purl→OSV parser, the correlation) are unit-tested, and
+  the external SBOM step is delegated, on purpose.
 - **OSV batch transport.** The audit finds every affected tool in one
-  `/v1/querybatch` call, then fetches each distinct CVE once — fewer requests on
+  `/v1/querybatch` call, then fetches each distinct CVE once: fewer requests on
   the healthy path and OSV's rate-limit-friendly endpoint, with a per-tool
   fallback if the batch is down. The CVSS/semver matching engine is unchanged.
 - **One cached digest, never blocking.** `opsforge notify` aggregates CVEs,
   available updates, leaked secrets and a newer opsforge into a single cached
   digest (`internal/notices`, `~/.cache/opsforge/`, 6h TTL). Both the shell (a
   once-per-session one-liner via `notify.zsh`) and `opsforge status` read it
-  *without* a synchronous network call — a stale cache is recomputed in a
-  detached background process — so the heads-up path can never hang your prompt.
-  A fresh CVE, update or leak surfaces in your shell without you asking for it.
+  *without* a synchronous network call (a stale cache is recomputed in a detached
+  background process), so the heads-up path can never hang your prompt. A fresh
+  CVE, update or leak surfaces in your shell without you asking for it.
 - **Reproducible env + a CVE gate in one file.** A committed `opsforge.yaml`
   (`version`, `tools`, `profiles`, `fail_on`) makes `opsforge sync` reproduce a
-  repo's toolchain — and `fail_on: high|critical` audits *only the required
-  tools* and fails the sync on a matching CVE. That's the reproducibility mise
-  and devbox give you, plus a supply-chain gate in the same file.
+  repo's toolchain, and `fail_on: high|critical` audits *only the required tools*
+  and fails the sync on a matching CVE. That's the reproducibility mise and devbox
+  give you, plus a supply-chain gate in the same file.
 - **Auth-safe detection.** Probing `kubectl --version` where kubectl is a
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
   never triggers auth or hangs on a wrapper CLI holding the output pipe.
 - **The catalog can't lie.** A CI job validates all 287 brew references against
   the Homebrew API and every GitHub asset template against the tool's real latest
-  release (darwin/linux × amd64/arm64) — a renamed formula is caught before a
+  release (darwin/linux × amd64/arm64), so a renamed formula is caught before a
   user hits it mid-install.
 - **Homebrew edge cases handled.** Auto-taps third-party taps and recovers from
   link conflicts (`brew link --overwrite`) that otherwise fail a docker upgrade.
-- **Never breaks your shell.** Modules are `zsh -n`-checked in CI; the `shell
+- **Never breaks your shell.** Modules are `zsh -n`-checked in CI, and the `shell
   env` snippet does only PATH lookups (no subprocesses) for fast startup.
 
 ### Architecture
@@ -1332,22 +1370,24 @@ OPSFORGE_SKIP_BREW_VALIDATION=1 go test ./...   # skip the network catalog check
 go build -o opsforge .
 ```
 
-CI runs gofmt, vet, race tests on Linux & macOS, validates the catalog against
-upstream, and cross-compiles all targets. Releases are cut by GoReleaser on tag.
+CI runs gofmt, vet and race tests on Linux and macOS, validates the catalog
+against upstream, and cross-compiles every target. Releases are cut by GoReleaser
+on tag.
 
 ## Roadmap
 
 **Recently shipped**
 
-- [x] `opsforge verify` — read-only [credential-hygiene](#credential-hygiene-verify) audit of the workstation
-- [x] `opsforge scan <image>` — image CVE scan correlated with your workstation
-- [x] `opsforge sbom/vex --sign` — key-based Sigstore signing of the artifacts
+- [x] `opsforge verify`, a read-only [credential-hygiene](#credential-hygiene-verify) audit of the workstation
+- [x] `opsforge scan <image>`, an image CVE scan correlated with your workstation
+- [x] `opsforge sbom/vex --sign`, key-based Sigstore signing of the artifacts
 - [x] One-command interactive [demo sandbox](#try-it-in-a-sandbox) (Docker + Codespaces)
 - [x] Read-only [MCP server](#ai-agents-mcp) for AI agents
-- [x] `opsforge.lock` — verifiable, reproducible toolchains
+- [x] `opsforge.lock` for verifiable, reproducible toolchains
 - [x] **fish** support for the shell layer (guards, prompt, `?` help, aliases)
-- [x] **bash** support for the shell layer (prompt, `?` help, aliases; guard is
-      best-effort — bash can't cancel a command pre-execution like zsh/fish)
+- [x] **bash** support for the shell layer (prompt, `?` help, aliases; the guard
+      is best-effort, since bash can't cancel a command pre-execution like
+      zsh/fish)
 
 **Next**
 

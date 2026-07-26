@@ -2,23 +2,23 @@
 
 # opsforge 🔥
 
-**Une couche de sécurité policy-as-code pour votre poste de travail DevOps.**
+**Une couche de sécurité pour votre poste de travail DevOps, pour qu'une commande étourdie (ou un agent IA) ne puisse pas rayer le mauvais cluster de la carte.**
 
-opsforge transforme votre shell (zsh, fish ou bash) en un environnement qui
-connaît votre contexte, avec des **guards policy-as-code** qui arrêtent un
-`kubectl delete` ou `terraform destroy` étourdi sur le mauvais cluster — les
-mêmes règles vous protégeant au clavier *et* [tout agent IA](#agents-ia-mcp)
-qui pilote votre machine — plus un [**audit d'hygiène des credentials**](#hygiène-des-credentials-verify)
-en lecture seule de tous les secrets du poste. Il garde un [journal
-d'audit](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-) append-only
-de ce qui a déclenché un guard sur prod, et complète le tout par un SBOM corrélé
-aux CVE + **OpenVEX** priorisé par le catalogue des vulnérabilités activement
-exploitées de la CISA.
+Vous connaissez la situation : vous vouliez lancer ce `kubectl delete` sur
+staging, mais votre shell pointait vers la prod. opsforge est la ceinture de
+sécurité de ce moment-là. Il transforme votre shell (zsh, fish ou bash) en un
+shell qui sait sur quel cluster vous êtes, et arrête une commande destructrice
+avant qu'elle ne tombe, à partir de règles que *vous* avez écrites, dans un
+fichier. Les mêmes règles s'appliquent, que ce soit vous au clavier ou [un agent
+IA](#agents-ia-mcp) qui travaille sur votre machine.
 
-Et parce qu'une couche de sécurité ne sert à rien sur une machine vide, il
-**installe et maintient aussi votre boîte à outils** — un sélecteur interactif
-parmi 287 CLI triés sur le volet, dans un seul binaire. Un outil perso, pas une
-plateforme d'équipe — pas de serveur, pas de compte, rien qui vous enferme.
+C'est le cœur de l'affaire. Autour, opsforge garde aussi la machine honnête : il
+audite [les credentials](#hygiène-des-credentials-verify) posés sur votre disque
+et les [trous connus](#sbom--chaîne-dapprovisionnement) dans vos outils. Et
+comme rien de tout ça n'aide sur une machine vide, il installe et maintient
+aussi votre boîte à outils DevOps. Le tout dans un seul binaire. C'est un outil
+perso, pas une plateforme d'équipe : pas de serveur, pas de compte, rien qui
+vous enferme.
 
 [English](README.md) · **Français**
 
@@ -41,34 +41,39 @@ plateforme d'équipe — pas de serveur, pas de compte, rien qui vous enferme.
 
 ## Ce que c'est
 
-Le différenciateur d'abord, la plomberie en dernier :
+Voyez opsforge comme trois outils qui se trouvent partager un seul binaire. Les
+voici, le plus intéressant en premier :
 
 | | | |
 |:--:|---|---|
-| 🛡️ | **Les guards — le moat** | Une seule commande transforme votre **zsh, fish ou bash** en un shell qui connaît votre contexte, où des [**guards policy-as-code**](#guards-policy-as-code) interceptent les commandes destructrices selon le contexte kube/cloud/tf actif. Les mêmes règles, testables et versionnables, vous protègent au clavier *et* [tout agent IA](#agents-ia-mcp) qui pilote la machine — avec un [journal d'audit](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-) append-only de ce qui s'est déclenché sur prod. |
-| 🔐 | **La sécurité du poste** | [`opsforge verify`](#hygiène-des-credentials-verify) audite les **credentials de votre machine** (clés statiques, secrets en clair, permissions trop larges, certs qui expirent) en lecture seule et hors-ligne ; [`opsforge audit`](#ci--intégrations)/[`sbom`](#sbom--chaîne-dapprovisionnement)/[`vex`](#sbom--chaîne-dapprovisionnement) couvrent les **CVE de vos outils** — un SBOM signé + OpenVEX, priorisé par le catalogue CISA KEV. |
-| 📦 | **La boîte à outils (la commodité)** | Un sélecteur interactif parmi **287 CLI triés sur le volet** — détecte ce que vous avez et ce qui a vieilli, installe le reste via Homebrew *ou* directement depuis les binaires GitHub (même sur une machine Linux nue). Plus le [poste- & projet-as-code](#mode-projet) : `snapshot`/`apply`/`sync` reproduisent une machine ou la boîte à outils d'un dépôt, avec un gate CVE. |
+| 🛡️ | **Les guards — le vrai sujet** | Une seule commande transforme votre shell (zsh, fish ou bash) en un shell qui *sait où il se trouve*. Quand vous tapez `kubectl delete` ou `terraform destroy` sur un cluster de production, il vous arrête et demande d'abord. Les règles sont les vôtres, écrites dans un fichier, et elles vous protègent au clavier *et* [tout agent IA](#agents-ia-mcp) qui travaille sur votre machine. Tout ce qui déclenche un guard sur prod est [consigné](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-), pour que vous puissiez y revenir plus tard. |
+| 🔐 | **Garder la machine honnête** | Deux questions, deux réponses. *Les credentials sur ma machine sont-ils un risque ?* — [`opsforge verify`](#hygiène-des-credentials-verify) trouve les clés qui n'expirent jamais, les secrets en clair, les fichiers lisibles par tout le monde. *Mes outils ont-ils des trous connus ?* — [`opsforge audit`](#ci--intégrations) et compagnie produisent un inventaire signé ([SBOM](#sbom--chaîne-dapprovisionnement) + [VEX](#sbom--chaîne-dapprovisionnement)) de chaque CVE, et pointent celles que les attaquants exploitent *vraiment*. Tout en lecture seule, sans cloud. |
+| 📦 | **Monter la boîte à outils** | Et parce qu'une couche de sécurité ne sert à rien sur une machine vide, opsforge installe aussi vos outils DevOps et les garde à jour : un sélecteur cherchable parmi **287 CLI triés sur le volet**, dans un seul binaire, sur macOS ou une machine Linux nue. Plus des [setups reproductibles](#mode-projet) : décrivez une machine (ou la boîte à outils d'un dépôt) dans un fichier et reconstruisez-la n'importe où. |
 
 ### Pourquoi ça existe
 
-Une machine DevOps a un problème de sécurité que l'outillage habituel ignore :
+Une machine DevOps a un problème de sécurité que l'outillage habituel se contente
+d'ignorer.
 
-- **Un `kubectl delete` étourdi sur le mauvais contexte** n'a aucune ceinture de
-  sécurité — les outils l'exécutent qu'on soit sur staging ou sur prod. Et
-  maintenant un **agent IA** peut le lancer *à votre place*, plus vite, sans que
-  personne ne regarde.
-- **Personne ne sait ce qui est un risque sur la machine** — quels credentials
-  n'expirent jamais, lesquels sont en clair, quels outils portent une CVE
-  activement exploitée.
-- **Reconstruire un poste**, c'est installer une vingtaine de CLI et brancher un
-  shell utilisable pour chacun — la base, mais toujours une journée perdue.
+- **Un `kubectl delete` étourdi sur le mauvais cluster** n'a aucune ceinture de
+  sécurité. L'outil l'exécute que vous soyez sur staging ou sur prod : il ne fait
+  pas la différence, et il ne demandera rien. Pire : un **agent IA** peut
+  maintenant le lancer *à votre place*, plus vite, sans que personne ne regarde.
+- **Personne ne sait vraiment ce qui est risqué sur la machine.** Quels
+  credentials n'expirent jamais ? Lesquels sont en clair ? Quel outil porte un
+  trou que quelqu'un est en train d'exploiter là, maintenant ? Il faudrait
+  vérifier à la main, outil par outil.
+- **Reconstruire un poste, c'est une journée perdue.** Installer une vingtaine
+  de CLI, puis brancher complétions, alias et un prompt correct pour chacun. À
+  chaque fois.
 
-opsforge réunit tout ça dans un seul binaire parce que ces problèmes partagent
-le même lieu (votre shell) et la même donnée (la boîte à outils détectée). C'est
-délibérément un **outil perso, pas une plateforme d'équipe** — pas de serveur,
-pas de compte, rien qui vous enferme — pour que ça reste quelque chose que vous
-lancez, pas quelque chose que vous opérez. (Passer à une flotte ? Voir
-[Les guards à l'échelle d'une équipe](#les-guards-à-léchelle-dune-équipe).)
+opsforge réunit tout ça dans un seul binaire parce que ces problèmes partagent le
+même lieu (votre shell) et la même donnée (les outils qu'il détecte). C'est
+délibérément un **outil perso, pas une plateforme d'équipe** (pas de serveur, pas
+de compte, rien qui vous enferme), pour que ça reste quelque chose que vous
+*lancez*, pas quelque chose que vous devez *opérer*. (Vous vous interrogez sur une
+flotte entière ? Voir [Les guards à l'échelle d'une
+équipe](#les-guards-à-léchelle-dune-équipe).)
 
 ---
 
@@ -160,8 +165,9 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 </table>
 
 > **Lisible par une machine, partout.** Un flag global `--json` fait sortir à
-> `list`, `status`, `doctor` et `audit` du JSON structuré au lieu de la TUI —
-> voir [CI & intégrations](#ci--intégrations).
+> `list`, `status`, `doctor` et `audit` du JSON structuré au lieu de la TUI, si
+> bien que les mêmes commandes alimentent un script tout aussi volontiers. Voir
+> [CI & intégrations](#ci--intégrations).
 
 ### Le sélecteur
 
@@ -222,18 +228,19 @@ opsforge guard test "terraform destroy" --context prod --json  # vérifiez en CI
 
 ### Profils de stack
 
-Installez toute une stack en une commande — ou créez la vôtre :
+Un profil, c'est juste un paquet d'outils avec un nom. Installez toute une stack
+en une commande, ou créez le vôtre :
 
 ```sh
 opsforge install --profile aws-k8s   # aws, eksctl, kubectl, helm, k9s, terraform…
 opsforge profiles                    # liste tout avec le statut d'installation
 ```
 
-Intégrés : `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`, `observability`,
-`security`, `sysadmin`, `netsec`, `secrets`, `ai`. Dans le sélecteur, cochez vos
-outils et appuyez sur `s` pour enregistrer un profil personnel dans
-`~/.config/opsforge/profiles.yaml` — ensuite `opsforge install --profile my-stack`
-le reproduit n'importe où.
+Les profils intégrés sont `core`, `k8s`, `aws-k8s`, `gcp-k8s`, `iac`,
+`observability`, `security`, `sysadmin`, `netsec`, `secrets` et `ai`. Vous voulez
+le vôtre ? Dans le sélecteur, cochez vos outils et appuyez sur `s` pour
+enregistrer un profil personnel dans `~/.config/opsforge/profiles.yaml`. À partir
+de là, `opsforge install --profile my-stack` le reproduit n'importe où.
 
 ### Poste de travail as-code
 
@@ -315,31 +322,33 @@ opsforge shell install && exec fish   # fish (auto-détecté depuis $SHELL)
 opsforge shell install && exec bash   # bash
 ```
 
-Transforme votre **zsh, fish ou bash** en un environnement taillé pour le DevOps
-(`shell install` détecte votre shell depuis `$SHELL`, ou passez `--shell
-zsh|fish|bash` ; `shell uninstall` restaure tout).
+Ceci prend votre **propre zsh, fish ou bash** et le rend conscient du DevOps. Il
+ne remplace pas votre shell, il améliore celui que vous utilisez déjà. (`shell
+install` détecte votre shell depuis `$SHELL`, ou forcez-le avec `--shell
+zsh|fish|bash` ; `shell uninstall` remet tout comme avant.)
 
 > **zsh · fish · bash.** Le prompt qui signale la prod, l'aide inline `?` et les
 > alias DevOps marchent dans les trois. Deux réserves à énoncer clairement :
 > - Les agréments interactifs ci-dessous (suggestion en ligne, coloration
->   syntaxique, recherche d'historique par préfixe) sont **natifs dans fish** —
->   opsforge n'y ajoute que les guards et le prompt ; sur **zsh** il installe les
->   plugins qui les fournissent ; **bash** n'a pas d'équivalent standard, il
->   utilise readline tel quel.
+>   syntaxique, recherche d'historique par préfixe) sont **natifs dans fish**,
+>   opsforge n'y ajoute donc que les guards et le prompt. Sur **zsh** il installe
+>   les plugins qui les fournissent. **bash** n'a pas d'équivalent standard, il
+>   se rabat sur readline tel quel.
 > - Le **guard bloquant** est pleinement fiable sur **zsh et fish** (les deux
 >   peuvent annuler une commande avant qu'elle s'exécute). **bash ne peut pas**
->   le faire proprement : son guard est donc *best-effort* — il confirme/avertit,
->   mais le passage en arrière-plan et certaines constructions multi-lignes se
->   comportent différemment. Pour un blocage garanti, utilisez zsh ou fish.
->   (Les guards sont un filet de sécurité, pas une barrière de sécurité, quel que
->   soit le shell.)
+>   le faire proprement : son guard est donc *best-effort*. Il confirme et
+>   avertit, mais le passage en arrière-plan et certaines constructions
+>   multi-lignes se comportent différemment. Pour un blocage garanti, utilisez zsh
+>   ou fish. (Les guards sont un filet de sécurité, pas une barrière de sécurité,
+>   quel que soit le shell.)
 >
 > La description ci-dessous détaille l'expérience zsh.
 
-Transforme votre **zsh** en un environnement taillé pour le DevOps (modules sous
-`~/.config/opsforge/shell/`, `shell uninstall` restaure tout) :
+Les détails, maintenant. opsforge transforme votre **propre zsh** en un
+environnement conscient du DevOps (ses modules vivent sous
+`~/.config/opsforge/shell/`, et `shell uninstall` restaure tout) :
 
-- **Une édition qui reste discrète, à la demande** — rien ne surgit pendant que
+- **Une édition qui reste discrète, à la demande.** Rien ne surgit pendant que
   vous tapez : juste une suggestion grise en ligne, issue de votre historique.
   `↑`/`↓` parcourent l'historique en filtrant sur le **début de ligne entier** que
   vous avez tapé, `→` accepte toute la suggestion, `Tab` l'accepte mot à mot, et la
@@ -357,37 +366,38 @@ Transforme votre **zsh** en un environnement taillé pour le DevOps (modules sou
 
   Vous préférez l'ancien menu toujours ouvert (zsh-autocomplete) ? Mettez
   `OPSFORGE_AUTOMENU=1`. Pour désactiver toute la couche, `OPSFORGE_INTERACTIVE=0`.
-- **Aide `?`** — appuyez sur `?` sur une ligne vide pour une antisèche aux couleurs
-  du thème ; tapez `kubectl get ?` pour l'aide de cette commande, rendue sous un
-  en-tête encadré avec la syntaxe man colorée par `bat` ; tapez `??` pour qu'une IA
-  vous explique votre dernière erreur.
-- **Prompt contextuel** — le prompt de droite affiche le `cluster:namespace` kube
-  et vire au **rouge dès que le contexte ressemble à de la prod** — une alarme
-  *visuelle* passive, que vous voyez **avant même de commencer à taper**, à côté du
-  compte cloud et du workspace terraform (affichés chacun seulement quand c'est
-  pertinent). Et à gauche, un prompt épuré : répertoire relatif au dépôt, branche
-  git avec ses marqueurs dirty/ahead/behind, durée de la dernière commande, et un
-  `❯` qui rougit en cas d'échec. Tout est lu en local — jamais un cloud ni un
-  cluster contacté.
-- **Guards policy-as-code** — avant une commande destructrice (`kubectl delete`,
+- **Aide `?`.** Appuyez sur `?` sur une ligne vide pour une antisèche aux couleurs
+  du thème. Tapez `kubectl get ?` et vous obtenez l'aide de cette commande, rendue
+  sous un en-tête encadré avec la syntaxe man colorée par `bat`. Tapez `??` pour
+  qu'une IA vous explique votre dernière erreur.
+- **Un prompt qui sait où il est.** Le prompt de droite affiche le
+  `cluster:namespace` kube et vire au **rouge dès que le contexte ressemble à de la
+  prod**. C'est une alarme *visuelle* passive, que vous voyez **avant même de
+  commencer à taper**, à côté du compte cloud et du workspace terraform (affichés
+  chacun seulement quand c'est pertinent). Et à gauche, un prompt épuré : répertoire
+  relatif au dépôt, branche git avec ses marqueurs dirty/ahead/behind, durée de la
+  dernière commande, et un `❯` qui rougit en cas d'échec. Tout est lu en local.
+  Jamais un cloud ni un cluster n'est contacté.
+- **Guards policy-as-code.** Avant une commande destructrice (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) dans un contexte de production, opsforge
-  peut confirmer, avertir ou bloquer — le tout piloté par des [règles
-  déclaratives](#guards-policy-as-code), et non par des vérifications codées en
-  dur. `OPSFORGE_GUARDS=0` pour désactiver.
-- **Alias & raccourcis** — `k`, `tf`, `dc`, plus `kx`/`kn` pour changer de
+  peut confirmer, avertir ou bloquer. Le tout piloté par des [règles que vous
+  écrivez dans un fichier](#guards-policy-as-code), et non par des vérifications
+  codées en dur dans l'outil. `OPSFORGE_GUARDS=0` pour désactiver.
+- **Alias & raccourcis.** `k`, `tf`, `dc`, plus `kx`/`kn` pour changer de
   contexte/namespace kube (sélecteur fzf quand il est là). Le builtin `history`
   est élargi pour afficher les **200** dernières lignes (`history 1` pour tout), et
-  `hg <terme>` grep l'intégralité de votre historique — tandis que
+  `hg <terme>` grep l'intégralité de votre historique, tandis que
   [`opsforge history`](#history) le regroupe par famille d'outils DevOps.
-- **Un signalement proactif** — une fois par session, opsforge affiche une ligne
-  compacte dans votre shell quand quelque chose sur votre machine réclame votre
-  attention : une CVE vient de toucher un outil installé, des mises à jour
-  attendent, un secret fuit, ou un opsforge plus récent est sorti. Il s'appuie sur
-  un cache local (`~/.cache/opsforge/`, TTL 6h) et rafraîchit un cache périmé en
-  arrière-plan, pour que le prompt ne bloque jamais sur le réseau. Lancez
-  [`opsforge notify`](#le-digest-notify) pour le détail complet ; coupez ce
+- **Un signalement proactif.** Une fois par session, opsforge affiche une ligne
+  compacte dans votre propre shell quand quelque chose réclame votre attention :
+  une CVE vient de toucher un outil installé, des mises à jour attendent, un secret
+  fuit, ou un opsforge plus récent est sorti. Il s'appuie sur un cache local
+  (`~/.cache/opsforge/`, TTL 6h) et rafraîchit un cache périmé en arrière-plan,
+  pour que le prompt ne bloque jamais sur le réseau. Lancez
+  [`opsforge notify`](#le-digest-notify) pour le détail complet, ou coupez ce
   signalement avec `OPSFORGE_NOTIFY=0`.
-- **Intégrations** — `fzf`, `zoxide`, `atuin` branchés quand ils sont présents.
+- **Intégrations.** `fzf`, `zoxide` et `atuin` sont branchés automatiquement
+  quand ils sont présents.
 
 **Trois couches, trois rôles :** le **prompt** est une alarme *passive* — il
 rougit pour que vous **voyiez** que vous êtes en prod ; les
@@ -453,11 +463,11 @@ avec un compteur d'exécutions `×N` ; `--limit/-n` les plafonne (20 par défaut
 
 </div>
 
-Des outils comme Homebrew Bundle, mise, chezmoi et aqua installent vos CLI ;
-opsforge ajoute une couche au-dessus — il **pose des garde-fous sur leur usage**.
-Il transforme la couche de sûreté prod du shell en un petit moteur de politique :
-un jeu de règles déclaratives qui décide si une commande destructrice doit
-s'exécuter, avertir, demander confirmation ou être refusée — selon le contexte
+Des outils comme Homebrew Bundle, mise, chezmoi et aqua installent vos CLI.
+opsforge ajoute une couche au-dessus : il **pose des garde-fous sur leur usage**.
+La couche de sûreté prod du shell est en réalité un petit moteur de politique, un
+jeu de règles déclaratives qui décide si une commande destructrice doit
+s'exécuter, avertir, demander confirmation ou être refusée, selon le contexte
 dans lequel vous vous trouvez réellement.
 
 ### La seule règle à retenir
@@ -739,8 +749,10 @@ relecteur peut croire — `opsforge.yaml` déclare le *quoi*, `opsforge.lock` pr
 
 </div>
 
-opsforge émet un **SBOM de votre poste de travail corrélé aux CVE** — un artefact
-supply-chain exploitable par grype, `trivy sbom` ou un pipeline de conformité.
+Un SBOM, c'est la liste des ingrédients de votre machine : chaque outil, sa
+version, et d'où il vient. opsforge émet un **SBOM de votre poste de travail
+corrélé aux CVE**, un artefact supply-chain que grype, `trivy sbom` ou un
+pipeline de conformité lisent directement.
 
 ```sh
 opsforge sbom                # JSON CycloneDX 1.6 de vos outils installés → stdout
@@ -767,9 +779,10 @@ avez obtenu au final — CVE comprises.
 ### VEX & CISA KEV
 
 Une simple liste de CVE vous dit qu'une vulnérabilité *existe*. Elle ne vous dit
-pas laquelle corriger **en premier** — et comme le NVD a cessé d'enrichir la
+pas laquelle corriger **en premier**, et comme le NVD a cessé d'enrichir la
 plupart des CVE en 2026, le score CVSS sur lequel vous trieriez est souvent
-absent ou périmé. `opsforge vex` répond aux deux questions.
+absent ou périmé. Le VEX (un document « vulnerability exploitability exchange »)
+est l'artefact qui porte ce verdict, et `opsforge vex` le produit.
 
 ```sh
 opsforge vex                 # document OpenVEX → stdout (va de pair avec `opsforge sbom`)
@@ -798,8 +811,9 @@ verdict jusqu'à ce qui le consomme ensuite.
 ### Signer les artefacts
 
 Le SBOM comme le VEX peuvent être signés dans un **bundle
-[Sigstore](https://www.sigstore.dev)** auto-contenu, que vous remettez à qui
-vous voulez :
+[Sigstore](https://www.sigstore.dev)** auto-contenu, que vous remettez à qui vous
+voulez (Sigstore est l'outillage standard pour signer et vérifier des artefacts
+logiciels) :
 
 ```sh
 opsforge sbom --sign > bom.json      # + un bundle bom.sigstore.json
@@ -869,8 +883,9 @@ il s'insère donc dans un pipeline comme barrière.
 
 ### Le digest notify
 
-opsforge n'attend pas que vous lanciez `audit` — `opsforge notify` rassemble **au
-même endroit tout ce qui, sur *votre* machine, réclame votre attention** :
+opsforge n'attend pas que vous lanciez `audit`. `opsforge notify`, c'est **un seul
+digest de tout ce qui, sur *votre* machine, réclame votre attention**, rassemblé
+au même endroit :
 
 - les outils installés porteurs d'une **CVE connue** (HIGH/CRITICAL signalés en
   rouge),
@@ -907,8 +922,8 @@ que ni le digest ni le signalement du shell n'attendent sur le réseau. Le même
 constat remonte aussi d'un coup d'œil dans [`opsforge status`](#aperçu-rapide).
 
 Il réunit CVE, mises à jour, secrets exposés *et* sa propre self-update dans un
-seul digest, et le fait remonter de lui-même dans votre shell — dès qu'un advisory
-tombe sur votre boîte à outils, vous le savez, sans avoir rien à lancer.
+seul digest, et le fait remonter de lui-même, dans votre shell. Ainsi, dès qu'un
+advisory tombe sur votre boîte à outils, vous le savez, sans avoir rien à lancer.
 
 ---
 
@@ -916,21 +931,21 @@ tombe sur votre boîte à outils, vous le savez, sans avoir rien à lancer.
 
 `opsforge audit` demande *mes outils sont-ils vulnérables ?* `opsforge verify`
 répond à l'autre moitié : *les credentials de cette machine sont-ils un risque ?*
-Un poste DevOps accumule des secrets — clés cloud, un kubeconfig, des clés SSH,
-des tokens de registry, une pile de logins `~/.docker`/`~/.npmrc`/`~/.netrc`.
-`verify` en fait l'inventaire et signale les risques d'hygiène, en une passe en
-lecture seule :
+Un poste DevOps accumule des secrets au fil du temps (clés cloud, un kubeconfig,
+des clés SSH, des tokens de registry, une pile de logins
+`~/.docker`/`~/.npmrc`/`~/.netrc`). `verify` en fait l'inventaire et signale les
+risques d'hygiène, en une passe en lecture seule :
 
-- **Clés statiques long-lived** qui n'expirent jamais — une clé d'accès AWS
-  `AKIA`, une clé JSON de compte de service GCP, une clé SSH sans passphrase, un
-  token kube statique legacy. Il distingue une clé statique d'une clé fédérée
+- **Clés statiques à longue durée de vie** qui n'expirent jamais : une clé d'accès
+  AWS `AKIA`, une clé JSON de compte de service GCP, une clé SSH sans passphrase,
+  un token kube statique legacy. Il distingue une clé statique d'une clé fédérée
   (SSO, OIDC, `exec`, assume-role) et ne signale que la première.
-- **Secrets en clair** — le credential store de git, `~/.netrc`, les logins
+- **Secrets en clair** : le credential store de git, `~/.netrc`, les logins
   base64 `~/.docker`/`~/.npmrc` (base64 n'est *pas* du chiffrement), les tokens
   `gh`/`glab`.
-- **Permissions trop larges** — un fichier de credential lisible au-delà de son
-  propriétaire (il devrait être `0600`).
-- **Certificats et tokens expirés** ou proches de l'expiration — lus directement
+- **Permissions trop larges** : un fichier de credential lisible au-delà de son
+  propriétaire, alors qu'il devrait être `0600`.
+- **Certificats et tokens expirés** ou proches de l'expiration, lus directement
   depuis le PEM/JWT local.
 
 ```sh
@@ -957,10 +972,11 @@ convention qu'[`opsforge audit`](#ci--intégrations).
 
 ## Agents IA (MCP)
 
-opsforge parle le **[Model Context Protocol](https://modelcontextprotocol.io)** —
-si bien qu'un agent IA (Claude Code, Cursor, n'importe quel client MCP) peut
-*interroger votre poste de travail* via les mêmes données que le CLI calcule,
-sans scraping ni devinette.
+opsforge parle le **[Model Context Protocol](https://modelcontextprotocol.io)**,
+MCP pour faire court, la façon standard dont un agent IA dialogue avec un outil.
+Un agent (Claude Code, Cursor, n'importe quel client MCP) peut donc *interroger
+votre poste de travail* via les mêmes données que le CLI calcule, sans scraping
+ni devinette.
 
 ```sh
 claude mcp add opsforge -- opsforge mcp   # enregistre le serveur stdio une fois
