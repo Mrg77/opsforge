@@ -144,3 +144,21 @@ func TestBinDirPrependedToPath(t *testing.T) {
 		t.Errorf("BinDir appears %d times in PATH, want 1", n)
 	}
 }
+
+// TestVersionCommandIsDiscoverable guards the fix where `opsforge version` (the
+// reflex command) didn't exist — only `--version` and the buried `self version`
+// did. The top-level command must be registered and share self version's impl.
+func TestVersionCommandIsDiscoverable(t *testing.T) {
+	c, _, err := rootCmd.Find([]string{"version"})
+	if err != nil || c.Name() != "version" {
+		t.Fatalf("`opsforge version` must resolve to a top-level command, got %v (%v)", c, err)
+	}
+	// It reports something sane regardless of build-time injection.
+	v := currentVersion()
+	if v.Version == "" {
+		t.Error("version must never be empty")
+	}
+	if v.Platform == "" || v.Go == "" {
+		t.Error("version info must include platform and go")
+	}
+}

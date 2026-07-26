@@ -22,19 +22,12 @@ var selfCmd = &cobra.Command{
 	Short: "Manage the opsforge binary itself (version, update)",
 }
 
+// selfVersionCmd is kept for backward compatibility; `opsforge version` is the
+// discoverable top-level command. Both report the same info.
 var selfVersionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the running opsforge version",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		if output.JSON {
-			return output.Emit(struct {
-				Version string `json:"version"`
-				Dev     bool   `json:"dev"`
-			}{version, version == "dev" || version == ""})
-		}
-		fmt.Println(version)
-		return nil
-	},
+	Short: "Print the running opsforge version (alias of `opsforge version`)",
+	RunE:  versionCmd.RunE,
 }
 
 var (

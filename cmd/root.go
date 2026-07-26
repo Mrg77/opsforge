@@ -12,8 +12,14 @@ import (
 	"github.com/Mrg77/opsforge/internal/installer"
 )
 
-// version is injected at build time by GoReleaser via ldflags.
-var version = "dev"
+// version, commit and date are injected at build time by GoReleaser via
+// ldflags. They default to a "dev" marker for source builds so the version
+// command can honestly say the binary wasn't cut from a release.
+var (
+	version = "dev"
+	commit  = ""
+	date    = ""
+)
 
 var rootCmd = &cobra.Command{
 	Use:           "opsforge",

@@ -143,6 +143,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge mcp</code></td><td>Run a read-only MCP server so an AI agent can query your workstation (see <a href="#ai-agents-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Export / rebuild a whole workstation</td></tr>
 <tr><td><code>opsforge apply --check &lt;file-or-url&gt;</code></td><td>Verify a machine against your snapshot without changing it · non-zero exit on drift (<code>--json</code>)</td></tr>
+<tr><td><code>opsforge version</code></td><td>Print the version, commit and build info (also <code>--version</code>; <code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
 <tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Ask your AI CLI to explain a command or your last failure (the shell <code>??</code> shortcut)</td></tr>

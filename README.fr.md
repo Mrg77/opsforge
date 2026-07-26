@@ -148,6 +148,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge mcp</code></td><td>Lance un serveur MCP en lecture seule pour qu'un agent IA interroge votre poste de travail (voir <a href="#agents-ia-mcp">MCP</a>)</td></tr>
 <tr><td><code>opsforge snapshot</code> / <code>apply</code></td><td>Exporter / reconstruire tout un poste de travail</td></tr>
 <tr><td><code>opsforge apply --check &lt;fichier-ou-url&gt;</code></td><td>Vérifie une machine par rapport à votre snapshot sans la modifier · code de sortie non nul en cas d'écart (<code>--json</code>)</td></tr>
+<tr><td><code>opsforge version</code></td><td>Affiche la version, le commit et les infos de build (aussi <code>--version</code> ; <code>--json</code> pour scripter)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Affiche la version ou se met à jour — checksum vérifié avant le remplacement (<code>--check</code> pour CI/cron)</td></tr>
 <tr><td><code>opsforge history [famille|outil]</code></td><td>Commandes shell récentes, regroupées par famille d'outils (<code>kube</code>, <code>git</code>, <code>tf</code>… — voir <a href="#history">History</a>)</td></tr>
 <tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Demande à votre CLI IA d'expliquer une commande ou votre dernière erreur (le raccourci <code>??</code> du shell)</td></tr>
