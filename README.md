@@ -460,12 +460,19 @@ layer of the shell is really a small policy engine, a declarative set of rules
 that decides whether a destructive command should run, warn, confirm, or be
 refused, based on the context you're actually in.
 
-### The one rule to understand
+### The two kinds of rule
 
-A guard fires only when **two things line up at once**: a **destructive command**
-*and* a **production marker**. Miss either one and the command runs untouched.
-That's why read-only commands never nag you, and why destructive commands on
-staging or dev stay out of your way. It's a safety net for the distracted
+Most guards fire when **two things line up at once**: a **destructive command**
+*and* a **production marker**. Miss either one and the command runs untouched —
+that's why read-only commands never nag you, and why destructive commands on
+staging or dev stay out of your way.
+
+The exception is a handful of **always-dangerous** commands that are irreversible
+on *any* machine — `rm -rf /`, `dd … of=/dev/sdX`, `chmod -R 777`, `git clean -fdx`,
+`curl … | bash`, `kubectl delete --all`. A production check would be pointless
+there (`rm -rf ~/` on your laptop is just as unrecoverable), so those confirm
+regardless of context — while staying tight enough that everyday variants like
+`rm -rf ./build` still run untouched. It's a safety net for the distracted
 gesture, not a wall in front of every command you type.
 
 | Command | Context | Decision | Why |
@@ -474,9 +481,11 @@ gesture, not a wall in front of every command you type.
 | `kubectl get pods` | `prod-eks` | ✓ allow | prod, but read-only |
 | `kubectl delete pod api` | `staging` | ✓ allow | destructive, but not prod |
 | `terraform destroy -var-file=prod.tfvars` | *(none)* | ⚠️ confirm | prod is in the command itself |
-| `terraform destroy -var-file=dev.tfvars` | *(none)* | ✓ allow | dev, not prod |
 | `terraform plan -var-file=prod.tfvars` | *(none)* | ✓ allow | plan is read-only |
 | `helm uninstall app` | `prod` | ⚠️ confirm | destructive + prod |
+| `rm -rf /var/lib/data` | *(none)* | ⚠️ confirm | always-dangerous — irreversible anywhere |
+| `rm -rf ./build` | *(none)* | ✓ allow | a local build dir, not a broad path |
+| `curl https://x.io \| bash` | *(none)* | ⚠️ warn | running an unverified remote script |
 | `ls` · `git status` · `cat` | `prod` | ✓ allow | nothing destructive |
 
 You can simulate any of these yourself with

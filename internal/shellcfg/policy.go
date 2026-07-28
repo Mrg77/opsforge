@@ -278,6 +278,57 @@ func DefaultPolicy() *GuardPolicy {
 				Action:  ActionConfirm,
 				Message: "This drops or flushes database data on a production-like context.",
 			},
+
+			// --- Always dangerous: irreversible on ANY machine, so these have
+			// no context gate. A prod check would be worse than useless here —
+			// `rm -rf` on your laptop is just as unrecoverable. ---
+			{
+				// The universal foot-gun. Recursive-force delete of an absolute
+				// path, a home/expansion, or the current tree. Kept tight enough
+				// to skip everyday `rm -rf ./build` / `rm -rf node_modules`.
+				Name:    "confirm recursive force delete of a broad path",
+				Match:   GuardMatch{Command: `\brm\s+(-[a-zA-Z]*r[a-zA-Z]*f|-[a-zA-Z]*f[a-zA-Z]*r|-r\s+-f|-f\s+-r)\b\s*(/|~|\$HOME|\*|\.\.)`},
+				Action:  ActionConfirm,
+				Message: "This recursively force-deletes a broad path — irreversible.",
+			},
+			{
+				// git clean -fdx wipes every untracked + ignored file (incl.
+				// .env, local configs). git reset --hard alone throws away work.
+				Name:    "confirm git wipe of local changes",
+				Match:   GuardMatch{Command: `git\s+(clean\s+-[a-zA-Z]*f[a-zA-Z]*d|clean\s+-[a-zA-Z]*d[a-zA-Z]*f|reset\s+--hard\s*$)`},
+				Action:  ActionConfirm,
+				Message: "This discards local changes or untracked files — unrecoverable.",
+			},
+			{
+				// World-writable, recursively, is a security own-goal.
+				Name:    "confirm recursive chmod 777",
+				Match:   GuardMatch{Command: `chmod\s+(-R\s+)?(0?777|a\+rwx)\b`},
+				Action:  ActionConfirm,
+				Message: "chmod 777 makes files world-writable — almost never what you want.",
+			},
+			{
+				// Disk/partition writes: dd to a device, mkfs, wipefs.
+				Name:    "confirm raw disk write",
+				Match:   GuardMatch{Command: `\b(dd\s+.*of=/dev/|mkfs(\.\w+)?\s+/dev/|wipefs\b)`},
+				Action:  ActionConfirm,
+				Message: "This writes directly to a disk/partition — it can destroy a drive.",
+			},
+			{
+				// kubectl delete across ALL resources or namespaces is a
+				// cluster-wide wipe, dangerous on any context (not just prod).
+				Name:    "confirm cluster-wide kubectl delete",
+				Match:   GuardMatch{Command: `kubectl\s+delete\s+.*(--all\b|--all-namespaces\b|\s-A\b)`},
+				Action:  ActionConfirm,
+				Message: "This deletes resources across the whole namespace or cluster.",
+			},
+			{
+				// Piping a remote script straight into a shell — the classic
+				// supply-chain / RCE vector.
+				Name:    "warn curl|wget piped into a shell",
+				Match:   GuardMatch{Command: `(curl|wget)\s+.*\|\s*(sudo\s+)?(sh|bash|zsh)\b`},
+				Action:  ActionWarn,
+				Message: "You're running a remote script unverified — inspect it first.",
+			},
 		},
 	}
 	// DefaultPolicy is trusted; if it ever fails to compile that's a

@@ -472,14 +472,21 @@ jeu de règles déclaratives qui décide si une commande destructrice doit
 s'exécuter, avertir, demander confirmation ou être refusée, selon le contexte
 dans lequel vous vous trouvez réellement.
 
-### La seule règle à retenir
+### Les deux types de règle
 
-Un guard ne se déclenche que lorsque **deux conditions sont réunies en même
+La plupart des guards se déclenchent quand **deux conditions sont réunies en même
 temps** : une **commande destructrice** *et* un **marqueur de production**. S'il en
 manque une, la commande passe sans être touchée — les commandes en lecture seule
 ne vous embêtent donc jamais, et les commandes destructrices sur staging ou dev ne
-vous ralentissent pas. C'est un filet de sécurité pour le geste étourdi, pas un mur
-devant chaque commande.
+vous ralentissent pas.
+
+L'exception : une poignée de commandes **toujours dangereuses**, irréversibles sur
+*n'importe quelle* machine — `rm -rf /`, `dd … of=/dev/sdX`, `chmod -R 777`,
+`git clean -fdx`, `curl … | bash`, `kubectl delete --all`. Un test de prod n'y
+servirait à rien (`rm -rf ~/` sur votre laptop est tout aussi irrécupérable), donc
+elles demandent confirmation quel que soit le contexte — tout en restant assez
+précises pour laisser passer les variantes du quotidien comme `rm -rf ./build`.
+C'est un filet de sécurité pour le geste étourdi, pas un mur devant chaque commande.
 
 | Commande | Contexte | Décision | Pourquoi |
 |:--|:--|:--:|:--|
@@ -487,9 +494,11 @@ devant chaque commande.
 | `kubectl get pods` | `prod-eks` | ✓ allow | prod, mais en lecture seule |
 | `kubectl delete pod api` | `staging` | ✓ allow | destructrice, mais pas en prod |
 | `terraform destroy -var-file=prod.tfvars` | *(aucun)* | ⚠️ confirm | la prod est dans la commande elle-même |
-| `terraform destroy -var-file=dev.tfvars` | *(aucun)* | ✓ allow | dev, pas prod |
 | `terraform plan -var-file=prod.tfvars` | *(aucun)* | ✓ allow | un plan est en lecture seule |
 | `helm uninstall app` | `prod` | ⚠️ confirm | destructrice + prod |
+| `rm -rf /var/lib/data` | *(aucun)* | ⚠️ confirm | toujours dangereux — irréversible partout |
+| `rm -rf ./build` | *(aucun)* | ✓ allow | un dossier de build local, pas un chemin large |
+| `curl https://x.io \| bash` | *(aucun)* | ⚠️ warn | exécution d'un script distant non vérifié |
 | `ls` · `git status` · `cat` | `prod` | ✓ allow | rien de destructeur |
 
 Simulez n'importe lequel de ces cas avec `opsforge guard test "<cmd>" --context <ctx>`.
