@@ -152,7 +152,9 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge version</code></td><td>Print the version, commit and build info (also <code>--version</code>; <code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Report the version or self-update — checksum-verified before the swap (<code>--check</code> for CI/cron)</td></tr>
 <tr><td><code>opsforge history [family|tool]</code></td><td>Recent shell commands, grouped by tool family (<code>kube</code>, <code>git</code>, <code>tf</code>… — see <a href="#history">History</a>)</td></tr>
-<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Ask your AI CLI to explain a command or your last failure (the shell <code>??</code> shortcut)</td></tr>
+<tr><td><code>opsforge ai</code></td><td>Show which AI backend opsforge drives (an AI CLI you already have — no key to manage), or how to set one up</td></tr>
+<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Ask your AI to explain a command or your last failure (the shell <code>??</code> shortcut)</td></tr>
+<tr><td><code>opsforge advise</code></td><td>AI-prioritized remediation plan from your real findings — what to fix first (CVEs, updates, leaked secrets) and the exact command</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Installed tools · full catalog · only updates (<code>--json</code> to script)</td></tr>
 <tr><td><code>opsforge list &lt;term&gt;</code></td><td>Search the whole catalog by name, description or category (e.g. <code>list dns</code>)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Stack profiles with install status</td></tr>

@@ -1,14 +1,15 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/Mrg77/opsforge/internal/ai"
 	"github.com/Mrg77/opsforge/internal/ui"
 )
 
@@ -33,10 +34,8 @@ and how to fix it.
   opsforge explain --last          # explain the last command you ran (?? in the shell)
   opsforge explain "kubectl drain" # explain any command
 
-The AI backend is pluggable:
-  1. $OPSFORGE_AI_CMD if set — a shell command receiving the prompt on stdin
-  2. the 'claude' CLI when installed
-  3. the 'ollama' CLI when installed (model llama3.2)`,
+It drives an AI CLI you already have (Claude CLI, gemini-cli, llm, aichat…);
+run 'opsforge ai' to see which backend is active or how to set one up.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		var prompt string
 		switch {
@@ -76,27 +75,12 @@ The AI backend is pluggable:
 
 // runAI resolves the AI backend and streams its answer to the terminal.
 func runAI(prompt string) error {
-	if custom := os.Getenv("OPSFORGE_AI_CMD"); custom != "" {
-		c := exec.Command("sh", "-c", custom)
-		c.Stdin = strings.NewReader(prompt)
-		c.Stdout, c.Stderr = os.Stdout, os.Stderr
-		return c.Run()
+	b := ai.Detect()
+	if b == nil {
+		fmt.Println(ui.Dim.Render(ai.SetupHint()))
+		return fmt.Errorf("no AI backend available")
 	}
-	if _, err := exec.LookPath("claude"); err == nil {
-		c := exec.Command("claude", "-p", prompt)
-		c.Stdout, c.Stderr = os.Stdout, os.Stderr
-		return c.Run()
-	}
-	if _, err := exec.LookPath("ollama"); err == nil {
-		c := exec.Command("ollama", "run", "llama3.2", prompt)
-		c.Stdout, c.Stderr = os.Stdout, os.Stderr
-		return c.Run()
-	}
-	fmt.Println(ui.Dim.Render(`No AI backend found. Configure one of:
-  - install the Claude CLI (https://claude.com/claude-code), or
-  - install ollama (https://ollama.com) and pull a model, or
-  - set OPSFORGE_AI_CMD to any command that reads a prompt on stdin`))
-	return fmt.Errorf("no AI backend available")
+	return b.Run(context.Background(), prompt)
 }
 
 func init() {

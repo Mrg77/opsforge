@@ -156,7 +156,9 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge version</code></td><td>Affiche la version, le commit et les infos de build (aussi <code>--version</code> ; <code>--json</code> pour scripter)</td></tr>
 <tr><td><code>opsforge self [version|update]</code></td><td>Affiche la version ou se met à jour — checksum vérifié avant le remplacement (<code>--check</code> pour CI/cron)</td></tr>
 <tr><td><code>opsforge history [famille|outil]</code></td><td>Commandes shell récentes, regroupées par famille d'outils (<code>kube</code>, <code>git</code>, <code>tf</code>… — voir <a href="#history">History</a>)</td></tr>
-<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Demande à votre CLI IA d'expliquer une commande ou votre dernière erreur (le raccourci <code>??</code> du shell)</td></tr>
+<tr><td><code>opsforge ai</code></td><td>Montre quel backend IA opsforge utilise (un CLI IA que vous avez déjà — aucune clé à gérer), ou comment en configurer un</td></tr>
+<tr><td><code>opsforge explain [--last] &lt;cmd&gt;</code></td><td>Demande à votre IA d'expliquer une commande ou votre dernière erreur (le raccourci <code>??</code> du shell)</td></tr>
+<tr><td><code>opsforge advise</code></td><td>Plan de remédiation priorisé par l'IA depuis vos vrais findings — quoi corriger d'abord (CVEs, mises à jour, secrets fuités) et la commande exacte</td></tr>
 <tr><td><code>opsforge list [all] [-u]</code></td><td>Outils installés · catalogue complet · seulement les mises à jour (<code>--json</code> pour scripter)</td></tr>
 <tr><td><code>opsforge list &lt;terme&gt;</code></td><td>Cherche dans tout le catalogue par nom, description ou catégorie (ex. <code>list dns</code>)</td></tr>
 <tr><td><code>opsforge profiles</code></td><td>Profils de stack avec leur statut d'installation</td></tr>
