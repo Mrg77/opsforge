@@ -53,8 +53,10 @@ _opsforge_rprompt() {
   print -n "$(_opsforge_kube_segment)$(_opsforge_cloud_segment)$(_opsforge_tf_segment)"
 }
 
-# Only claim RPROMPT if the user (or another theme) hasn't already.
-if [[ -z "$RPROMPT" ]]; then
+# Only claim RPROMPT if the user (or another theme) hasn't already — and stand
+# down entirely under starship (its own modules render the kube/cloud context),
+# so the two don't show the cluster twice.
+if [[ -z "$RPROMPT" && -z "$STARSHIP_SHELL" ]]; then
   setopt PROMPT_SUBST
   RPROMPT='$(_opsforge_rprompt)'
 fi

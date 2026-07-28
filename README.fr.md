@@ -27,7 +27,7 @@ vous enferme.
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <br>
-[![Tools](https://img.shields.io/badge/tools-287-blue)](#le-catalogue)
+[![Tools](https://img.shields.io/badge/tools-288-blue)](#le-catalogue)
 [![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--chaîne-dapprovisionnement)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
@@ -48,7 +48,7 @@ voici, le plus intéressant en premier :
 |:--:|---|---|
 | 🛡️ | **Les guards — le vrai sujet** | Une seule commande transforme votre shell (zsh, fish ou bash) en un shell qui *sait où il se trouve*. Quand vous tapez `kubectl delete` ou `terraform destroy` sur un cluster de production, il vous arrête et demande d'abord. Les règles sont les vôtres, écrites dans un fichier, et elles vous protègent au clavier *et* [tout agent IA](#agents-ia-mcp) qui travaille sur votre machine. Tout ce qui déclenche un guard sur prod est [consigné](#un-journal-daudit--quai-je-lancé-sur-prod-cette-semaine-), pour que vous puissiez y revenir plus tard. |
 | 🔐 | **Garder la machine honnête** | Deux questions, deux réponses. *Les credentials sur ma machine sont-ils un risque ?* — [`opsforge verify`](#hygiène-des-credentials-verify) trouve les clés qui n'expirent jamais, les secrets en clair, les fichiers lisibles par tout le monde. *Mes outils ont-ils des trous connus ?* — [`opsforge audit`](#ci--intégrations) et compagnie produisent un inventaire signé ([SBOM](#sbom--chaîne-dapprovisionnement) + [VEX](#sbom--chaîne-dapprovisionnement)) de chaque CVE, et pointent celles que les attaquants exploitent *vraiment*. Tout en lecture seule, sans cloud. |
-| 📦 | **Monter la boîte à outils** | Et parce qu'une couche de sécurité ne sert à rien sur une machine vide, opsforge installe aussi vos outils DevOps et les garde à jour : un sélecteur cherchable parmi **287 CLI triés sur le volet**, dans un seul binaire, sur macOS ou une machine Linux nue. Plus des [setups reproductibles](#mode-projet) : décrivez une machine (ou la boîte à outils d'un dépôt) dans un fichier et reconstruisez-la n'importe où. |
+| 📦 | **Monter la boîte à outils** | Et parce qu'une couche de sécurité ne sert à rien sur une machine vide, opsforge installe aussi vos outils DevOps et les garde à jour : un sélecteur cherchable parmi **288 CLI triés sur le volet**, dans un seul binaire, sur macOS ou une machine Linux nue. Plus des [setups reproductibles](#mode-projet) : décrivez une machine (ou la boîte à outils d'un dépôt) dans un fichier et reconstruisez-la n'importe où. |
 
 ### Pourquoi ça existe
 
@@ -379,7 +379,10 @@ environnement conscient du DevOps (ses modules vivent sous
   chacun seulement quand c'est pertinent). Et à gauche, un prompt épuré : répertoire
   relatif au dépôt, branche git avec ses marqueurs dirty/ahead/behind, durée de la
   dernière commande, et un `❯` qui rougit en cas d'échec. Tout est lu en local.
-  Jamais un cloud ni un cluster n'est contacté.
+  Jamais un cloud ni un cluster n'est contacté. Vous préférez **starship** ?
+  Installez-le (`opsforge install starship`) et opsforge l'initialise pour vous
+  puis s'efface — aucune édition de `~/.zshrc`, pas de double prompt
+  (`OPSFORGE_STARSHIP=0` garde le prompt opsforge à la place).
 - **Guards policy-as-code.** Avant une commande destructrice (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) dans un contexte de production, opsforge
   peut confirmer, avertir ou bloquer. Le tout piloté par des [règles que vous
@@ -398,8 +401,8 @@ environnement conscient du DevOps (ses modules vivent sous
   pour que le prompt ne bloque jamais sur le réseau. Lancez
   [`opsforge notify`](#le-digest-notify) pour le détail complet, ou coupez ce
   signalement avec `OPSFORGE_NOTIFY=0`.
-- **Intégrations.** `fzf`, `zoxide` et `atuin` sont branchés automatiquement
-  quand ils sont présents.
+- **Intégrations.** `fzf`, `zoxide`, `atuin` et `starship` sont branchés
+  automatiquement quand ils sont présents.
 
 **Trois couches, trois rôles :** le **prompt** est une alarme *passive* — il
 rougit pour que vous **voyiez** que vous êtes en prod ; les
@@ -1142,7 +1145,7 @@ repos:
 
 ## Le catalogue
 
-**287 outils répartis en 16 catégories** — Kubernetes, Infrastructure as Code, CLI
+**288 outils répartis en 16 catégories** — Kubernetes, Infrastructure as Code, CLI
 Cloud, Conteneurs, Git & CI/CD, Observabilité & Monitoring, Logs, Réseau & HTTP,
 **Système & SysAdmin**, Bases de données, Sécurité & Conformité, Secrets & Identité,
 Serverless & PaaS, Runtime & Versions, Utilitaires, et une nouvelle catégorie
@@ -1415,7 +1418,7 @@ Les points sur lesquels attirer l'œil d'un relecteur :
   un login navigateur. Chaque sonde tourne avec un `KUBECONFIG` neutralisé et un
   `WaitDelay`, pour que la détection ne déclenche jamais d'auth et ne reste jamais
   bloquée sur un CLI wrapper qui retient le pipe de sortie.
-- **Le catalogue ne peut pas mentir.** Un job CI valide les 287 références brew
+- **Le catalogue ne peut pas mentir.** Un job CI valide les 288 références brew
   contre l'API Homebrew et chaque template d'asset GitHub contre la vraie dernière
   release de l'outil (darwin/linux × amd64/arm64) — une formule renommée est
   repérée avant qu'un utilisateur ne tombe dessus en pleine installation.

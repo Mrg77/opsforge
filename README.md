@@ -25,7 +25,7 @@ to lock you in.
 [![Go Report Card](https://goreportcard.com/badge/github.com/Mrg77/opsforge)](https://goreportcard.com/report/github.com/Mrg77/opsforge)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 <br>
-[![Tools](https://img.shields.io/badge/tools-287-blue)](#the-catalog)
+[![Tools](https://img.shields.io/badge/tools-288-blue)](#the-catalog)
 [![SBOM](https://img.shields.io/badge/SBOM-CycloneDX%201.6-orange)](#sbom--supply-chain)
 [![Made with Go](https://img.shields.io/badge/made%20with-Go-00ADD8?logo=go&logoColor=white)](https://go.dev)
 
@@ -46,7 +46,7 @@ most interesting first:
 |:--:|---|---|
 | 🛡️ | **The guards — the real point** | One command turns your shell (zsh, fish or bash) into one that *knows where it is*. When you type `kubectl delete` or `terraform destroy` on a production cluster, it stops you and asks first. The rules are yours, written in a file — and they protect you at the keyboard *and* [any AI agent](#ai-agents-mcp) working on your machine. Everything that trips a guard on prod is [written down](#an-audit-trail-what-did-i-run-on-prod-this-week), so you can look back later. |
 | 🔐 | **Keeping the machine honest** | Two questions, answered. *Are the credentials on my machine a liability?* — [`opsforge verify`](#credential-hygiene-verify) finds keys that never expire, secrets in clear text, files anyone can read. *Do my tools have known holes?* — [`opsforge audit`](#ci--integrations) and friends produce a signed inventory ([SBOM](#sbom--supply-chain) + [VEX](#sbom--supply-chain)) of every CVE, and flag the ones attackers are *actually* exploiting. All read-only, no cloud. |
-| 📦 | **Setting up the toolbox** | And because a safety layer is no use on an empty machine, opsforge also installs and keeps your DevOps tools current — a searchable picker over **287 curated CLIs**, in one binary, on macOS or a bare Linux box. Plus [reproducible setups](#project-mode): describe a machine (or a repo's toolchain) in a file and rebuild it anywhere. |
+| 📦 | **Setting up the toolbox** | And because a safety layer is no use on an empty machine, opsforge also installs and keeps your DevOps tools current — a searchable picker over **288 curated CLIs**, in one binary, on macOS or a bare Linux box. Plus [reproducible setups](#project-mode): describe a machine (or a repo's toolchain) in a file and rebuild it anywhere. |
 
 ### Why it exists
 
@@ -371,7 +371,9 @@ uninstall` restores everything):
   relevant). The left prompt stays clean: repo-relative dir, git branch with
   dirty/ahead/behind markers, how long the last command took, and a `❯` that
   goes red on failure. Everything is read locally. No cloud or cluster is ever
-  contacted.
+  contacted. Prefer **starship**? Install it (`opsforge install starship`) and
+  opsforge initializes it for you and steps aside — no `~/.zshrc` edit, no double
+  prompt (`OPSFORGE_STARSHIP=0` keeps the opsforge prompt instead).
 - **Policy-as-code guards.** Before a destructive command (`kubectl delete`,
   `terraform destroy`, `helm uninstall`…) on a production context, opsforge can
   confirm, warn, or block. It's driven by [rules you write in a
@@ -389,8 +391,8 @@ uninstall` restores everything):
   the background, so your prompt never blocks on the network. Run
   [`opsforge notify`](#the-notify-digest) for the full breakdown, or silence the
   heads-up with `OPSFORGE_NOTIFY=0`.
-- **Integrations.** `fzf`, `zoxide` and `atuin` are wired up automatically when
-  they're present.
+- **Integrations.** `fzf`, `zoxide`, `atuin` and `starship` are wired up
+  automatically when they're present.
 
 **Three layers, three different jobs.** The **prompt** is a *passive* alarm: it
 reddens so you **see** you're on prod. The [**guards**](#policy-as-code-guards)
@@ -1104,7 +1106,7 @@ repos:
 
 ## The catalog
 
-**287 tools across 16 categories**: Kubernetes, Infrastructure as Code, Cloud
+**288 tools across 16 categories**: Kubernetes, Infrastructure as Code, Cloud
 CLIs, Containers, Git & CI/CD, Observability & Monitoring, Logs, Networking &
 HTTP, **System & SysAdmin**, Databases, Security & Compliance, Secrets & Identity,
 Serverless & PaaS, Runtime & Versions, Utilities, and a new **AI & LLM** category.
@@ -1354,7 +1356,7 @@ If you're reviewing the code, these are the parts worth a closer look:
   cloud-SDK dispatcher wired to an OIDC plugin can pop a browser login. Every
   probe runs with a neutralized `KUBECONFIG` and a `WaitDelay`, so detection
   never triggers auth or hangs on a wrapper CLI holding the output pipe.
-- **The catalog can't lie.** A CI job validates all 287 brew references against
+- **The catalog can't lie.** A CI job validates all 288 brew references against
   the Homebrew API and every GitHub asset template against the tool's real latest
   release (darwin/linux × amd64/arm64), so a renamed formula is caught before a
   user hits it mid-install.

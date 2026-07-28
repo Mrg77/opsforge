@@ -1,7 +1,7 @@
 profiles:
   - name: core
     description: Daily-driver basics for any ops work
-    tools: [jq, yq, fzf, direnv, gh, ripgrep, bat]
+    tools: [jq, yq, fzf, direnv, gh, ripgrep, bat, starship]
   - name: k8s
     description: Kubernetes workstation
     tools: [kubectl, helm, k9s, kubectx, stern, kustomize]
@@ -1366,6 +1366,17 @@ categories:
         github:
           repo: ajeetdsouza/zoxide
           asset: "zoxide-{version}-{arch}-{os}.tar.gz"
+          os_map: {darwin: apple-darwin, linux: unknown-linux-musl}
+          arch_map: {amd64: x86_64, arm64: aarch64}
+      - name: starship
+        bin: starship
+        brew: starship
+        description: Fast, cross-shell prompt (Git branch, K8s context, tool versions)
+        osv: {ecosystem: crates.io, name: starship}
+        completion_zsh: ["starship", "completions", "zsh"]
+        github:
+          repo: starship/starship
+          asset: "starship-{arch}-{os}.tar.gz"
           os_map: {darwin: apple-darwin, linux: unknown-linux-musl}
           arch_map: {amd64: x86_64, arm64: aarch64}
       - name: atuin

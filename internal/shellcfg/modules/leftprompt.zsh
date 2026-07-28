@@ -11,7 +11,19 @@
 # force it with OPSFORGE_PROMPT=1. Disable entirely with OPSFORGE_PROMPT=0.
 
 [[ "$OPSFORGE_PROMPT" == "0" ]] && return
-# Respect an existing prompt framework.
+
+# starship: if it's installed, it IS the prompt. opsforge initializes it here
+# (before its own prompt logic) and steps aside — so `opsforge install starship`
+# gives you a working starship prompt with no manual `~/.zshrc` edit, and the
+# opsforge left/right prompts below don't fight it. Opt out with OPSFORGE_PROMPT=0
+# above, or OPSFORGE_STARSHIP=0 to keep the opsforge prompt even with starship
+# installed. Setting $STARSHIP_SHELL also makes prompt.zsh's RPROMPT stand down.
+if [[ "$OPSFORGE_STARSHIP" != "0" && -z "$STARSHIP_SHELL" ]] && command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
+fi
+
+# Respect an existing prompt framework (starship — just initialized above — or
+# a p10k / oh-my-posh the user set up themselves).
 [[ -n "$STARSHIP_SHELL" || -n "$POWERLEVEL9K_MODE" || -n "$POSH_THEME" ]] && return
 
 if [[ "$OPSFORGE_PROMPT" != "1" ]]; then
