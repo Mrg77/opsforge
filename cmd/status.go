@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/cve"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/i18n"
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/notices"
 	"github.com/Mrg77/opsforge/internal/output"
@@ -35,9 +37,9 @@ func printPostureLine() {
 	case p.Score < 75:
 		style = ui.Warn
 	}
-	fmt.Printf("  %s %s %s\n", ui.Label("Posture", 10),
+	fmt.Printf("  %s %s %s\n", ui.Label(i18n.T("status.label.posture"), 10),
 		style.Render(fmt.Sprintf("%d/100  %s", p.Score, p.Grade)),
-		ui.Dim.Render("— your workstation security posture · `opsforge advise` for a plan"))
+		ui.Dim.Render(i18n.T("status.posture.hint")))
 }
 
 // printSecurityLine shows the cached CVE status (instant, no network). If
@@ -45,21 +47,22 @@ func printPostureLine() {
 // so the next `status`/prompt is accurate — the current call never waits.
 func printSecurityLine() {
 	s, ok := cve.Load()
+	secLabel := i18n.T("status.label.security")
 	switch {
 	case !ok || s.ScannedAt.IsZero():
-		fmt.Printf("  %s %s\n", ui.Label("Security", 10),
-			ui.Dim.Render("scan pending — `opsforge audit` for a full report"))
+		fmt.Printf("  %s %s\n", ui.Label(secLabel, 10),
+			ui.Dim.Render(i18n.T("status.security.pending")))
 	case s.HighOrCritical > 0:
-		fmt.Printf("  %s %s %s\n", ui.Label("Security", 10),
-			ui.Err.Render(fmt.Sprintf("%s %d tool(s) with HIGH/CRITICAL CVEs", ui.MarkErr, s.HighOrCritical)),
-			ui.Dim.Render("— `opsforge audit`"))
+		fmt.Printf("  %s %s %s\n", ui.Label(secLabel, 10),
+			ui.Err.Render(ui.MarkErr+" "+i18n.T("status.security.highcrit", i18n.V("n", strconv.Itoa(s.HighOrCritical)))),
+			ui.Dim.Render(i18n.T("status.security.audithint")))
 	case s.Vulnerable > 0:
-		fmt.Printf("  %s %s %s\n", ui.Label("Security", 10),
-			ui.Warn.Render(fmt.Sprintf("%s %d tool(s) with CVEs", ui.MarkWarn, s.Vulnerable)),
-			ui.Dim.Render("— `opsforge audit`"))
+		fmt.Printf("  %s %s %s\n", ui.Label(secLabel, 10),
+			ui.Warn.Render(ui.MarkWarn+" "+i18n.T("status.security.cves", i18n.V("n", strconv.Itoa(s.Vulnerable)))),
+			ui.Dim.Render(i18n.T("status.security.audithint")))
 	default:
-		fmt.Printf("  %s %s\n", ui.Label("Security", 10),
-			ui.OK.Render(ui.MarkOK+" no known CVEs"))
+		fmt.Printf("  %s %s\n", ui.Label(secLabel, 10),
+			ui.OK.Render(ui.MarkOK+" "+i18n.T("status.security.clean")))
 	}
 	if !ok || s.Stale(cve.DefaultTTL, time.Now().UTC()) {
 		refreshCVECacheInBackground()
@@ -74,7 +77,7 @@ func refreshCVECacheInBackground() {
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "A one-glance cockpit of your DevOps workstation",
+	Short: i18n.T("status.short"),
 	Long: `A compact dashboard: how many tools are installed, how many have updates,
 whether the shell environment is on, and your active theme — everything at
 a glance. Run 'opsforge' (no args) for the interactive picker.`,
@@ -137,24 +140,25 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 			}{installed, total, outdated, sec, shellOn, vm, backend, ui.Active.Name, names})
 		}
 
-		fmt.Println(ui.Header("opsforge", "your DevOps workstation at a glance"))
+		fmt.Println(ui.Header("opsforge", i18n.T("status.header.tag")))
 		fmt.Println()
 
 		// Toolbox line with a coverage bar.
 		fmt.Printf("  %s %s  %s\n",
-			ui.Label("Toolbox", 10),
+			ui.Label(i18n.T("status.label.toolbox"), 10),
 			ui.Bar(installed, total, 20),
-			ui.Dim.Render(fmt.Sprintf("%d/%d installed", installed, total)))
+			ui.Dim.Render(i18n.T("status.toolbox.installed",
+				i18n.V("n", strconv.Itoa(installed), "total", strconv.Itoa(total)))))
 
 		// Updates.
 		if outdated > 0 {
 			fmt.Printf("  %s %s %s\n",
-				ui.Label("Updates", 10),
-				ui.Warn.Render(fmt.Sprintf("%s %d available", ui.MarkUpdate, outdated)),
-				ui.Dim.Render("— run `opsforge upgrade -u`"))
+				ui.Label(i18n.T("status.label.updates"), 10),
+				ui.Warn.Render(ui.MarkUpdate+" "+i18n.T("status.updates.available", i18n.V("n", strconv.Itoa(outdated)))),
+				ui.Dim.Render(i18n.T("status.updates.hint")))
 		} else if installed > 0 {
-			fmt.Printf("  %s %s\n", ui.Label("Updates", 10),
-				ui.OK.Render(ui.MarkOK+" everything up to date"))
+			fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.updates"), 10),
+				ui.OK.Render(ui.MarkOK+" "+i18n.T("status.updates.uptodate")))
 		}
 
 		// Security — from the cached CVE scan, so status never blocks on
@@ -166,47 +170,47 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		}
 
 		// Shell environment.
-		shellVal := ui.Dim.Render("off — `opsforge shell install`")
+		shellVal := ui.Dim.Render(i18n.T("status.shell.off"))
 		if shellOn {
-			shellVal = ui.OK.Render(ui.MarkOK + " active")
+			shellVal = ui.OK.Render(ui.MarkOK + " " + i18n.T("status.shell.active"))
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Shell", 10), shellVal)
+		fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.shell"), 10), shellVal)
 
 		// Version manager.
-		vmLine := ui.Dim.Render("none — install mise for `opsforge use`")
+		vmLine := ui.Dim.Render(i18n.T("status.versions.none"))
 		if vm != "" {
 			vmLine = ui.OK.Render(ui.MarkOK + " " + vm)
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Versions", 10), vmLine)
+		fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.versions"), 10), vmLine)
 
 		// Backend + theme footer.
-		backendLine := "GitHub releases"
+		backendLine := i18n.T("status.backend.github")
 		if installer.BrewAvailable() {
-			backendLine = "Homebrew + GitHub"
+			backendLine = i18n.T("status.backend.brew")
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Backend", 10), ui.Dim.Render(backendLine))
+		fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.backend"), 10), ui.Dim.Render(backendLine))
 		theme := ui.Accent.Render(ui.Active.Name)
 		switch {
 		case os.Getenv("OPSFORGE_THEME") != "":
-			theme += ui.Dim.Render(" (from $OPSFORGE_THEME)")
+			theme += ui.Dim.Render(i18n.T("status.theme.fromenv"))
 		case !ui.ThemePersisted():
-			theme += ui.Dim.Render(" (auto — `opsforge theme set <name>` to change)")
+			theme += ui.Dim.Render(i18n.T("status.theme.auto"))
 		}
-		fmt.Printf("  %s %s\n", ui.Label("Theme", 10), theme)
+		fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.theme"), 10), theme)
 
 		if len(userps) > 0 {
 			names := make([]string, 0, len(userps))
 			for _, p := range userps {
 				names = append(names, p.Name)
 			}
-			fmt.Printf("  %s %s\n", ui.Label("Profiles", 10),
+			fmt.Printf("  %s %s\n", ui.Label(i18n.T("status.label.profiles"), 10),
 				ui.Dim.Render(strings.Join(names, ", ")))
 		}
 
 		fmt.Println()
-		fmt.Println(ui.Dim.Render("  Run `opsforge` to open the picker · `opsforge doctor` for a full check"))
+		fmt.Println(ui.Dim.Render(i18n.T("status.footer")))
 		// One discreet pointer to a non-obvious feature, so it gets found.
-		fmt.Println(ui.Faint.Render("  Tip: `opsforge audit --secrets` scans your tools for CVEs and your shell for leaked credentials"))
+		fmt.Println(ui.Faint.Render(i18n.T("status.tip")))
 		return nil
 	},
 }

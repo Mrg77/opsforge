@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/i18n"
 	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/secrets"
 	"github.com/Mrg77/opsforge/internal/ui"
@@ -128,13 +130,8 @@ func auditJSON(cat *catalog.Catalog) error {
 
 var auditCmd = &cobra.Command{
 	Use:   "audit",
-	Short: "Scan installed tools for CVEs — and your workstation for leaked secrets",
-	Long: `Cross-references the versions of your installed tools against the OSV.dev
-vulnerability database and reports which ones have known CVEs and should be
-upgraded. Only tools with an OSV mapping in the catalog are checked.
-
-With --secrets, also scans the places credentials habitually leak — shell
-history, shell rc files, and local .env files — and reports masked findings.`,
+	Short: i18n.T("audit.short"),
+	Long:  i18n.T("audit.long"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {
@@ -145,9 +142,9 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 			return auditJSON(cat)
 		}
 
-		sub := "installed tool versions vs the OSV.dev vulnerability database"
+		sub := i18n.T("audit.header.sub.cves")
 		if auditSecrets {
-			sub = "CVEs in your tools + credentials leaking on your workstation"
+			sub = i18n.T("audit.header.sub.secrets")
 		}
 		fmt.Println(ui.Header("opsforge audit", sub))
 		fmt.Println()
@@ -161,11 +158,11 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 
 		targets := CollectOSVTargets(cat)
 		if len(targets) == 0 {
-			fmt.Println("No auditable tools installed (no installed tool carries an OSV mapping).")
+			fmt.Println(i18n.T("audit.noauditable"))
 			return nil
 		}
 
-		fmt.Printf("Auditing %d installed tool(s) against OSV.dev…\n\n", len(targets))
+		fmt.Printf("%s\n\n", i18n.T("audit.scanning", i18n.V("n", strconv.Itoa(len(targets)))))
 		ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 		defer cancel()
 		findings := audit.ScanTools(ctx, targets)
@@ -183,7 +180,7 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 		for _, f := range findings {
 			if len(f.Vulns) == 0 {
 				fmt.Printf("%s %-14s %s\n", ui.OK.Render("✓"), f.Tool,
-					ui.Dim.Render(f.Version+" — no known vulnerabilities"))
+					ui.Dim.Render(i18n.T("audit.tool.clean", i18n.V("version", f.Version))))
 				continue
 			}
 			vulnerable++
@@ -195,7 +192,7 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 			for _, v := range f.Vulns {
 				fix := ""
 				if v.FixedIn != "" {
-					fix = ui.Dim.Render("  → fixed in " + v.FixedIn)
+					fix = ui.Dim.Render(i18n.T("audit.vuln.fixedin", i18n.V("version", v.FixedIn)))
 				}
 				id := ui.Hyperlink(vulnURL(v.ID), v.ID)
 				summary := truncate(v.Summary, 90-len(v.ID))
@@ -207,11 +204,12 @@ history, shell rc files, and local .env files — and reports masked findings.`,
 
 		fmt.Println()
 		if vulnerable == 0 {
-			fmt.Println(ui.OK.Render("All audited tools are free of known vulnerabilities."))
+			fmt.Println(ui.OK.Render(i18n.T("audit.allclean")))
 			return nil
 		}
-		fmt.Printf("%s in %d tool(s). Run `opsforge upgrade` or update the affected tools.\n",
-			ui.SevHigh.Render("Found vulnerabilities"), vulnerable)
+		fmt.Printf("%s %s\n",
+			ui.SevHigh.Render(i18n.T("audit.found")),
+			i18n.T("audit.found.hint", i18n.V("n", strconv.Itoa(vulnerable))))
 		// Non-zero exit on HIGH/CRITICAL so `opsforge audit` can gate CI.
 		if highOrWorse > 0 {
 			return fmt.Errorf("%d tool(s) with HIGH or CRITICAL vulnerabilities", highOrWorse)
@@ -255,13 +253,13 @@ func vulnURL(id string) string {
 // runSecretsScan scans the workstation for leaked credentials and prints
 // masked findings grouped by file.
 func runSecretsScan() error {
-	fmt.Println("Scanning your workstation for leaked secrets…")
-	fmt.Println(ui.Dim.Render("  (shell history, shell rc files, local .env files — values are masked)"))
+	fmt.Println(i18n.T("audit.secrets.scanning"))
+	fmt.Println(ui.Dim.Render(i18n.T("audit.secrets.scanning.note")))
 	fmt.Println()
 
 	findings := secrets.ScanWorkstation()
 	if len(findings) == 0 {
-		fmt.Println(ui.OK.Render("✓ No leaked credentials found."))
+		fmt.Println(ui.OK.Render(i18n.T("audit.secrets.clean")))
 		return nil
 	}
 
@@ -284,17 +282,18 @@ func runSecretsScan() error {
 				style = ui.SevCritical
 				critical++
 			}
-			fmt.Printf("  %s line %-6d %s  %s\n",
+			fmt.Printf("  %s %s %-6d %s  %s\n",
 				style.Render(fmt.Sprintf("[%s]", f.Rule.Severity)),
+				i18n.T("audit.secrets.line"),
 				f.Line, f.Rule.Desc, ui.Dim.Render(f.Excerpt))
 		}
 	}
 
 	fmt.Println()
-	fmt.Printf("%s in %d location(s).\n",
-		ui.SevHigh.Render(fmt.Sprintf("Found %d potential leak(s)", len(findings))), len(order))
-	fmt.Println(ui.Dim.Render(`  Clean up: rotate any real credentials, then remove the lines
-  (history: edit ~/.zsh_history · prefer 'read -s' or a secrets manager next time)`))
+	fmt.Printf("%s %s\n",
+		ui.SevHigh.Render(i18n.T("audit.secrets.found", i18n.V("n", strconv.Itoa(len(findings))))),
+		i18n.T("audit.secrets.found.hint", i18n.V("n", strconv.Itoa(len(order)))))
+	fmt.Println(ui.Dim.Render(i18n.T("audit.secrets.cleanup")))
 	if critical > 0 {
 		return fmt.Errorf("%d critical secret leak(s) found", critical)
 	}
@@ -303,6 +302,6 @@ func runSecretsScan() error {
 
 func init() {
 	auditCmd.Flags().BoolVar(&auditSecrets, "secrets", false,
-		"also scan shell history, rc files and local .env files for leaked credentials")
+		i18n.T("audit.flag.secrets"))
 	rootCmd.AddCommand(auditCmd)
 }

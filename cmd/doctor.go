@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +15,7 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/i18n"
 	"github.com/Mrg77/opsforge/internal/installer"
 	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/secrets"
@@ -131,7 +133,7 @@ func boolRes(ok bool) checkResult {
 
 var doctorCmd = &cobra.Command{
 	Use:   "doctor",
-	Short: "Full health check of your DevOps workstation",
+	Short: i18n.T("doctor.short"),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cat, err := catalog.Load()
 		if err != nil {
@@ -140,56 +142,56 @@ var doctorCmd = &cobra.Command{
 		r := &doctorReport{}
 
 		if !output.JSON {
-			fmt.Println(ui.Header("opsforge doctor", "a full health check of your DevOps workstation"))
+			fmt.Println(ui.Header("opsforge doctor", i18n.T("doctor.header.tag")))
 			fmt.Println()
 		}
 
 		// --- System ---------------------------------------------------------
-		r.beginSection("System")
+		r.beginSection(i18n.T("doctor.section.system"))
 		brew := installer.BrewAvailable()
-		r.line(boolRes(brew), "Homebrew", brewDetail(brew),
-			"install from https://brew.sh (opsforge can also install via GitHub releases)")
+		r.line(boolRes(brew), i18n.T("doctor.system.homebrew"), brewDetail(brew),
+			i18n.T("doctor.system.homebrew.fix"))
 		inPath := strings.Contains(os.Getenv("PATH"), "/opt/homebrew/bin") ||
 			strings.Contains(os.Getenv("PATH"), "/usr/local/bin")
-		r.line(boolRes(inPath), "Homebrew bin on PATH", "",
-			"add `eval \"$(/opt/homebrew/bin/brew shellenv)\"` to ~/.zprofile")
+		r.line(boolRes(inPath), i18n.T("doctor.system.brewpath"), "",
+			i18n.T("doctor.system.brewpath.fix"))
 		localBin := strings.Contains(os.Getenv("PATH"), ".local/bin")
-		r.line(boolRes(localBin), "~/.local/bin on PATH", ui.Dim.Render("(GitHub-installed tools land here)"),
-			"add `export PATH=\"$HOME/.local/bin:$PATH\"` to ~/.zshrc")
+		r.line(boolRes(localBin), i18n.T("doctor.system.localbin"), ui.Dim.Render(i18n.T("doctor.system.localbin.detail")),
+			i18n.T("doctor.system.localbin.fix"))
 		if mgr := versions.Detect(); mgr != versions.None {
-			r.line(pass, "Version manager", string(mgr)+" — `opsforge use <tool>@<ver>` works", "")
+			r.line(pass, i18n.T("doctor.system.vm"), i18n.T("doctor.system.vm.works", i18n.V("mgr", string(mgr))), "")
 		} else {
 			// Optional feature — a note, not a warning.
-			r.line(pass, "Version manager",
-				ui.Dim.Render("not installed (optional — `opsforge install mise` enables `opsforge use`)"), "")
+			r.line(pass, i18n.T("doctor.system.vm"),
+				ui.Dim.Render(i18n.T("doctor.system.vm.none")), "")
 		}
 		doctorBlank()
 
 		// --- Shell environment ---------------------------------------------
-		r.beginSection("Shell environment")
+		r.beginSection(i18n.T("doctor.section.shell"))
 		shellOn := shellcfg.InstalledInZshrc()
-		r.line(boolRes(shellOn), "opsforge shell layer", shellStateDetail(shellOn),
-			"run `opsforge shell install`")
+		r.line(boolRes(shellOn), i18n.T("doctor.shell.layer"), shellStateDetail(shellOn),
+			i18n.T("doctor.shell.layer.fix"))
 		if complDir, e := shellcfg.CompletionsDir(); e == nil {
 			entries, _ := os.ReadDir(complDir)
 			res := pass
 			if len(entries) == 0 {
 				res = warn
 			}
-			r.line(res, "Cached completions", fmt.Sprintf("%d tool(s)", len(entries)),
-				"run `opsforge shell sync`")
+			r.line(res, i18n.T("doctor.shell.completions"), i18n.T("doctor.shell.completions.n", i18n.V("n", strconv.Itoa(len(entries)))),
+				i18n.T("doctor.shell.completions.fix"))
 		}
 		for _, p := range shellcfg.InteractivePluginStatus() {
 			res := pass
 			if !p.Installed {
 				res = warn
 			}
-			r.line(res, p.Name, "", "installed by `opsforge shell install`")
+			r.line(res, p.Name, "", i18n.T("doctor.shell.plugin.fix"))
 		}
 		doctorBlank()
 
 		// --- Toolbox --------------------------------------------------------
-		r.beginSection("Toolbox")
+		r.beginSection(i18n.T("doctor.section.toolbox"))
 		statuses := detect.AllWithOutdated(cat.Tools())
 		installed := 0
 		var outdatedTools []string
@@ -212,25 +214,25 @@ var doctorCmd = &cobra.Command{
 				broken = append(broken, t.Name)
 			}
 		}
-		r.line(pass, "Installed tools",
-			fmt.Sprintf("%d of %d catalog tools", installed, len(cat.Tools())), "")
+		r.line(pass, i18n.T("doctor.toolbox.installed"),
+			i18n.T("doctor.toolbox.installed.n", i18n.V("n", strconv.Itoa(installed), "total", strconv.Itoa(len(cat.Tools())))), "")
 		if len(outdatedTools) > 0 {
-			r.line(warn, "Updates available",
-				fmt.Sprintf("%d tool(s): %s", len(outdatedTools), strings.Join(outdatedTools, ", ")),
-				"run `opsforge upgrade -u` to update them all")
+			r.line(warn, i18n.T("doctor.toolbox.updates.avail"),
+				i18n.T("doctor.toolbox.updates.detail", i18n.V("n", strconv.Itoa(len(outdatedTools)), "list", strings.Join(outdatedTools, ", "))),
+				i18n.T("doctor.toolbox.updates.fix"))
 		} else {
-			r.line(pass, "Updates", "everything up to date", "")
+			r.line(pass, i18n.T("doctor.toolbox.updates.ok"), i18n.T("doctor.toolbox.updates.uptodate"), "")
 		}
 		if len(broken) > 0 {
 			// krew and similar report no --version; it's cosmetic, not a fault.
-			r.line(pass, "Version probe",
-				ui.Dim.Render(fmt.Sprintf("%s report no version (cosmetic): %s",
-					plural(len(broken), "tool"), strings.Join(broken, ", "))), "")
+			r.line(pass, i18n.T("doctor.toolbox.probe"),
+				ui.Dim.Render(i18n.T("doctor.toolbox.probe.detail",
+					i18n.V("n", strconv.Itoa(len(broken)), "list", strings.Join(broken, ", ")))), "")
 		}
 		doctorBlank()
 
 		// --- Security -------------------------------------------------------
-		r.beginSection("Security")
+		r.beginSection(i18n.T("doctor.section.security"))
 		checkCVEs(r, cat)
 		checkSecrets(r)
 		doctorBlank()
@@ -244,7 +246,7 @@ var doctorCmd = &cobra.Command{
 			printDoctorSummary(r)
 		}
 		if r.fail > 0 {
-			return fmt.Errorf("%d check(s) failed", r.fail)
+			return fmt.Errorf("%s", i18n.T("doctor.checks.failed", i18n.V("n", strconv.Itoa(r.fail))))
 		}
 		return nil
 	},
@@ -262,12 +264,12 @@ func doctorBlank() {
 // slow query degrades to a note rather than failing the whole doctor.
 func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 	if doctorSkipSecurity {
-		r.line(pass, "Known CVEs", ui.Dim.Render("skipped (--skip-security)"), "")
+		r.line(pass, i18n.T("doctor.sec.cves"), ui.Dim.Render(i18n.T("doctor.sec.cves.skipped")), "")
 		return
 	}
 	targets := CollectOSVTargets(cat)
 	if len(targets) == 0 {
-		r.line(pass, "Known CVEs", ui.Dim.Render("no auditable tool installed"), "")
+		r.line(pass, i18n.T("doctor.sec.cves"), ui.Dim.Render(i18n.T("doctor.sec.cves.noauditable")), "")
 		return
 	}
 
@@ -276,7 +278,7 @@ func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 	// terminal-control decoration, not even on stderr.
 	showProgress := !output.JSON
 	if showProgress {
-		fmt.Fprint(os.Stderr, ui.Dim.Render("  scanning OSV.dev for CVEs…"))
+		fmt.Fprint(os.Stderr, ui.Dim.Render(i18n.T("doctor.sec.cves.scanning")))
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
@@ -293,8 +295,8 @@ func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 		}
 	}
 	if len(vuln) == 0 {
-		r.line(pass, "Known CVEs",
-			fmt.Sprintf("%d tool(s) checked, none vulnerable", len(targets)), "")
+		r.line(pass, i18n.T("doctor.sec.cves"),
+			i18n.T("doctor.sec.cves.clean", i18n.V("n", strconv.Itoa(len(targets)))), "")
 		return
 	}
 	sort.Slice(vuln, func(a, b int) bool {
@@ -313,9 +315,9 @@ func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 	for _, f := range vuln {
 		names = append(names, fmt.Sprintf("%s (%s)", f.Tool, f.TopSeverity()))
 	}
-	r.line(res, "Known CVEs",
-		fmt.Sprintf("%s affected: %s", plural(len(vuln), "tool"), strings.Join(names, ", ")),
-		"run `opsforge audit` for details, then `opsforge upgrade` the affected tools")
+	r.line(res, i18n.T("doctor.sec.cves"),
+		i18n.T("doctor.sec.cves.affected", i18n.V("n", strconv.Itoa(len(vuln)), "list", strings.Join(names, ", "))),
+		i18n.T("doctor.sec.cves.fix"))
 }
 
 // checkSecrets scans the workstation for leaked credentials and reports
@@ -323,7 +325,7 @@ func checkCVEs(r *doctorReport, cat *catalog.Catalog) {
 func checkSecrets(r *doctorReport) {
 	findings := secrets.ScanWorkstation()
 	if len(findings) == 0 {
-		r.line(pass, "Leaked secrets", "none in history, rc files or local .env", "")
+		r.line(pass, i18n.T("doctor.sec.secrets"), i18n.T("doctor.sec.secrets.clean"), "")
 		return
 	}
 	critical := 0
@@ -336,49 +338,49 @@ func checkSecrets(r *doctorReport) {
 	if critical > 0 {
 		res = failed
 	}
-	detail := fmt.Sprintf("%s found", plural(len(findings), "potential leak"))
+	detail := i18n.T("doctor.sec.secrets.found", i18n.V("n", strconv.Itoa(len(findings))))
 	if critical > 0 {
-		detail += fmt.Sprintf(" (%d critical)", critical)
+		detail += i18n.T("doctor.sec.secrets.critical", i18n.V("n", strconv.Itoa(critical)))
 	}
-	r.line(res, "Leaked secrets", detail,
-		"run `opsforge audit --secrets`, then rotate and remove the exposed credentials")
+	r.line(res, i18n.T("doctor.sec.secrets"), detail,
+		i18n.T("doctor.sec.secrets.fix"))
 }
 
 func brewDetail(ok bool) string {
 	if ok {
-		return "available"
+		return i18n.T("doctor.system.homebrew.available")
 	}
-	return "not found"
+	return i18n.T("doctor.system.homebrew.notfound")
 }
 
 func shellStateDetail(on bool) string {
 	if on {
-		return "active in ~/.zshrc"
+		return i18n.T("doctor.shell.active")
 	}
-	return "not installed"
+	return i18n.T("doctor.shell.inactive")
 }
 
 func printDoctorSummary(r *doctorReport) {
 	total := r.pass + r.warn + r.fail
-	fmt.Println(ui.Section("Health"))
+	fmt.Println(ui.Section(i18n.T("doctor.section.health")))
 	fmt.Printf("  %s  %s  %s\n",
-		ui.OK.Render(fmt.Sprintf("%s %d passed", ui.MarkOK, r.pass)),
-		ui.Warn.Render(fmt.Sprintf("%s %d warnings", ui.MarkWarn, r.warn)),
-		ui.Err.Render(fmt.Sprintf("%s %d failed", ui.MarkErr, r.fail)))
+		ui.OK.Render(ui.MarkOK+" "+i18n.T("doctor.health.passed", i18n.V("n", strconv.Itoa(r.pass)))),
+		ui.Warn.Render(ui.MarkWarn+" "+i18n.T("doctor.health.warnings", i18n.V("n", strconv.Itoa(r.warn)))),
+		ui.Err.Render(ui.MarkErr+" "+i18n.T("doctor.health.failed", i18n.V("n", strconv.Itoa(r.fail)))))
 	fmt.Printf("  %s\n", ui.Bar(r.pass, total, 24))
 	fmt.Println()
 	switch {
 	case r.fail > 0:
-		fmt.Println(ui.Err.Render("Some checks failed — address the → hints above."))
+		fmt.Println(ui.Err.Render(i18n.T("doctor.health.failing")))
 	case r.warn > 0:
-		fmt.Println(ui.Warn.Render("Healthy, with a few optional improvements above."))
+		fmt.Println(ui.Warn.Render(i18n.T("doctor.health.warned")))
 	default:
-		fmt.Println(ui.OKBold.Render("All good. Happy shipping! 🔥"))
+		fmt.Println(ui.OKBold.Render(i18n.T("doctor.health.allgood")))
 	}
 }
 
 func init() {
 	doctorCmd.Flags().BoolVar(&doctorSkipSecurity, "skip-security", false,
-		"skip the online CVE scan (offline / faster)")
+		i18n.T("doctor.flag.skipsecurity"))
 	rootCmd.AddCommand(doctorCmd)
 }

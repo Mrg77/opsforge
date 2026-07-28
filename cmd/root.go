@@ -9,8 +9,13 @@ import (
 	"golang.org/x/term"
 
 	"github.com/Mrg77/opsforge/internal/catalog"
+	"github.com/Mrg77/opsforge/internal/i18n"
 	"github.com/Mrg77/opsforge/internal/installer"
 )
+
+// langFlag lets a user force the UI language for a single invocation
+// (`opsforge --lang fr status`). Empty = auto-detect from $OPSFORGE_LANG/$LANG.
+var langFlag string
 
 // version, commit and date are injected at build time by GoReleaser via
 // ldflags. They default to a "dev" marker for source builds so the version
@@ -27,6 +32,16 @@ var rootCmd = &cobra.Command{
 	Version:       version,
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	// PersistentPreRun applies --lang before any command renders, overriding
+	// the env-detected language. Runs for every subcommand.
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		switch strings.ToLower(langFlag) {
+		case "fr":
+			i18n.SetLang(i18n.FR)
+		case "en":
+			i18n.SetLang(i18n.EN)
+		}
+	},
 	Long: `opsforge sets up a DevOps workstation in minutes.
 
 Pick the CLIs you need (Kubernetes, IaC, cloud providers, containers...)
@@ -46,6 +61,11 @@ Run with no arguments to open the interactive picker.`,
 		}
 		return runPicker(cat)
 	},
+}
+
+func init() {
+	rootCmd.PersistentFlags().StringVar(&langFlag, "lang", "",
+		"UI language: en or fr (default: auto from $OPSFORGE_LANG / $LANG)")
 }
 
 // Execute runs the root command. It is the single entry point used by main.

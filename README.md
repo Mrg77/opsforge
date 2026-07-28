@@ -1219,6 +1219,25 @@ runs `$OPSFORGE_THEME` › saved (`theme set`) › auto.
 
 ---
 
+## Language (English / French)
+
+opsforge speaks **English and French**. The showcase commands — `status`,
+`doctor`, `audit`, `advise`, `ai` — are fully localized, and the rest falls back
+to clear English (so a missing translation is never a raw key).
+
+```sh
+opsforge status            # auto-detected from your locale
+opsforge --lang fr status  # force French for one command
+OPSFORGE_LANG=fr opsforge doctor
+```
+
+The language is picked once, from `--lang` › `$OPSFORGE_LANG` › your `$LANG` /
+`$LC_ALL`, defaulting to English. `opsforge advise` even asks your AI backend to
+reply in that language, so the whole session stays in one tongue. Adding a
+language is adding one map in `internal/i18n` — English stays the source of truth.
+
+---
+
 ## Engineering highlights
 
 If you're reviewing the code, these are the parts worth a closer look:

@@ -1260,6 +1260,27 @@ priorité : `$OPSFORGE_THEME` › thème enregistré (`theme set`) › auto.
 
 ---
 
+## Langue (français / anglais)
+
+opsforge parle **français et anglais**. Les commandes vitrines — `status`,
+`doctor`, `audit`, `advise`, `ai` — sont entièrement traduites, et le reste
+retombe sur un anglais clair (une traduction manquante n'affiche jamais une clé
+brute).
+
+```sh
+opsforge status            # auto-détecté depuis votre locale
+opsforge --lang fr status  # force le français pour une commande
+OPSFORGE_LANG=fr opsforge doctor
+```
+
+La langue est choisie une fois, dans l'ordre `--lang` › `$OPSFORGE_LANG` › votre
+`$LANG` / `$LC_ALL`, avec l'anglais par défaut. `opsforge advise` demande même à
+votre moteur d'IA de répondre dans cette langue, pour que toute la session reste
+cohérente. Ajouter une langue, c'est ajouter une map dans `internal/i18n` —
+l'anglais reste la source de vérité.
+
+---
+
 ## Points forts d'ingénierie
 
 Les points sur lesquels attirer l'œil d'un relecteur :

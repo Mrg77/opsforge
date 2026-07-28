@@ -13,13 +13,14 @@ import (
 	"github.com/Mrg77/opsforge/internal/audit"
 	"github.com/Mrg77/opsforge/internal/catalog"
 	"github.com/Mrg77/opsforge/internal/detect"
+	"github.com/Mrg77/opsforge/internal/i18n"
 	"github.com/Mrg77/opsforge/internal/secrets"
 	"github.com/Mrg77/opsforge/internal/ui"
 )
 
 var adviseCmd = &cobra.Command{
 	Use:   "advise",
-	Short: "Ask the AI to prioritize your workstation's CVEs, updates & secrets",
+	Short: i18n.T("advise.short"),
 	Long: `opsforge already DETECTS what needs attention (CVEs, outdated tools, leaked
 credentials). 'advise' asks your AI backend to turn that pile into a plan: what to
 fix first and why, in plain language.
@@ -31,23 +32,23 @@ titles are sent (never secret values or file contents).`,
 		backend := ai.Detect()
 		if backend == nil {
 			fmt.Println(ui.Dim.Render(ai.SetupHint()))
-			return fmt.Errorf("no AI backend available")
+			return fmt.Errorf("%s", i18n.T("advise.nobackend"))
 		}
 
-		fmt.Println(ui.Header("opsforge advise", "AI-prioritized plan for your workstation"))
+		fmt.Println(ui.Header("opsforge advise", i18n.T("advise.header.tag")))
 		fmt.Println()
-		fmt.Println(ui.Dim.Render("  Scanning (CVEs · updates · credentials)…"))
+		fmt.Println(ui.Dim.Render(i18n.T("advise.scanning")))
 
 		ctx, cancel := context.WithTimeout(cmd.Context(), 60*time.Second)
 		defer cancel()
 		facts, empty := gatherAdviceFacts(ctx)
 		if empty {
-			fmt.Printf("\n  %s %s\n", ui.OKMark(), ui.OK.Render("Nothing flagged — your workstation looks clean."))
+			fmt.Printf("\n  %s %s\n", ui.OKMark(), ui.OK.Render(i18n.T("advise.clean")))
 			return nil
 		}
 
 		prompt := advicePrompt(facts)
-		fmt.Println(ui.Dim.Render("  Asking " + backend.Name + "…\n"))
+		fmt.Println(ui.Dim.Render(i18n.T("advise.asking", i18n.V("backend", backend.Name)) + "\n"))
 		return backend.Run(ctx, prompt)
 	},
 }
@@ -129,6 +130,7 @@ Rules:
 - Group the rest briefly. Don't restate every line — prioritize.
 - Be honest: a CVE in a tool you don't run as a server is lower risk than one you do.
 - Keep it under ~150 words. No preamble.
+- ` + i18n.T("advise.replylang") + `
 
 FINDINGS:
 ` + facts
