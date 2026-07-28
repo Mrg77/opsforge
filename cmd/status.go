@@ -12,12 +12,33 @@ import (
 	"github.com/Mrg77/opsforge/internal/cve"
 	"github.com/Mrg77/opsforge/internal/detect"
 	"github.com/Mrg77/opsforge/internal/installer"
+	"github.com/Mrg77/opsforge/internal/notices"
 	"github.com/Mrg77/opsforge/internal/output"
 	"github.com/Mrg77/opsforge/internal/shellcfg"
 	"github.com/Mrg77/opsforge/internal/ui"
 	"github.com/Mrg77/opsforge/internal/userprofiles"
 	"github.com/Mrg77/opsforge/internal/versions"
 )
+
+// printPostureLine shows the workstation security-posture score + grade from the
+// cached notices digest (CVEs + secrets + updates). Instant, no network.
+func printPostureLine() {
+	d, ok := notices.Load()
+	if !ok || d.RefreshedAt.IsZero() {
+		return // nothing scanned yet; the Security line already invites a scan
+	}
+	p := d.PostureScore()
+	style := ui.OK
+	switch {
+	case p.Score < 50:
+		style = ui.Err
+	case p.Score < 75:
+		style = ui.Warn
+	}
+	fmt.Printf("  %s %s %s\n", ui.Label("Posture", 10),
+		style.Render(fmt.Sprintf("%d/100  %s", p.Score, p.Grade)),
+		ui.Dim.Render("— your workstation security posture · `opsforge advise` for a plan"))
+}
 
 // printSecurityLine shows the cached CVE status (instant, no network). If
 // the cache is missing or stale it kicks off a detached background refresh
@@ -141,6 +162,7 @@ a glance. Run 'opsforge' (no args) for the interactive picker.`,
 		// refresh for next time.
 		if installed > 0 {
 			printSecurityLine()
+			printPostureLine()
 		}
 
 		// Shell environment.

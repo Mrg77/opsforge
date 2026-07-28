@@ -133,7 +133,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <table>
 <tr><th align="left">Command</th><th align="left">What it does</th></tr>
 <tr><td><code>opsforge</code></td><td>Interactive picker — browse, check, install</td></tr>
-<tr><td><code>opsforge status</code></td><td>Cockpit: tools, updates, shell, theme at a glance</td></tr>
+<tr><td><code>opsforge status</code></td><td>Cockpit: tools, updates, shell, theme, and a <strong>0–100 security-posture score</strong> at a glance</td></tr>
 <tr><td><code>opsforge notify [--json]</code></td><td>One digest of what needs attention — CVEs, updates, leaked secrets, a newer opsforge (see <a href="#the-notify-digest">notify</a>)</td></tr>
 <tr><td><code>opsforge install kubectl helm</code></td><td>Non-interactive install by name (scriptable)</td></tr>
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Install a whole stack preset in one command</td></tr>

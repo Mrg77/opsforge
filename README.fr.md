@@ -137,7 +137,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <table>
 <tr><th align="left">Commande</th><th align="left">Ce qu'elle fait</th></tr>
 <tr><td><code>opsforge</code></td><td>Sélecteur interactif — parcourir, vérifier, installer</td></tr>
-<tr><td><code>opsforge status</code></td><td>Cockpit : outils, mises à jour, shell, thème en un coup d'œil</td></tr>
+<tr><td><code>opsforge status</code></td><td>Cockpit : outils, mises à jour, shell, thème, et un <strong>score de posture de sécurité 0–100</strong> en un coup d'œil</td></tr>
 <tr><td><code>opsforge notify [--json]</code></td><td>Un seul digest de ce qui réclame votre attention — CVE, mises à jour, secrets exposés, un opsforge plus récent (voir <a href="#le-digest-notify">notify</a>)</td></tr>
 <tr><td><code>opsforge install kubectl helm</code></td><td>Installation non interactive par nom (scriptable)</td></tr>
 <tr><td><code>opsforge install --profile aws-k8s</code></td><td>Installe toute une stack prédéfinie en une commande</td></tr>

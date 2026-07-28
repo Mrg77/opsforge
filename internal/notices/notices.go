@@ -106,6 +106,47 @@ func (d Digest) Items() []Item {
 	return out
 }
 
+// Posture is a 0–100 security-posture score for the workstation, with a letter
+// grade — the one-glance answer to "how exposed is this machine?". It weights by
+// real blast radius: a leaked credential or a HIGH/CRITICAL CVE hurts far more
+// than a cosmetic update. It mirrors KubeForge's SecOps posture score so the two
+// products speak the same language.
+type Posture struct {
+	Score int    `json:"score"` // 0 (bad) … 100 (clean)
+	Grade string `json:"grade"` // A … F
+}
+
+// PostureScore computes the workstation posture from the digest. Only meaningful
+// once a scan has run (RefreshedAt set); callers should check that.
+func (d Digest) PostureScore() Posture {
+	penalty := 0.0
+	penalty += float64(d.SecretsCritical) * 25 // a leaked live credential is the worst
+	penalty += float64(d.Secrets-d.SecretsCritical) * 6
+	penalty += float64(d.CVEHighOrCritical) * 12
+	penalty += float64(d.CVETools-d.CVEHighOrCritical) * 3 // lower-severity CVEs
+	penalty += float64(d.Updates) * 1                      // hygiene, low weight
+	if d.SelfUpdate {
+		penalty += 1
+	}
+
+	score := int(100 - penalty)
+	if score < 0 {
+		score = 0
+	}
+	grade := "F"
+	switch {
+	case score >= 90:
+		grade = "A"
+	case score >= 75:
+		grade = "B"
+	case score >= 60:
+		grade = "C"
+	case score >= 40:
+		grade = "D"
+	}
+	return Posture{Score: score, Grade: grade}
+}
+
 // TopSeverity is the worst severity across all items (SevInfo when empty).
 func (d Digest) TopSeverity() Severity {
 	top := SevInfo
