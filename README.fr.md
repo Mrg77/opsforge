@@ -368,6 +368,19 @@ environnement conscient du DevOps (ses modules vivent sous
 
   Vous préférez l'ancien menu toujours ouvert (zsh-autocomplete) ? Mettez
   `OPSFORGE_AUTOMENU=1`. Pour désactiver toute la couche, `OPSFORGE_INTERACTIVE=0`.
+- **`export <Tab>` connaît l'écosystème.** Le zsh natif ne complète que les
+  variables *déjà présentes* dans votre session — donc une variable jamais
+  définie (ex. `AWS_SECRET_ACCESS_KEY`) n'est jamais proposée, vous la retapez
+  en entier. opsforge apprend à `export`/`typeset` les **variables standard des
+  outils qu'il gère** (AWS, GCP, Azure, Kubernetes, Terraform, Vault, Docker,
+  GitHub…), chacune avec une description. `export AWS_<Tab>` liste
+  `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_PROFILE`… Pour
+  les variables sûres et énumérables, il complète aussi la **valeur** —
+  `AWS_PROFILE=<Tab>` lit votre `~/.aws/config`, `AWS_REGION=<Tab>` liste les
+  régions, `TF_LOG=<Tab>` propose les niveaux de log. Il ne complète **jamais**
+  la valeur d'un secret (clés, tokens, mots de passe) : il n'y a rien de sûr à
+  suggérer et il ne lit aucun secret sur le disque. Désactivez avec
+  `OPSFORGE_ENVCOMP=0`.
 - **Aide `?`.** Appuyez sur `?` sur une ligne vide pour une antisèche aux couleurs
   du thème. Tapez `kubectl get ?` et vous obtenez l'aide de cette commande, rendue
   sous un en-tête encadré avec la syntaxe man colorée par `bat`. Tapez `??` pour

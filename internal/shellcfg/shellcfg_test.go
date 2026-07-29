@@ -53,7 +53,7 @@ func TestModulesLoadAndAreNonEmpty(t *testing.T) {
 	}
 	want := map[string]bool{
 		"prompt": true, "aliases": true, "integrations": true,
-		"completions-special": true, "interactive": true, "help": true, "guards": true, "leftprompt": true,
+		"completions-special": true, "interactive": true, "env-completion": true, "help": true, "guards": true, "leftprompt": true,
 		"notify": true,
 	}
 	for _, m := range mods {

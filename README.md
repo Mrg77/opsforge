@@ -360,6 +360,18 @@ uninstall` restores everything):
   Miss the old always-open live menu (zsh-autocomplete)? Set
   `OPSFORGE_AUTOMENU=1`. Or turn the whole layer off with
   `OPSFORGE_INTERACTIVE=0`.
+- **`export <Tab>` knows the ecosystem.** Native zsh only completes variables
+  that *already exist* in your session — so a var you've never set (say
+  `AWS_SECRET_ACCESS_KEY`) is never offered and you retype it in full. opsforge
+  teaches `export`/`typeset` the **standard variables of the tools it manages**
+  (AWS, GCP, Azure, Kubernetes, Terraform, Vault, Docker, GitHub…), each with a
+  one-line description. `export AWS_<Tab>` lists `AWS_ACCESS_KEY_ID`,
+  `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_PROFILE`… For the safe, enumerable
+  ones it also completes the **value** — `AWS_PROFILE=<Tab>` reads your
+  `~/.aws/config`, `AWS_REGION=<Tab>` lists regions, `TF_LOG=<Tab>` offers the
+  log levels. It **never** completes a secret's value (keys, tokens, passwords):
+  there's nothing safe to suggest and it won't read one from disk. Disable with
+  `OPSFORGE_ENVCOMP=0`.
 - **`?` help.** Press `?` on an empty line for a themed cheat-sheet. Type
   `kubectl get ?` and you get that command's help, rendered under a framed header
   with `bat`-colored man syntax. Type `??` to have an AI explain your last
