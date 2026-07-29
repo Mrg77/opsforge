@@ -19,3 +19,15 @@ fi
 if command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init zsh --disable-up-arrow)"
 fi
+
+# opsenv: unlock the encrypted env vault into THIS shell. It must run in the
+# current shell (not a subprocess) so the exports apply — hence a function, not
+# an alias to `opsforge env load`. The passphrase prompt is written to stderr
+# by `env load`, so command substitution captures only the export lines.
+opsenv() {
+  command -v opsforge >/dev/null 2>&1 || { print -u2 "opsenv: opsforge not found"; return 1; }
+  local lines
+  lines="$(opsforge env load)" || return $?   # prompts on stderr; exit code propagates
+  eval "$lines"
+  print -u2 "opsenv: vault loaded into this shell"
+}

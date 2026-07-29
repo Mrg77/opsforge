@@ -141,6 +141,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
 <tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Credential-hygiene audit of the workstation — static keys, clear-text secrets, loose file perms, expiring certs · read-only, offline (see <a href="#credential-hygiene-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
+<tr><td><code>opsforge env [set|list|rm|load]</code></td><td>Encrypted (age) env-var vault — persist secrets without cleartext; <code>opsenv</code> unlocks them into your shell (see <a href="#encrypted-env-vault">env vault</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs · <code>--sign</code> adds a Sigstore bundle (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
@@ -457,6 +458,38 @@ distinct commands, most-recent first, with a `×N` run count. `--limit/-n` caps
 the list (default 20, `0` for all) and `--json` emits it for scripts. The history
 is parsed **passively**: opsforge reads the file and never runs anything from
 it.
+
+---
+
+## Encrypted env vault
+
+Re-exporting the same `AWS_SECRET_ACCESS_KEY`, `VAULT_TOKEN` or registry
+credentials in every new terminal is tedious — but putting them in `~/.zshrc`
+persists them *in cleartext*, exactly the leak `opsforge audit --secrets`
+(and any dotfiles backup) will find. `opsforge env` is the middle path: a
+passphrase-locked vault that persists your variables **without ever writing a
+secret in cleartext to disk**.
+
+```sh
+opsforge env set AWS_SECRET_ACCESS_KEY   # prompts for the value (masked) + a passphrase
+opsforge env set AWS_DEFAULT_REGION=us-east-1   # non-secret? pass it inline
+opsforge env list                        # variable NAMES only — never values
+opsenv                                    # unlock into THIS shell (prompts once per session)
+```
+
+<table>
+<tr><th align="left">Guarantee</th><th align="left">How</th></tr>
+<tr><td>Nothing in cleartext at rest</td><td>The file <code>~/.config/opsforge/env.age</code> is encrypted with <a href="https://age-encryption.org">age</a> (scrypt passphrase). <code>cat</code>-ing it reveals nothing; <code>audit --secrets</code> ignores it.</td></tr>
+<tr><td>Secrets never hit argv/history</td><td><code>env set NAME</code> reads the value <em>masked</em> from the terminal — it's never a command argument.</td></tr>
+<tr><td>Loads into your real shell</td><td><code>opsenv</code> is a shell function (installed by the layer) that <code>eval</code>s the decrypted exports into the current session — the passphrase prompt goes to stderr, so it can't leak into the eval'd text.</td></tr>
+</table>
+
+**Honesty about the threat model:** once unlocked, the values are ordinary
+environment variables in that session, visible to child processes. That's
+inherent to using them (the AWS CLI must read the key). What the vault buys you
+is: nothing in cleartext on disk, no retyping, and dotfiles you can back up or
+commit without leaking. The crypto is [age](https://age-encryption.org) via its
+reference Go library — opsforge rolls no crypto of its own.
 
 ---
 

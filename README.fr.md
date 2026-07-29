@@ -145,6 +145,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>Scan CVE des outils installés · scan de secrets exposés en option · <code>--json</code> + code de sortie non nul pour verrouiller la CI</td></tr>
 <tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Audit d'hygiène des credentials du poste — clés statiques, secrets en clair, permissions trop larges, certs qui expirent · lecture seule, hors-ligne (voir <a href="#hygiène-des-credentials-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
+<tr><td><code>opsforge env [set|list|rm|load]</code></td><td>Coffre de variables d'env chiffré (age) — persiste les secrets sans clair ; <code>opsenv</code> les déverrouille dans votre shell (voir <a href="#coffre-denvironnement-chiffré">coffre env</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE · <code>--sign</code> ajoute un bundle Sigstore (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
@@ -470,6 +471,39 @@ outil. Les résultats sont des commandes distinctes, les plus récentes en tête
 avec un compteur d'exécutions `×N` ; `--limit/-n` les plafonne (20 par défaut,
 `0` = tout) et `--json` les sort pour les scripts. L'historique est analysé
 **passivement** — opsforge lit le fichier, il n'exécute jamais rien.
+
+---
+
+## Coffre d'environnement chiffré
+
+Ré-exporter les mêmes `AWS_SECRET_ACCESS_KEY`, `VAULT_TOKEN` ou identifiants de
+registre dans chaque nouveau terminal, c'est pénible — mais les mettre dans
+`~/.zshrc` les persiste *en clair*, précisément la fuite que `opsforge audit
+--secrets` (et n'importe quel backup de dotfiles) va trouver. `opsforge env`
+est la voie du milieu : un coffre verrouillé par passphrase qui persiste vos
+variables **sans jamais écrire un secret en clair sur le disque**.
+
+```sh
+opsforge env set AWS_SECRET_ACCESS_KEY   # demande la valeur (masquée) + une passphrase
+opsforge env set AWS_DEFAULT_REGION=us-east-1   # non-secret ? passez-la en ligne
+opsforge env list                        # les NOMS de variables seulement — jamais les valeurs
+opsenv                                    # déverrouille dans CE shell (une fois par session)
+```
+
+<table>
+<tr><th align="left">Garantie</th><th align="left">Comment</th></tr>
+<tr><td>Rien en clair au repos</td><td>Le fichier <code>~/.config/opsforge/env.age</code> est chiffré avec <a href="https://age-encryption.org">age</a> (passphrase scrypt). Un <code>cat</code> ne révèle rien ; <code>audit --secrets</code> l'ignore.</td></tr>
+<tr><td>Les secrets ne passent jamais par argv/historique</td><td><code>env set NAME</code> lit la valeur <em>masquée</em> depuis le terminal — jamais en argument de commande.</td></tr>
+<tr><td>Chargé dans votre vrai shell</td><td><code>opsenv</code> est une fonction shell (installée par la couche) qui <code>eval</code> les exports déchiffrés dans la session courante — le prompt de passphrase part sur stderr, il ne peut pas polluer le texte eval'é.</td></tr>
+</table>
+
+**Honnêteté sur le modèle de menace :** une fois déverrouillées, les valeurs
+sont des variables d'environnement ordinaires pour cette session, visibles par
+les sous-process. C'est inhérent à leur usage (l'AWS CLI doit lire la clé). Ce
+que le coffre vous apporte : rien en clair sur le disque, plus de retape, et des
+dotfiles que vous pouvez sauvegarder ou committer sans fuite. La crypto, c'est
+[age](https://age-encryption.org) via sa bibliothèque Go de référence —
+opsforge n'écrit aucune crypto maison.
 
 ---
 
