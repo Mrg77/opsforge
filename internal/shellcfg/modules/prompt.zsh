@@ -54,9 +54,11 @@ _opsforge_rprompt() {
 }
 
 # Only claim RPROMPT if the user (or another theme) hasn't already — and stand
-# down entirely under starship (its own modules render the kube/cloud context),
-# so the two don't show the cluster twice.
-if [[ -z "$RPROMPT" && -z "$STARSHIP_SHELL" ]]; then
+# down under starship (its own modules render the kube/cloud context), so the
+# two don't show the cluster twice. We test starship's precmd HOOK, not
+# $STARSHIP_SHELL: that env var is inherited by nested/IDE shells even when
+# starship isn't actually running here (see leftprompt.zsh for the full story).
+if [[ -z "$RPROMPT" ]] && (( ! ${precmd_functions[(I)prompt_starship_precmd]} )); then
   setopt PROMPT_SUBST
   RPROMPT='$(_opsforge_rprompt)'
 fi

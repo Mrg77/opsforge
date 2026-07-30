@@ -70,7 +70,16 @@ var envSetCmd = &cobra.Command{
 			value = v
 		}
 
-		pass, err := readPassphrase(false)
+		// First time? This `set` CREATES the vault and FIXES the master
+		// passphrase — so confirm it (type twice), because a typo here would
+		// lock the vault forever (there's no recovery by design). On an
+		// existing vault, no confirm: a wrong passphrase simply fails to
+		// decrypt, which is safe.
+		firstTime := !envvault.Exists()
+		if firstTime {
+			fmt.Fprintln(os.Stderr, "Creating a new vault — choose a master passphrase (there is no recovery if you forget it).")
+		}
+		pass, err := readPassphrase(firstTime)
 		if err != nil {
 			return err
 		}

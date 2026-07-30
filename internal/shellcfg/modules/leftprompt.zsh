@@ -17,14 +17,32 @@
 # gives you a working starship prompt with no manual `~/.zshrc` edit, and the
 # opsforge left/right prompts below don't fight it. Opt out with OPSFORGE_PROMPT=0
 # above, or OPSFORGE_STARSHIP=0 to keep the opsforge prompt even with starship
-# installed. Setting $STARSHIP_SHELL also makes prompt.zsh's RPROMPT stand down.
-if [[ "$OPSFORGE_STARSHIP" != "0" && -z "$STARSHIP_SHELL" ]] && command -v starship >/dev/null 2>&1; then
-  eval "$(starship init zsh)"
+# installed.
+#
+# IMPORTANT: we key off starship's precmd HOOK, not $STARSHIP_SHELL. That env
+# var is exported by `starship init` and thus INHERITED by child/nested shells
+# (VS Code's integrated terminal, `exec zsh`, tmux…) even when starship has NOT
+# actually been initialized in *this* shell. Trusting $STARSHIP_SHELL there made
+# us skip the init AND stand down the opsforge prompt — leaving a bare prompt.
+# The hook is per-shell truth: present only once starship is really running here.
+if [[ "$OPSFORGE_STARSHIP" != "0" ]] && command -v starship >/dev/null 2>&1; then
+  if (( ! ${precmd_functions[(I)prompt_starship_precmd]} )); then
+    eval "$(starship init zsh)"
+  fi
 fi
 
-# Respect an existing prompt framework (starship — just initialized above — or
-# a p10k / oh-my-posh the user set up themselves).
-[[ -n "$STARSHIP_SHELL" || -n "$POWERLEVEL9K_MODE" || -n "$POSH_THEME" ]] && return
+# starship_active: true only if starship's precmd hook is really registered in
+# this shell — the reliable per-shell signal used to stand our prompt down.
+_opsforge_starship_active=0
+(( ${precmd_functions[(I)prompt_starship_precmd]} )) && _opsforge_starship_active=1
+
+# Respect a prompt framework that's genuinely active in THIS shell (starship —
+# just initialized above — or a p10k / oh-my-posh the user set up themselves).
+if (( _opsforge_starship_active )) || [[ -n "$POWERLEVEL9K_MODE" || -n "$POSH_THEME" ]]; then
+  unset _opsforge_starship_active
+  return
+fi
+unset _opsforge_starship_active
 
 if [[ "$OPSFORGE_PROMPT" != "1" ]]; then
   # Recognized stock defaults we're happy to replace. Anything else is
