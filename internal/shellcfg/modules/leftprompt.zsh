@@ -25,24 +25,28 @@
 # actually been initialized in *this* shell. Trusting $STARSHIP_SHELL there made
 # us skip the init AND stand down the opsforge prompt — leaving a bare prompt.
 # The hook is per-shell truth: present only once starship is really running here.
+# _opsforge_has_starship_hook: 0/1 whether starship's precmd hook is registered
+# in THIS shell. ${precmd_functions[(I)x]} yields the array index (a number) or
+# an empty string when the element/array is absent — so we coerce with :-0 to
+# keep the math valid even before any precmd hook exists (first module loaded).
+_opsforge_has_starship_hook() {
+  local i="${precmd_functions[(I)prompt_starship_precmd]:-0}"
+  [[ "$i" != 0 ]]
+}
+
 if [[ "$OPSFORGE_STARSHIP" != "0" ]] && command -v starship >/dev/null 2>&1; then
-  if (( ! ${precmd_functions[(I)prompt_starship_precmd]} )); then
+  if ! _opsforge_has_starship_hook; then
     eval "$(starship init zsh)"
   fi
 fi
 
-# starship_active: true only if starship's precmd hook is really registered in
-# this shell — the reliable per-shell signal used to stand our prompt down.
-_opsforge_starship_active=0
-(( ${precmd_functions[(I)prompt_starship_precmd]} )) && _opsforge_starship_active=1
-
 # Respect a prompt framework that's genuinely active in THIS shell (starship —
 # just initialized above — or a p10k / oh-my-posh the user set up themselves).
-if (( _opsforge_starship_active )) || [[ -n "$POWERLEVEL9K_MODE" || -n "$POSH_THEME" ]]; then
-  unset _opsforge_starship_active
+if _opsforge_has_starship_hook || [[ -n "$POWERLEVEL9K_MODE" || -n "$POSH_THEME" ]]; then
+  unfunction _opsforge_has_starship_hook
   return
 fi
-unset _opsforge_starship_active
+unfunction _opsforge_has_starship_hook
 
 if [[ "$OPSFORGE_PROMPT" != "1" ]]; then
   # Recognized stock defaults we're happy to replace. Anything else is

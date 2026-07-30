@@ -58,7 +58,9 @@ _opsforge_rprompt() {
 # two don't show the cluster twice. We test starship's precmd HOOK, not
 # $STARSHIP_SHELL: that env var is inherited by nested/IDE shells even when
 # starship isn't actually running here (see leftprompt.zsh for the full story).
-if [[ -z "$RPROMPT" ]] && (( ! ${precmd_functions[(I)prompt_starship_precmd]} )); then
+# ${precmd_functions[(I)x]:-0} coerces the "absent" empty string to 0, so the
+# math stays valid even if precmd_functions isn't an array yet.
+if [[ -z "$RPROMPT" ]] && (( ${precmd_functions[(I)prompt_starship_precmd]:-0} == 0 )); then
   setopt PROMPT_SUBST
   RPROMPT='$(_opsforge_rprompt)'
 fi
