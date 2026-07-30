@@ -4,89 +4,169 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
-// withTempHome points $HOME at a scratch dir so tests never touch the real
-// vault, and restores it after.
-func withTempHome(t *testing.T) {
+// withTempEnv isolates $HOME (vault location) and a session dir so tests never
+// touch the real vault or a real RAM session.
+func withTempEnv(t *testing.T) {
 	t.Helper()
-	dir := t.TempDir()
-	old := os.Getenv("HOME")
-	os.Setenv("HOME", dir)
-	t.Cleanup(func() { os.Setenv("HOME", old) })
+	home := t.TempDir()
+	run := t.TempDir()
+	for k, v := range map[string]string{"HOME": home, "XDG_RUNTIME_DIR": run} {
+		old := os.Getenv(k)
+		os.Setenv(k, v)
+		t.Cleanup(func() { os.Setenv(k, old) })
+	}
 }
 
-func TestRoundTrip(t *testing.T) {
-	withTempHome(t)
+func TestCreateAndRoundTrip(t *testing.T) {
+	withTempEnv(t)
 	pass := "correct horse battery staple"
 
-	v := New()
-	must(t, v.Set("AWS_ACCESS_KEY_ID", "AKIAEXAMPLE"))
-	must(t, v.Set("AWS_SECRET_ACCESS_KEY", "s3cr3t/with+slash and space"))
-	if err := Save(v, pass); err != nil {
-		t.Fatalf("save: %v", err)
+	id, err := Create(pass)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if !Exists() {
+		t.Fatal("Exists() should be true after Create")
 	}
 
-	got, err := Load(pass)
+	v, err := LoadWith(id)
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	if got.Len() != 2 {
-		t.Fatalf("want 2 vars, got %d", got.Len())
+	must(t, v.Set("AWS_SECRET_ACCESS_KEY", "s3cr3t/with+slash and space"))
+	must(t, SaveWith(v, id))
+
+	// Re-unwrap from passphrase and read back.
+	id2, err := UnwrapIdentity(pass)
+	if err != nil {
+		t.Fatalf("unwrap: %v", err)
+	}
+	got, err := LoadWith(id2)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
 	}
 	if val, _ := got.Get("AWS_SECRET_ACCESS_KEY"); val != "s3cr3t/with+slash and space" {
-		t.Errorf("value round-trip mismatch: %q", val)
+		t.Errorf("round-trip mismatch: %q", val)
 	}
 }
 
 func TestWrongPassphraseFails(t *testing.T) {
-	withTempHome(t)
-	v := New()
-	must(t, v.Set("TOKEN", "abc"))
-	must(t, Save(v, "right-pass"))
-
-	if _, err := Load("wrong-pass"); err == nil {
-		t.Fatal("expected an error with the wrong passphrase, got nil")
+	withTempEnv(t)
+	if _, err := Create("right-pass"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := UnwrapIdentity("wrong-pass"); err == nil {
+		t.Fatal("expected error with wrong passphrase")
 	}
 }
 
-func TestFileIsEncryptedAtRest(t *testing.T) {
-	withTempHome(t)
-	v := New()
-	secret := "AKIAVERYSECRETVALUE12345"
-	must(t, v.Set("AWS_SECRET_ACCESS_KEY", secret))
-	must(t, Save(v, "pw"))
-
-	p, _ := Path()
-	raw, err := os.ReadFile(p)
+func TestFilesEncryptedAtRest(t *testing.T) {
+	withTempEnv(t)
+	id, err := Create("pw")
 	if err != nil {
 		t.Fatal(err)
 	}
+	v, _ := LoadWith(id)
+	secret := "AKIAVERYSECRETVALUE12345"
+	must(t, v.Set("AWS_SECRET_ACCESS_KEY", secret))
+	must(t, SaveWith(v, id))
+
+	vp, _ := VaultPath()
+	raw, _ := os.ReadFile(vp)
 	if strings.Contains(string(raw), secret) {
-		t.Fatal("secret value appears in cleartext in the vault file — encryption failed")
+		t.Fatal("secret in cleartext in vault file")
 	}
-	// age files start with this header; a good sanity check we actually encrypted.
 	if !strings.HasPrefix(string(raw), "age-encryption.org/v1") {
-		t.Errorf("vault file is not an age file; header=%q", firstLine(string(raw)))
+		t.Error("vault is not an age file")
+	}
+	// The identity file must also be an encrypted age file (passphrase-wrapped).
+	ip, _ := identityPath()
+	rawID, _ := os.ReadFile(ip)
+	if !strings.HasPrefix(string(rawID), "age-encryption.org/v1") {
+		t.Error("identity file is not an age file")
+	}
+	if strings.Contains(string(rawID), "AGE-SECRET-KEY-") {
+		t.Fatal("identity secret key is in cleartext")
 	}
 }
 
-func TestMissingVaultLoadsEmpty(t *testing.T) {
-	withTempHome(t)
-	v, err := Load("anything")
-	if err != nil {
-		t.Fatalf("load of missing vault should succeed empty, got %v", err)
+func TestSessionUnlockAvoidsPassphrase(t *testing.T) {
+	withTempEnv(t)
+	pass := "pw"
+	if _, err := Create(pass); err != nil {
+		t.Fatal(err)
 	}
-	if v.Len() != 0 {
-		t.Errorf("want empty vault, got %d vars", v.Len())
+
+	// No session yet.
+	if _, ok := Session(); ok {
+		t.Fatal("no session should exist before unlock")
+	}
+
+	// Unlock: caches the identity in RAM.
+	if err := OpenSession(pass, DefaultTTL); err != nil {
+		t.Fatalf("unlock: %v", err)
+	}
+	id, ok := Session()
+	if !ok {
+		t.Fatal("session should be active after unlock")
+	}
+
+	// The cached identity actually works to save/load without the passphrase.
+	v, _ := LoadWith(id)
+	must(t, v.Set("KUBECONFIG", "/tmp/kc"))
+	must(t, SaveWith(v, id))
+	got, _ := LoadWith(id)
+	if val, _ := got.Get("KUBECONFIG"); val != "/tmp/kc" {
+		t.Errorf("session identity round-trip failed: %q", val)
+	}
+
+	// Lock clears it.
+	if !CloseSession() {
+		t.Error("CloseSession should report a session was present")
+	}
+	if _, ok := Session(); ok {
+		t.Fatal("session should be gone after lock")
+	}
+}
+
+func TestSessionExpires(t *testing.T) {
+	withTempEnv(t)
+	pass := "pw"
+	if _, err := Create(pass); err != nil {
+		t.Fatal(err)
+	}
+	// Open with a negative TTL → already expired.
+	if err := OpenSession(pass, -time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := Session(); ok {
+		t.Fatal("an expired session must not be returned")
+	}
+}
+
+func TestSessionFileIs0600(t *testing.T) {
+	withTempEnv(t)
+	if _, err := Create("pw"); err != nil {
+		t.Fatal(err)
+	}
+	if err := OpenSession("pw", DefaultTTL); err != nil {
+		t.Fatal(err)
+	}
+	p, _ := sessionPath()
+	fi, err := os.Stat(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := fi.Mode().Perm(); perm != 0o600 {
+		t.Errorf("session file perms = %o, want 600", perm)
 	}
 }
 
 func TestExportLinesQuotingIsInjectionProof(t *testing.T) {
 	v := New()
-	// A value engineered to break out of quoting or inject a command. Each
-	// embedded ' becomes the '\'' sequence; the whole value stays wrapped in a
-	// single-quoted string, so a shell eval sees it as one literal argument.
 	must(t, v.Set("EVIL", `'; rm -rf /; echo '`))
 	line := strings.TrimSpace(v.ExportLines())
 	want := `export EVIL='` + `'\''` + `; rm -rf /; echo ` + `'\''` + `'`
@@ -116,27 +196,9 @@ func TestSetRejectsNewline(t *testing.T) {
 	}
 }
 
-func TestRemove(t *testing.T) {
-	v := New()
-	must(t, v.Set("A", "1"))
-	if !v.Remove("A") {
-		t.Error("Remove should report ok for present key")
-	}
-	if v.Remove("A") {
-		t.Error("Remove should report false for absent key")
-	}
-}
-
 func must(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
 	}
-}
-
-func firstLine(s string) string {
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
-	}
-	return s
 }

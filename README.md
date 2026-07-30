@@ -141,7 +141,7 @@ opsforge self update  # self-update, checksum-verified before the swap
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>CVE scan of installed tools · optional leaked-secrets scan · <code>--json</code> + non-zero exit gates CI</td></tr>
 <tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Credential-hygiene audit of the workstation — static keys, clear-text secrets, loose file perms, expiring certs · read-only, offline (see <a href="#credential-hygiene-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Policy-as-code guards on destructive commands · <code>lint</code>/<code>test --json</code> make them CI-checkable (see <a href="#policy-as-code-guards">Guards</a>)</td></tr>
-<tr><td><code>opsforge env [set|list|rm|load]</code></td><td>Encrypted (age) env-var vault — persist secrets without cleartext; <code>opsenv</code> unlocks them into your shell (see <a href="#encrypted-env-vault">env vault</a>)</td></tr>
+<tr><td><code>opsforge env [unlock|set|list|rm|load|lock]</code></td><td>Encrypted (age) env-var vault — persist secrets without cleartext; <code>unlock</code> once (ssh-agent-style session), then <code>opsenv</code> loads them into your shell (see <a href="#encrypted-env-vault">env vault</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Pin a tool version here (delegates to mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Install the tools a committed <code>opsforge.yaml</code> declares · <code>--check</code> reports drift for CI · optional CVE gate (see <a href="#project-mode">Project mode</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Emit a CycloneDX 1.6 SBOM of installed tools · <code>--audit</code> embeds their CVEs · <code>--sign</code> adds a Sigstore bundle (see <a href="#sbom--supply-chain">SBOM</a>)</td></tr>
@@ -471,23 +471,33 @@ passphrase-locked vault that persists your variables **without ever writing a
 secret in cleartext to disk**.
 
 ```sh
-opsforge env set AWS_SECRET_ACCESS_KEY   # prompts for the value (masked) + a passphrase
+opsforge env unlock                      # type the passphrase ONCE (session ~15 min)
+opsforge env set AWS_SECRET_ACCESS_KEY   # value read masked — no passphrase (session open)
 opsforge env set AWS_DEFAULT_REGION=us-east-1   # non-secret? pass it inline
 opsforge env list                        # variable NAMES only — never values
-opsenv                                    # unlock into THIS shell (prompts once per session)
+opsenv                                    # load into THIS shell (no passphrase — session open)
+opsforge env lock                        # forget the session now (or let it expire)
 ```
+
+**Unlock once, work — like ssh-agent.** The vault is encrypted to a random
+key, and that key is itself encrypted with your passphrase. `unlock` decrypts
+the key once and caches it in a **0600 RAM file that self-expires** (~15 min);
+every `set`/`list`/`load`/`opsenv` after that reuses it with **no re-prompt**.
+So you type the passphrase once, not on every command.
 
 <table>
 <tr><th align="left">Guarantee</th><th align="left">How</th></tr>
-<tr><td>Nothing in cleartext at rest</td><td>The file <code>~/.config/opsforge/env.age</code> is encrypted with <a href="https://age-encryption.org">age</a> (scrypt passphrase). <code>cat</code>-ing it reveals nothing; <code>audit --secrets</code> ignores it.</td></tr>
+<tr><td>One passphrase, not per-command</td><td>ssh-agent model: <code>unlock</code> caches the vault key in a RAM session ($XDG_RUNTIME_DIR / $TMPDIR, 0600, ~15 min TTL). What's cached is the <em>key</em>, never the passphrase, and it self-expires.</td></tr>
+<tr><td>Nothing in cleartext at rest</td><td>Both <code>~/.config/opsforge/env.age</code> (the vars) and <code>identity.age</code> (the key, wrapped by your passphrase) are <a href="https://age-encryption.org">age</a>-encrypted. <code>cat</code>-ing them reveals nothing; <code>audit --secrets</code> ignores them.</td></tr>
 <tr><td>Secrets never hit argv/history</td><td><code>env set NAME</code> reads the value <em>masked</em> from the terminal — it's never a command argument.</td></tr>
-<tr><td>Loads into your real shell</td><td><code>opsenv</code> is a shell function (installed by the layer) that <code>eval</code>s the decrypted exports into the current session — the passphrase prompt goes to stderr, so it can't leak into the eval'd text.</td></tr>
+<tr><td>Loads into your real shell</td><td><code>opsenv</code> is a shell function (installed by the layer) that <code>eval</code>s the decrypted exports into the current session — prompts go to stderr, so they can't leak into the eval'd text.</td></tr>
 </table>
 
-**Honesty about the threat model:** once unlocked, the values are ordinary
-environment variables in that session, visible to child processes. That's
-inherent to using them (the AWS CLI must read the key). What the vault buys you
-is: nothing in cleartext on disk, no retyping, and dotfiles you can back up or
+**Honesty about the threat model:** once loaded into a shell, the values are
+ordinary environment variables in that session, visible to child processes; and
+while unlocked, the vault key sits in a 0600 RAM file readable by you. Both are
+inherent to the convenience. What the vault buys you is: nothing in cleartext on
+disk, no retyping, a key that self-expires, and dotfiles you can back up or
 commit without leaking. The crypto is [age](https://age-encryption.org) via its
 reference Go library — opsforge rolls no crypto of its own.
 

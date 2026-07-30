@@ -145,7 +145,7 @@ opsforge self update  # mise à jour, checksum vérifié avant le remplacement
 <tr><td><code>opsforge audit [--secrets] [--json]</code></td><td>Scan CVE des outils installés · scan de secrets exposés en option · <code>--json</code> + code de sortie non nul pour verrouiller la CI</td></tr>
 <tr><td><code>opsforge verify [--strict] [--json]</code></td><td>Audit d'hygiène des credentials du poste — clés statiques, secrets en clair, permissions trop larges, certs qui expirent · lecture seule, hors-ligne (voir <a href="#hygiène-des-credentials-verify">verify</a>)</td></tr>
 <tr><td><code>opsforge guard [init|list|test|lint|log]</code></td><td>Guards policy-as-code sur les commandes destructrices · <code>lint</code>/<code>test --json</code> les rendent vérifiables en CI (voir <a href="#guards-policy-as-code">Guards</a>)</td></tr>
-<tr><td><code>opsforge env [set|list|rm|load]</code></td><td>Coffre de variables d'env chiffré (age) — persiste les secrets sans clair ; <code>opsenv</code> les déverrouille dans votre shell (voir <a href="#coffre-denvironnement-chiffré">coffre env</a>)</td></tr>
+<tr><td><code>opsforge env [unlock|set|list|rm|load|lock]</code></td><td>Coffre de variables d'env chiffré (age) — persiste les secrets sans clair ; <code>unlock</code> une fois (session type ssh-agent), puis <code>opsenv</code> les charge dans votre shell (voir <a href="#coffre-denvironnement-chiffré">coffre env</a>)</td></tr>
 <tr><td><code>opsforge use terraform@1.5</code></td><td>Épingle une version d'outil ici (délègue à mise/asdf)</td></tr>
 <tr><td><code>opsforge sync [--check] [--init]</code></td><td>Installe les outils déclarés par un <code>opsforge.yaml</code> committé · <code>--check</code> signale la dérive pour la CI · gate CVE en option (voir <a href="#mode-projet">Mode projet</a>)</td></tr>
 <tr><td><code>opsforge sbom [--audit] [--sign]</code></td><td>Émet un SBOM CycloneDX 1.6 des outils installés · <code>--audit</code> y embarque leurs CVE · <code>--sign</code> ajoute un bundle Sigstore (voir <a href="#sbom--chaîne-dapprovisionnement">SBOM</a>)</td></tr>
@@ -484,24 +484,35 @@ est la voie du milieu : un coffre verrouillé par passphrase qui persiste vos
 variables **sans jamais écrire un secret en clair sur le disque**.
 
 ```sh
-opsforge env set AWS_SECRET_ACCESS_KEY   # demande la valeur (masquée) + une passphrase
+opsforge env unlock                      # tapez la passphrase UNE fois (session ~15 min)
+opsforge env set AWS_SECRET_ACCESS_KEY   # valeur lue masquée — pas de passphrase (session ouverte)
 opsforge env set AWS_DEFAULT_REGION=us-east-1   # non-secret ? passez-la en ligne
 opsforge env list                        # les NOMS de variables seulement — jamais les valeurs
-opsenv                                    # déverrouille dans CE shell (une fois par session)
+opsenv                                    # charge dans CE shell (pas de passphrase — session ouverte)
+opsforge env lock                        # oublie la session maintenant (ou laissez-la expirer)
 ```
+
+**Déverrouillez une fois, puis travaillez — comme ssh-agent.** Le coffre est
+chiffré par une clé aléatoire, et cette clé est elle-même chiffrée par votre
+passphrase. `unlock` déchiffre la clé une fois et la met en cache dans un
+**fichier RAM 0600 qui expire tout seul** (~15 min) ; ensuite chaque
+`set`/`list`/`load`/`opsenv` la réutilise **sans redemander**. Vous tapez la
+passphrase une fois, pas à chaque commande.
 
 <table>
 <tr><th align="left">Garantie</th><th align="left">Comment</th></tr>
-<tr><td>Rien en clair au repos</td><td>Le fichier <code>~/.config/opsforge/env.age</code> est chiffré avec <a href="https://age-encryption.org">age</a> (passphrase scrypt). Un <code>cat</code> ne révèle rien ; <code>audit --secrets</code> l'ignore.</td></tr>
+<tr><td>Une passphrase, pas par commande</td><td>Modèle ssh-agent : <code>unlock</code> met la clé du coffre en cache dans une session RAM ($XDG_RUNTIME_DIR / $TMPDIR, 0600, TTL ~15 min). Ce qui est en cache, c'est la <em>clé</em>, jamais la passphrase, et ça expire tout seul.</td></tr>
+<tr><td>Rien en clair au repos</td><td><code>~/.config/opsforge/env.age</code> (les variables) et <code>identity.age</code> (la clé, enveloppée par votre passphrase) sont chiffrés avec <a href="https://age-encryption.org">age</a>. Un <code>cat</code> ne révèle rien ; <code>audit --secrets</code> les ignore.</td></tr>
 <tr><td>Les secrets ne passent jamais par argv/historique</td><td><code>env set NAME</code> lit la valeur <em>masquée</em> depuis le terminal — jamais en argument de commande.</td></tr>
-<tr><td>Chargé dans votre vrai shell</td><td><code>opsenv</code> est une fonction shell (installée par la couche) qui <code>eval</code> les exports déchiffrés dans la session courante — le prompt de passphrase part sur stderr, il ne peut pas polluer le texte eval'é.</td></tr>
+<tr><td>Chargé dans votre vrai shell</td><td><code>opsenv</code> est une fonction shell (installée par la couche) qui <code>eval</code> les exports déchiffrés dans la session courante — les prompts partent sur stderr, ils ne peuvent pas polluer le texte eval'é.</td></tr>
 </table>
 
-**Honnêteté sur le modèle de menace :** une fois déverrouillées, les valeurs
-sont des variables d'environnement ordinaires pour cette session, visibles par
-les sous-process. C'est inhérent à leur usage (l'AWS CLI doit lire la clé). Ce
-que le coffre vous apporte : rien en clair sur le disque, plus de retape, et des
-dotfiles que vous pouvez sauvegarder ou committer sans fuite. La crypto, c'est
+**Honnêteté sur le modèle de menace :** une fois chargées dans un shell, les
+valeurs sont des variables d'environnement ordinaires, visibles par les
+sous-process ; et pendant le déverrouillage, la clé du coffre vit dans un
+fichier RAM 0600 lisible par vous. C'est inhérent au confort. Ce que le coffre
+apporte : rien en clair sur le disque, plus de retape, une clé qui expire toute
+seule, et des dotfiles sauvegardables sans fuite. La crypto, c'est
 [age](https://age-encryption.org) via sa bibliothèque Go de référence —
 opsforge n'écrit aucune crypto maison.
 
