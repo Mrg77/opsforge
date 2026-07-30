@@ -355,8 +355,15 @@ environnement conscient du DevOps (ses modules vivent sous
   vous tapez : juste une suggestion grise en ligne, issue de votre historique.
   `↑`/`↓` parcourent l'historique en filtrant sur le **début de ligne entier** que
   vous avez tapé, `→` accepte toute la suggestion, `Tab` l'accepte mot à mot, et la
-  ligne se colore au fil de la frappe. Même terraform (qui ne fournit aucune
-  complétion zsh) et opsforge lui-même sont couverts.
+  ligne se colore au fil de la frappe.
+- **Complétion pour les outils qui n'en ont pas.** Les outils avec un completer
+  zsh natif (kubectl, helm, gh, docker, git…) gardent le leur. Pour ceux qui n'en
+  ont pas — **terraform, tofu, terragrunt, packer** — opsforge complète les
+  sous-commandes **dynamiquement en parsant le `--help` de l'outil**, à tous les
+  niveaux : `terraform state <Tab>` propose `list`/`show`/`mv`/`rm`/`pull`/`push`…
+  Même source de vérité que l'aide inline `?` (l'outil lui-même), donc toujours à
+  jour — aucune liste de sous-commandes à maintenir. Les résultats sont mis en
+  cache par chemin de commande ; désactivez avec `OPSFORGE_HELPCOMP=0`.
 
   <table>
   <tr><th align="left">Touche</th><th align="left">Ce qu'elle fait</th></tr>

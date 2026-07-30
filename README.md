@@ -345,9 +345,15 @@ uninstall` restores everything):
 - **Calm, on-demand editing.** Nothing pops open in your face as you type, just a
   grey inline suggestion pulled from your history. `↑`/`↓` search history by the
   **whole-line prefix** you've typed, `→` accepts the whole suggestion, `Tab`
-  takes it one word at a time, and the line is syntax-colored as you go. Even
-  terraform (which ships no zsh completion of its own) and opsforge itself are
-  covered.
+  takes it one word at a time, and the line is syntax-colored as you go.
+- **Completion for tools that ship none.** Tools with a native zsh completer
+  (kubectl, helm, gh, docker, git…) keep theirs. For the ones that don't —
+  **terraform, tofu, terragrunt, packer** — opsforge completes subcommands
+  **dynamically by parsing the tool's own `--help`**, at every level:
+  `terraform state <Tab>` offers `list`/`show`/`mv`/`rm`/`pull`/`push`… Same
+  source of truth as the `?` inline help (the tool itself), so it's always
+  current — no hand-maintained subcommand lists. Results are cached per command
+  path; disable with `OPSFORGE_HELPCOMP=0`.
 
   <table>
   <tr><th align="left">Key</th><th align="left">What it does</th></tr>

@@ -182,7 +182,7 @@ var specs = map[Shell]spec{
 	Zsh: {
 		ext:    ".zsh",
 		subdir: "",
-		order:  []string{"leftprompt", "prompt", "aliases", "integrations", "completions-special", "interactive", "env-completion", "help", "guards", "notify"},
+		order:  []string{"leftprompt", "prompt", "aliases", "integrations", "interactive", "env-completion", "help-completion", "help", "guards", "notify"},
 		rcPath: func(home string) string { return filepath.Join(home, ".zshrc") },
 	},
 	Fish: {
