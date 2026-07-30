@@ -34,12 +34,45 @@ _opsforge_tf_subcommands=(
   'workspace:Workspace management'
 )
 
+# Second-level subcommands for the terraform commands that have them. Keyed by
+# the level-1 command word ($words[2]); anything not listed here falls back to
+# file completion after its subcommand.
+_opsforge_tf_state=(
+  'list:List resources in the state'
+  'show:Show a resource in the state'
+  'mv:Move an item in the state'
+  'rm:Remove instances from the state'
+  'pull:Pull current state and output to stdout'
+  'push:Update remote state from a local state file'
+  'replace-provider:Replace provider in the state'
+)
+_opsforge_tf_workspace=(
+  'list:List workspaces'
+  'select:Select a workspace'
+  'new:Create a new workspace'
+  'delete:Delete a workspace'
+  'show:Show the name of the current workspace'
+)
+_opsforge_tf_providers=(
+  'lock:Write out dependency locks for the configured providers'
+  'mirror:Save local copies of all required provider plugins'
+  'schema:Show schemas for the providers used in the configuration'
+)
+
 _opsforge_terraform() {
   if (( CURRENT == 2 )); then
     _describe -t commands 'terraform command' _opsforge_tf_subcommands
-  else
-    _files   # after the subcommand, complete file paths
+    return
   fi
+  if (( CURRENT == 3 )); then
+    # Second level: offer this command's subcommands when it has any.
+    case "$words[2]" in
+      state)     _describe -t subcommands 'terraform state subcommand' _opsforge_tf_state; return ;;
+      workspace) _describe -t subcommands 'terraform workspace subcommand' _opsforge_tf_workspace; return ;;
+      providers) _describe -t subcommands 'terraform providers subcommand' _opsforge_tf_providers; return ;;
+    esac
+  fi
+  _files   # deeper, or commands with no fixed subcommands: complete file paths
 }
 
 if command -v terraform >/dev/null 2>&1; then
