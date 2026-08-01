@@ -100,8 +100,8 @@ locally:
 ## Install
 
 ```sh
-brew install mrg77/tap/opsforge                                          # macOS / Linux
-# or the install script:
+brew install mrg77/tap/opsforge                                          # macOS (Homebrew)
+# Linux (Debian/Ubuntu/Alpine…) or macOS — the install script:
 curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
