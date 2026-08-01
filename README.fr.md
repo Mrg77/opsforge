@@ -106,12 +106,14 @@ installation locale :
 ## Installation
 
 ```sh
+brew install mrg77/tap/opsforge                                          # macOS / Linux
+# ou le script d'installation :
 curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
-Télécharge le bon binaire pour votre OS/arch dans `~/.local/bin` (à surcharger
-avec `OPSFORGE_INSTALL_DIR`, à épingler avec `OPSFORGE_VERSION=v1.2.3`). Depuis
-les sources : `go install github.com/Mrg77/opsforge@latest`.
+Le script télécharge le bon binaire pour votre OS/arch dans `~/.local/bin` (à
+surcharger avec `OPSFORGE_INSTALL_DIR`, à épingler avec `OPSFORGE_VERSION=v1.2.3`).
+Depuis les sources : `go install github.com/Mrg77/opsforge@latest`.
 
 Pour rester à jour, `opsforge self update` télécharge la dernière release,
 **vérifie son SHA-256 publié avant de remplacer le binaire en place**, et ne fait

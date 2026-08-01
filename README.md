@@ -100,10 +100,12 @@ locally:
 ## Install
 
 ```sh
+brew install mrg77/tap/opsforge                                          # macOS / Linux
+# or the install script:
 curl -fsSL https://raw.githubusercontent.com/Mrg77/opsforge/main/install.sh | sh
 ```
 
-That grabs the right binary for your OS and architecture and drops it in
+The script grabs the right binary for your OS and architecture and drops it in
 `~/.local/bin` (override the location with `OPSFORGE_INSTALL_DIR`, or pin a
 version with `OPSFORGE_VERSION=v1.2.3`). Prefer building from source?
 `go install github.com/Mrg77/opsforge@latest`.

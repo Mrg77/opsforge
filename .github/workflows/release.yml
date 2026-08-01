@@ -32,6 +32,9 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # A fine-grained PAT with Contents:write on Mrg77/homebrew-tap, so
+          # goreleaser can push the Homebrew formula. Stored as a repo secret here.
+          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
       # Native GitHub SLSA provenance attestation over the built archives, in
       # addition to the cosign signature. This is best-effort hardening: if it
       # ever fails it must not fail an otherwise-good release, and the cosign

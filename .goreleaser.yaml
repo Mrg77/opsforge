@@ -67,11 +67,24 @@ changelog:
       - "^ci:"
       - "^chore:"
 
-# Uncomment once a homebrew-tap repository exists to ship
-# `brew install Mrg77/tap/opsforge`.
-# brews:
-#   - repository:
-#       owner: Mrg77
-#       name: homebrew-tap
-#     homepage: https://github.com/Mrg77/opsforge
-#     description: "Forge your DevOps workstation"
+# Homebrew (goreleaser v2: homebrew_casks, brews is deprecated), pushed to the
+# tap → `brew install mrg77/tap/opsforge`.
+homebrew_casks:
+  - name: opsforge
+    repository:
+      owner: Mrg77
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/Mrg77/opsforge"
+    description: "Forge your DevOps workstation: pick your CLIs, get a policy-as-code shell layer."
+    commit_author:
+      name: Mrg77
+      email: 52857557+Mrg77@users.noreply.github.com
+    # Clear the quarantine attribute so the unsigned binary runs without a
+    # Gatekeeper prompt on macOS.
+    hooks:
+      post:
+        install: |
+          if system_command("/usr/bin/xattr", args: ["-h"]).exit_status == 0
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/opsforge"]
+          end
